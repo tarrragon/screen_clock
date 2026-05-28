@@ -1,0 +1,100 @@
+# screen_clock - TodoList
+# 結構化版本管理與任務追蹤
+#
+# 此檔案是版本索引的 Source of Truth。
+# get_current_version() 優先解析此檔案中 status=active 的版本。
+# 版本細節（Wave 進度、品質指標等）請參閱各版本的 worklog。
+
+meta:
+  project: "screen_clock"
+  architecture: "Flutter Desktop（v1.0 前 macOS only；v1.1.x 起加 Windows）"
+  last_updated: "2026-05-29"
+  maintainer: "rosemary-project-manager"
+
+# ============================================================
+# 版本對應表
+# 狀態值: active | planned | completed | paused
+# ============================================================
+versions:
+  - version: "0.0.0"
+    codename: "scaffold"
+    description: "Flutter scaffold（macOS / Windows / iOS / Android / web 目錄齊備）"
+    status: "completed"
+    worklog: null
+    notes: |
+      未建立工作日誌；以 git history 為準。
+
+  - version: "0.1.0"
+    codename: "transparent-overlay"
+    description: "macOS 全螢幕透明遮罩視窗（frameless / always-on-top / click-through / no-shadow）"
+    status: "active"
+    worklog: "docs/work-logs/v0/v0.1/v0.1.0/"
+    notes: |
+      覆蓋 SPEC-001 全部 FR。Wave 結構：W1 環境準備、W2 透明遮罩 feature TDD、W3 手動驗收。
+
+  - version: "0.2.0"
+    codename: "center-clock"
+    description: "螢幕中央時鐘 widget（每秒更新、預設樣式、中央定位）"
+    status: "planned"
+    worklog: "docs/work-logs/v0/v0.2/v0.2.0/"
+    notes: |
+      覆蓋 SPEC-002 全部 FR。單一 feature TDD。
+
+  - version: "0.3.0"
+    codename: "multi-screen"
+    description: "多螢幕選擇能力（CLI 引數指定目標螢幕、熱插拔處理）"
+    status: "planned"
+    worklog: "docs/work-logs/v0/v0.3/v0.3.0/"
+    notes: |
+      W1 前置 ANA 評估螢幕偵測方案（screen_retriever vs window_manager），主 feature TDD。
+
+  - version: "1.0.0"
+    codename: "macos-release"
+    description: "macOS 首個正式版（設定持久化、設定面板 UI、開機啟動、code signing / notarization、打包）"
+    status: "planned"
+    worklog: "docs/work-logs/v1/v1.0/v1.0.0/"
+    notes: |
+      4 Wave：W1 設定持久化 / W2 設定面板 UI / W3 開機啟動 / W4 收尾與發布。
+
+# ============================================================
+# 開發核心原則
+# ============================================================
+principles:
+  - "每個版本對應一個 PROP 與其衍生的 SPEC/UC"
+  - "TDD 四階段流程：Phase 0 SA / Phase 1 設計 / Phase 2 測試 / Phase 3a 策略 / Phase 3b 實作 / Phase 4 重構"
+  - "v1.0 之前不考慮 Windows"
+  - "MVP 樣式寫死；可設定能力推遲到 v1.0.0"
+
+# ============================================================
+# 技術債務追蹤
+# ============================================================
+tech_debt: []
+
+# ============================================================
+# 品質標準
+# ============================================================
+quality_standards:
+  functionality:
+    - "SPEC FR 條目皆有對應 ticket 與驗收"
+    - "UC 的成功場景與例外場景皆有可驗證的測試或手動驗收步驟"
+  testing:
+    - "Widget Test：核心 widget 覆蓋（如時鐘、設定面板）"
+    - "手動驗收：click-through、透明、CPU 使用率"
+  code_quality:
+    - "符合 .claude/rules/core/quality-baseline.md"
+    - "無 Dart analyzer 警告"
+
+# ============================================================
+# 參考文件
+# ============================================================
+references:
+  development:
+    - path: "CLAUDE.md"
+      description: "專案開發指導規範"
+  requirements:
+    - path: "docs/proposals/PROP-001-screen-clock-overlay.md"
+      description: "桌面螢幕透明時鐘遮罩提案"
+    - path: "docs/spec/platform/transparent-overlay-window.md"
+      description: "SPEC-001 透明全螢幕遮罩視窗"
+    - path: "docs/spec/display/center-clock.md"
+      description: "SPEC-002 螢幕中央時鐘顯示"
