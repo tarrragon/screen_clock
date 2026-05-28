@@ -8,11 +8,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_clock/app_constants.dart';
 import 'package:screen_clock/main.dart';
+import 'package:screen_clock/models/settings_model.dart';
 
 void main() {
   testWidgets('ScreenClockApp builds with transparent scaffold',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const ScreenClockApp());
+    await tester.pumpWidget(
+      ScreenClockApp(settings: SettingsModel.defaults()),
+    );
 
     final scaffoldFinder = find.byType(Scaffold);
     expect(scaffoldFinder, findsOneWidget);

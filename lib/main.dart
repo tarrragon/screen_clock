@@ -3,24 +3,31 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_constants.dart';
+import 'models/settings_model.dart';
 import 'platform/display_detector.dart';
 import 'platform/screen_arg.dart';
+import 'services/settings_service.dart';
 import 'widgets/center_clock.dart';
 
 final DisplayDetector _detector = DisplayDetector();
+final SettingsService _settingsService = PreferencesSettingsService();
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  await _applyOverlayWindowProperties(args);
-  runApp(const ScreenClockApp());
+  final SettingsModel settings = await _settingsService.load();
+  await _applyOverlayWindowProperties(args, settings);
+  runApp(ScreenClockApp(settings: settings));
 }
 
 /// 依 SPEC-001 + SPEC-003 序列套用所有遮罩視窗屬性。
 ///
 /// 順序：static 屬性 → 解析目標螢幕 → 套用 size/position → show。
 /// Hot-plug 監聽於 show 之後啟動，避免初始化途中觸發切換。
-Future<void> _applyOverlayWindowProperties(List<String> args) async {
+Future<void> _applyOverlayWindowProperties(
+  List<String> args,
+  SettingsModel settings,
+) async {
   await windowManager.waitUntilReadyToShow();
   await windowManager.setAsFrameless();
   await windowManager.setBackgroundColor(AppColors.overlayBackground);
@@ -28,13 +35,14 @@ Future<void> _applyOverlayWindowProperties(List<String> args) async {
   await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop);
   await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
 
-  final int? requestedIndex = parseScreenArg(args);
-  final Display target = await _detector.resolveTargetDisplay(requestedIndex);
+  // SPEC-004 FR-04：CLI --screen 優先；缺省時用儲存的 targetScreenIndex。
+  final int targetIndex = parseScreenArg(args) ?? settings.targetScreenIndex;
+  final Display target = await _detector.resolveTargetDisplay(targetIndex);
   await _coverDisplay(target);
   await windowManager.show();
 
   _detector.startWatching(
-    watchedIndex: requestedIndex ?? 0,
+    watchedIndex: targetIndex,
     onTargetLost: _onTargetScreenLost,
   );
 }
@@ -61,7 +69,10 @@ Future<void> _onTargetScreenLost() async {
 }
 
 class ScreenClockApp extends StatelessWidget {
-  const ScreenClockApp({super.key});
+  const ScreenClockApp({super.key, required this.settings});
+
+  /// 啟動時讀到的設定快照。W2 引入設定面板時會升級為可變狀態。
+  final SettingsModel settings;
 
   @override
   Widget build(BuildContext context) {
