@@ -35,6 +35,23 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # 桌面視窗管理：透明 / frameless / always-on-top / click-through
+  # 對應 SPEC-001 全部 FR
+  window_manager: ^0.4.3
+
+  # 螢幕資訊偵測：主螢幕尺寸（SPEC-001 FR-01）；
+  # v0.3.0 多螢幕選擇也會用到
+  screen_retriever: ^0.2.0
+
+  # 設定持久化：SPEC-004 採 shared_preferences
+  shared_preferences: ^2.3.2
+
+  # 全域熱鍵：SPEC-005 FR-01 設定面板呼出（Cmd+Opt+,）
+  hotkey_manager: ^0.2.3
+
+  # 開機自動啟動：SPEC-006（macOS SMAppService / launchd 抽象）
+  launch_at_startup: ^0.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

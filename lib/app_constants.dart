@@ -29,6 +29,10 @@ class AppSizes {
 
   /// SPEC-001 FR-01：視窗原點為主螢幕左上角。
   static const Offset windowOrigin = Offset.zero;
+
+  /// SPEC-001 FR-01 替代場景 01a：主螢幕尺寸偵測失敗時的 fallback。
+  /// 1920x1080 是常見桌面解析度，能涵蓋大多數情境，避免視窗 0x0 不可見。
+  static const Size fallbackWindowSize = Size(1920, 1080);
 }
 
 class AppColors {

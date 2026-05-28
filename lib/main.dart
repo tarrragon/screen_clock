@@ -1,122 +1,237 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
+import 'package:screen_retriever/screen_retriever.dart';
+import 'package:window_manager/window_manager.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'app_constants.dart';
+import 'models/settings_model.dart';
+import 'platform/display_detector.dart';
+import 'platform/screen_arg.dart';
+import 'services/auto_launch_service.dart';
+import 'services/settings_service.dart';
+import 'state/settings_controller.dart';
+import 'state/settings_scope.dart';
+import 'widgets/center_clock.dart';
+import 'widgets/settings_panel.dart';
+
+final DisplayDetector _detector = DisplayDetector();
+final SettingsService _settingsService = PreferencesSettingsService();
+final AutoLaunchService _autoLaunchService = LaunchAtStartupAutoLaunchService();
+
+Future<void> main(List<String> args) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
+  await hotKeyManager.unregisterAll();
+  SettingsModel settings = await _settingsService.load();
+  // SPEC-006 FR-02：OS 開機啟動狀態為準，覆寫 saved settings。
+  final bool osAutoLaunch = await _autoLaunchService.isEnabled();
+  if (osAutoLaunch != settings.autoLaunch) {
+    settings = settings.copyWith(autoLaunch: osAutoLaunch);
+    await _settingsService.save(settings);
+  }
+  final SettingsController controller = SettingsController(
+    initial: settings,
+    service: _settingsService,
+    autoLaunchService: _autoLaunchService,
+  );
+  final int displayCount = (await _detector.listDisplays()).length;
+  await _applyOverlayWindowProperties(args, settings);
+  runApp(
+    ScreenClockApp(
+      controller: controller,
+      availableScreenCount: displayCount,
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// 依 SPEC-001 + SPEC-003 序列套用所有遮罩視窗屬性。
+Future<void> _applyOverlayWindowProperties(
+  List<String> args,
+  SettingsModel settings,
+) async {
+  await windowManager.waitUntilReadyToShow();
+  await windowManager.setAsFrameless();
+  await windowManager.setBackgroundColor(AppColors.overlayBackground);
+  await windowManager.setHasShadow(AppWindow.hasShadow);
+  await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop);
+  await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
 
-  // This widget is the root of your application.
+  final int targetIndex = parseScreenArg(args) ?? settings.targetScreenIndex;
+  final Display target = await _detector.resolveTargetDisplay(targetIndex);
+  await _coverDisplay(target);
+  await windowManager.show();
+
+  _detector.startWatching(
+    watchedIndex: targetIndex,
+    onTargetLost: _onTargetScreenLost,
+  );
+}
+
+Future<void> _coverDisplay(Display display) async {
+  final Offset position = display.visiblePosition ?? AppSizes.windowOrigin;
+  Size size = display.size;
+  if (size.width <= 0 || size.height <= 0) {
+    size = AppSizes.fallbackWindowSize;
+  }
+  await windowManager.setSize(size);
+  await windowManager.setPosition(position);
+}
+
+Future<void> _onTargetScreenLost() async {
+  debugPrint('[main] target display lost, fallback to primary');
+  final Display primary = await _detector.resolveTargetDisplay(null);
+  await _coverDisplay(primary);
+}
+
+class ScreenClockApp extends StatefulWidget {
+  const ScreenClockApp({
+    super.key,
+    required this.controller,
+    required this.availableScreenCount,
+  });
+
+  final SettingsController controller;
+  final int availableScreenCount;
+
+  @override
+  State<ScreenClockApp> createState() => _ScreenClockAppState();
+}
+
+class _ScreenClockAppState extends State<ScreenClockApp> {
+  bool _panelOpen = false;
+  HotKey? _registeredHotKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _registerHotKey();
+  }
+
+  @override
+  void dispose() {
+    final HotKey? key = _registeredHotKey;
+    if (key != null) {
+      hotKeyManager.unregister(key);
+    }
+    _registeredHotKey = null;
+    super.dispose();
+  }
+
+  Future<void> _registerHotKey() async {
+    final HotKey hotKey = HotKey(
+      key: PhysicalKeyboardKey.comma,
+      modifiers: <HotKeyModifier>[
+        HotKeyModifier.meta,
+        HotKeyModifier.alt,
+      ],
+      scope: HotKeyScope.system,
+    );
+    try {
+      await hotKeyManager.register(
+        hotKey,
+        keyDownHandler: (_) => _togglePanel(),
+      );
+      _registeredHotKey = hotKey;
+    } catch (error, stack) {
+      debugPrint('[main] hotkey register failed: $error');
+      debugPrint(stack.toString());
+    }
+  }
+
+  Future<void> _togglePanel() async {
+    if (_panelOpen) {
+      // 由 panel 內 Save / Cancel 觸發；此分支保留給日後可能的程式化 toggle。
+      return;
+    }
+    setState(() => _panelOpen = true);
+    try {
+      await windowManager.setIgnoreMouseEvents(false);
+    } catch (error) {
+      debugPrint('[main] disable click-through failed: $error');
+    }
+  }
+
+  Future<void> _onPanelClosed() async {
+    setState(() => _panelOpen = false);
+    try {
+      await windowManager
+          .setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
+    } catch (error) {
+      debugPrint('[main] restore click-through failed: $error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+    return SettingsScope(
+      controller: widget.controller,
+      child: MaterialApp(
+        title: AppText.appTitle,
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: AppColors.overlayBackground,
+          body: Stack(
+            children: <Widget>[
+              const CenterClock(),
+              if (_panelOpen)
+                _PanelHost(
+                  availableScreenCount: widget.availableScreenCount,
+                  onClosed: _onPanelClosed,
+                ),
+            ],
+          ),
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+/// 包覆 [SettingsPanel]，攔截 Navigator 的 pop 行為以恢復 click-through。
+class _PanelHost extends StatelessWidget {
+  const _PanelHost({
+    required this.availableScreenCount,
+    required this.onClosed,
+  });
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+  final int availableScreenCount;
+  final VoidCallback onClosed;
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (didPop) onClosed();
+      },
+      child: _DismissibleOverlay(
+        onDismiss: onClosed,
+        child: SettingsPanel(availableScreenCount: availableScreenCount),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    );
+  }
+}
+
+/// 暗背景遮罩 + Esc 鍵 / 外部點擊關閉。
+class _DismissibleOverlay extends StatelessWidget {
+  const _DismissibleOverlay({required this.onDismiss, required this.child});
+
+  final VoidCallback onDismiss;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Container(color: const Color(0x80000000)),
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+        Center(child: child),
+      ],
     );
   }
 }

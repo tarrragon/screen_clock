@@ -113,7 +113,13 @@ def main() -> int:
 
         # 開發分支跳過（feat/*, fix/* 等）
         file_dir = str(Path(file_path).parent) if file_path and file_path.startswith("/") else None
-        current_branch = get_current_branch(cwd=file_dir)
+        # 若 file_dir 不存在（新檔在新目錄）使 get_current_branch fallback 到 None cwd 才能取得分支
+        existing_dir = file_dir if file_dir and Path(file_dir).is_dir() else None
+        current_branch = get_current_branch(cwd=existing_dir)
+        # 專案特例：dev 為本專案長駐開發分支，主線程允許編輯
+        if current_branch == "dev" or (current_branch and current_branch.startswith("dev/")):
+            logger.info(f"dev 分支 '{current_branch}'：主線程編輯豁免")
+            return _allow_and_exit(logger, f"dev 分支 '{current_branch}' 為長駐開發分支，主線程豁免")
         if current_branch and is_allowed_branch(current_branch):
             logger.info(f"開發分支 '{current_branch}' 上，跳過主線程編輯限制")
             return _allow_and_exit(logger, f"開發分支 '{current_branch}' 不受主線程編輯限制")

@@ -53,3 +53,7 @@ htmlcov/
 .claude/tool-results/
 .claude/handoff/
 .claude/dispatch-active
+.claude/dispatch-active.json
+.claude/dispatch-active.lock
+.claude/hook-state/
+*.md.lock
