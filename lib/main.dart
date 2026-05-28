@@ -3,6 +3,7 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_constants.dart';
+import 'widgets/center_clock.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,7 +60,7 @@ class ScreenClockApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const Scaffold(
         backgroundColor: AppColors.overlayBackground,
-        body: SizedBox.expand(),
+        body: CenterClock(),
       ),
     );
   }
