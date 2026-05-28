@@ -49,6 +49,9 @@ dependencies:
   # 全域熱鍵：SPEC-005 FR-01 設定面板呼出（Cmd+Opt+,）
   hotkey_manager: ^0.2.3
 
+  # 開機自動啟動：SPEC-006（macOS SMAppService / launchd 抽象）
+  launch_at_startup: ^0.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

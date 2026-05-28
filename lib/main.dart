@@ -8,6 +8,7 @@ import 'app_constants.dart';
 import 'models/settings_model.dart';
 import 'platform/display_detector.dart';
 import 'platform/screen_arg.dart';
+import 'services/auto_launch_service.dart';
 import 'services/settings_service.dart';
 import 'state/settings_controller.dart';
 import 'state/settings_scope.dart';
@@ -16,15 +17,23 @@ import 'widgets/settings_panel.dart';
 
 final DisplayDetector _detector = DisplayDetector();
 final SettingsService _settingsService = PreferencesSettingsService();
+final AutoLaunchService _autoLaunchService = LaunchAtStartupAutoLaunchService();
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
   await hotKeyManager.unregisterAll();
-  final SettingsModel settings = await _settingsService.load();
+  SettingsModel settings = await _settingsService.load();
+  // SPEC-006 FR-02：OS 開機啟動狀態為準，覆寫 saved settings。
+  final bool osAutoLaunch = await _autoLaunchService.isEnabled();
+  if (osAutoLaunch != settings.autoLaunch) {
+    settings = settings.copyWith(autoLaunch: osAutoLaunch);
+    await _settingsService.save(settings);
+  }
   final SettingsController controller = SettingsController(
     initial: settings,
     service: _settingsService,
+    autoLaunchService: _autoLaunchService,
   );
   final int displayCount = (await _detector.listDisplays()).length;
   await _applyOverlayWindowProperties(args, settings);
