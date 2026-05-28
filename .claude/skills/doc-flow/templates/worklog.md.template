@@ -1,0 +1,41 @@
+<!-- 注意：本文件禁止使用 emoji（交接文件規範） -->
+
+# v{VERSION} 版本工作日誌
+
+**版本號**: v{VERSION}
+**開始日期**: {START_DATE}
+**目標**: {ONE_LINE_GOAL}
+**狀態**: 進行中
+
+---
+
+## 前情提要
+
+{WHY_THIS_VERSION}
+
+---
+
+## 開發日誌
+
+### {START_DATE}：版本開始
+
+- {INITIAL_CONTEXT}
+
+---
+
+## 關鍵文件
+
+- Tickets 目錄：`docs/work-logs/v{VERSION}/tickets/`
+
+---
+
+## Context 還原指引
+
+**新 Session 啟動時**：
+1. 讀取本文件了解版本故事線和當前狀態
+2. 執行 `ticket track list --version {VERSION} --status pending in_progress` 查看待處理任務
+3. 從開發日誌最後一個日期的記錄繼續
+
+---
+
+*最後更新：{LAST_UPDATE}*

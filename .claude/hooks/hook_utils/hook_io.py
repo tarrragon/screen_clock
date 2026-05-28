@@ -1,0 +1,580 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Hook I/O 操作模組
+
+提供 git 命令執行、stdin JSON 讀取、資料提取和輸入驗證等 I/O 相關功能。
+
+核心 API：
+- run_git(args, cwd, timeout, logger)
+- read_json_from_stdin(logger)
+- extract_tool_input(input_data, logger)
+- extract_tool_response(input_data, logger)
+- is_handoff_recovery_mode(logger)
+- validate_hook_input(input_data, logger, required_fields)
+"""
+
+import json
+import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import List, Optional, Tuple, Dict, Any
+
+
+_VALID_EFFORT_LEVELS = ("low", "medium", "high")
+
+from .hook_base import get_project_root
+
+
+# ============================================================================
+# 快取變數（模組級，用於效能改善）
+# ============================================================================
+
+_handoff_recovery_cache: Optional[bool] = None
+"""Process-level 快取：is_handoff_recovery_mode() 的結果（同一 session 內快取）"""
+
+
+def clear_handoff_recovery_cache() -> None:
+    """清空 Handoff 恢復模式快取（測試輔助函式）
+
+    將 _handoff_recovery_cache 重設為 None，
+    供測試隔離或其他需要重新掃描的場景使用。
+
+    生產環境不應呼叫此函式。
+    """
+    global _handoff_recovery_cache
+    _handoff_recovery_cache = None
+
+
+def _extract_field(
+    input_data: "dict | None",
+    field_name: str,
+    logger: "logging.Logger | None" = None
+) -> dict:
+    """安全提取 input_data 中指定欄位的通用邏輯
+
+    處理三種情況：
+    1. input_data 為 None 或空值 → 返回 {}
+    2. 指定欄位缺失或為 None → 返回 {}
+    3. 欄位為有效的 dict → 返回該 dict
+
+    Args:
+        input_data: Hook 輸入資料（dict 或 None）
+        field_name: 要提取的欄位名稱（如 "tool_input" 或 "tool_response"）
+        logger: 可選 Logger 實例，用於記錄詳細資訊
+
+    Returns:
+        dict: 提取出的欄位值（始終返回 dict，無欄位時返回空 dict）
+    """
+    if input_data is None:
+        if logger:
+            logger.debug("input_data 為 None，返回空 dict")
+        return {}
+
+    if not isinstance(input_data, dict):
+        if logger:
+            logger.warning("input_data 非 dict 類型，返回空 dict: {}".format(type(input_data)))
+        return {}
+
+    field_value = input_data.get(field_name)
+
+    # 欄位為 None 或不存在時返回 {}
+    if field_value is None:
+        if logger:
+            logger.debug("{} 欄位為 None 或不存在，返回空 dict".format(field_name))
+        return {}
+
+    # 欄位應為 dict，但可能是其他型別
+    if not isinstance(field_value, dict):
+        if logger:
+            logger.warning("{} 非 dict 類型，返回空 dict: {}".format(field_name, type(field_value)))
+        return {}
+
+    if logger:
+        logger.debug("成功提取 {}，欄位數: {}".format(field_name, len(field_value)))
+
+    return field_value
+
+
+def run_git(
+    args: List[str],
+    cwd: "str | None" = None,
+    timeout: int = 5,
+    logger: "logging.Logger | None" = None,
+) -> "str | None":
+    """執行 git 命令並回傳 stdout
+
+    Args:
+        args: git 子命令和參數，如 ["log", "-1", "--format=%ct"]
+        cwd: 工作目錄（預設為當前目錄）
+        timeout: 執行超時秒數（預設 5）
+        logger: 可選日誌物件，失敗時記錄 warning
+
+    Returns:
+        stdout 輸出（stripped），或 None 若執行失敗
+    """
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=timeout,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        else:
+            if logger:
+                logger.warning("git 命令失敗: {} (exit code: {})".format(
+                    " ".join(args), result.returncode
+                ))
+            return None
+    except subprocess.TimeoutExpired:
+        if logger:
+            logger.warning("git 命令超時: {}".format(" ".join(args)))
+        return None
+    except FileNotFoundError:
+        if logger:
+            logger.warning("git 命令未找到")
+        return None
+    except OSError as e:
+        if logger:
+            logger.warning("執行 git 命令失敗: {}".format(e))
+        return None
+
+
+def read_json_from_stdin(logger: logging.Logger) -> Optional[dict]:
+    """從 stdin 讀取 JSON 輸入
+
+    處理三種情況：
+    1. 空輸入（SessionStart 等事件無輸入）
+    2. JSON 解析失敗
+    3. 有效的 JSON 物件
+
+    Args:
+        logger: Logger 實例
+
+    Returns:
+        dict: 解析後的 JSON，或 None（空輸入或解析失敗）
+    """
+    try:
+        input_text = sys.stdin.read().strip()
+
+        # 空輸入：直接返回 None
+        if not input_text:
+            return None
+
+        # 解析 JSON
+        return json.loads(input_text)
+
+    except json.JSONDecodeError as e:
+        logger.info("JSON 解析跳過（stdin 含控制字元）: {}".format(e))
+        return None
+    except Exception as e:
+        logger.info("讀取 stdin 跳過: {}".format(e))
+        return None
+
+
+def get_effort_level(
+    payload: "dict | None" = None,
+    default: str = "medium",
+) -> str:
+    """取得當前 effort level（v2.1.133+ effort 感知）
+
+    優先序：payload['effort']['level'] > $CLAUDE_EFFORT > default
+
+    回傳值正規化為 low / medium / high，未知值降為 default。
+
+    Args:
+        payload: hook stdin JSON payload（可為 None）
+        default: 預設值，當無訊號時使用
+
+    Returns:
+        str: "low" / "medium" / "high"
+    """
+    level: Optional[str] = None
+    if isinstance(payload, dict):
+        effort = payload.get("effort")
+        if isinstance(effort, dict):
+            raw = effort.get("level")
+            if isinstance(raw, str) and raw.strip():
+                level = raw.strip().lower()
+
+    if level is None:
+        env_val = os.environ.get("CLAUDE_EFFORT")
+        if env_val and env_val.strip():
+            level = env_val.strip().lower()
+
+    if level not in _VALID_EFFORT_LEVELS:
+        return default if default in _VALID_EFFORT_LEVELS else "medium"
+    return level
+
+
+def extract_tool_input(
+    input_data: "dict | None",
+    logger: "logging.Logger | None" = None
+) -> dict:
+    """安全提取 input_data 中的 tool_input 欄位
+
+    處理三種情況：
+    1. input_data 為 None 或空值 → 返回 {}
+    2. tool_input 欄位缺失或為 None → 返回 {}
+    3. tool_input 為有效的 dict → 返回該 dict
+
+    Args:
+        input_data: Hook 輸入資料（dict 或 None）
+        logger: 可選 Logger 實例，用於記錄詳細資訊
+
+    Returns:
+        dict: 提取出的 tool_input（始終返回 dict，無欄位時返回空 dict）
+
+    Examples:
+        >>> extract_tool_input({"tool_input": {"file_path": "test.py"}})
+        {'file_path': 'test.py'}
+
+        >>> extract_tool_input({"other": "value"})
+        {}
+
+        >>> extract_tool_input(None)
+        {}
+    """
+    return _extract_field(input_data, "tool_input", logger)
+
+
+def extract_tool_response(
+    input_data: "dict | None",
+    logger: "logging.Logger | None" = None
+) -> dict:
+    """安全提取 input_data 中的 tool_response 欄位
+
+    處理三種情況：
+    1. input_data 為 None 或空值 → 返回 {}
+    2. tool_response 欄位缺失或為 None → 返回 {}
+    3. tool_response 為有效的 dict → 返回該 dict
+
+    Args:
+        input_data: Hook 輸入資料（dict 或 None）
+        logger: 可選 Logger 實例，用於記錄詳細資訊
+
+    Returns:
+        dict: 提取出的 tool_response（始終返回 dict，無欄位時返回空 dict）
+
+    Examples:
+        >>> extract_tool_response({"tool_response": {"stdout": "OK", "exit_code": 0}})
+        {'stdout': 'OK', 'exit_code': 0}
+
+        >>> extract_tool_response({"other": "value"})
+        {}
+
+        >>> extract_tool_response(None)
+        {}
+    """
+    return _extract_field(input_data, "tool_response", logger)
+
+
+# ============================================================================
+# Handoff 和輸入驗證
+# ============================================================================
+
+
+def is_handoff_recovery_mode(
+    logger: "logging.Logger | None" = None
+) -> bool:
+    """檢查是否處於 Handoff 恢復模式（快取版本）
+
+    Handoff 恢復時，Claude 自動讀取 Ticket 和派發代理人，
+    這些操作應被豁免，允許恢復流程正常進行。
+
+    本函式使用 Process-level 快取：
+    - 首次呼叫：執行 glob 掃描，快取結果
+    - 後續呼叫：直接返回快取結果，避免重複 I/O
+
+    Args:
+        logger: 可選 Logger 實例，用於記錄詳細資訊
+
+    Returns:
+        bool: 是否處於 Handoff 恢復模式
+
+    Handoff 恢復模式判斷：
+    - 檢查 .claude/handoff/pending 目錄是否存在
+    - 目錄內是否有任何 .json 檔案
+    """
+    global _handoff_recovery_cache
+
+    # 快取命中：直接返回快取結果
+    if _handoff_recovery_cache is not None:
+        if logger:
+            logger.debug("使用快取的 Handoff 恢復模式結果: {}".format(_handoff_recovery_cache))
+        return _handoff_recovery_cache
+
+    project_root = get_project_root()
+
+    handoff_pending_dir = project_root / ".claude" / "handoff" / "pending"
+
+    try:
+        # 檢查目錄是否存在且包含 JSON 檔案
+        if handoff_pending_dir.exists() and handoff_pending_dir.is_dir():
+            # 使用 glob 檢查是否有任何 .json 檔案
+            if any(handoff_pending_dir.glob("*.json")):
+                if logger:
+                    logger.info("檢測到 Handoff 恢復模式")
+                _handoff_recovery_cache = True
+                return True
+
+        if logger:
+            logger.debug("未檢測到 Handoff 恢復模式")
+        _handoff_recovery_cache = False
+        return False
+
+    except Exception as e:
+        if logger:
+            logger.warning("檢查 Handoff 恢復模式時發生錯誤: {}".format(e))
+        # 錯誤時快取 False（安全預設）
+        _handoff_recovery_cache = False
+        return False
+
+
+def validate_hook_input(
+    input_data: "dict | None",
+    logger: "logging.Logger | None" = None,
+    required_fields: "Tuple[str, ...] | None" = None
+) -> bool:
+    """統一的 Hook 輸入驗證函式
+
+    提供通用的 None 防護和欄位檢查，各 Hook 可指定自己的必要欄位。
+
+    Args:
+        input_data: Hook 輸入資料
+        logger: 可選 Logger 實例
+        required_fields: 必要欄位清單（如 ("tool_name", "tool_input")）
+                        預設為空，表示只檢查 None 防護
+
+    Returns:
+        bool: 輸入是否有效
+
+    Examples:
+        # PreToolUse Hook（需要 tool_name 和 tool_input）
+        >>> validate_hook_input(input_data, logger, ("tool_name", "tool_input"))
+
+        # UserPromptSubmit Hook（需要 prompt）
+        >>> validate_hook_input(input_data, logger, ("prompt",))
+
+        # 只檢查 None 防護
+        >>> validate_hook_input(input_data, logger)
+
+    説明：
+    - 此函式統一處理 None 防護問題
+    - 各 Hook 可根據需要指定檢查的欄位
+    """
+    # 第一步：None 防護
+    if input_data is None:
+        if logger:
+            logger.error("輸入資料為 None")
+        return False
+
+    if not isinstance(input_data, dict):
+        if logger:
+            logger.error("輸入資料非 dict 型別: {}".format(type(input_data)))
+        return False
+
+    # 第二步：欄位檢查（預設無額外欄位要求）
+    if required_fields:
+        for field in required_fields:
+            if field not in input_data:
+                if logger:
+                    logger.error("缺少必要欄位: {}".format(field))
+                return False
+
+            # 欄位不能為 None
+            if input_data.get(field) is None:
+                if logger:
+                    logger.error("欄位為 None: {}".format(field))
+                return False
+
+    if logger:
+        logger.debug("輸入驗證通過")
+    return True
+
+
+def validate_tool_input(
+    tool_input: dict,
+    logger: "logging.Logger | None" = None,
+    required_fields: "Tuple[str, ...] | None" = None
+) -> bool:
+    """驗證 tool_input 的必要欄位
+
+    呼叫前應確保 tool_input 已由 validate_hook_input() 驗證存在。
+    此函式只檢查 tool_input 內的子欄位。
+
+    Args:
+        tool_input: tool_input dict（已驗證存在）
+        logger: 可選 Logger 實例，允許 None（靜默模式）
+        required_fields: tool_input 必須包含的欄位清單，如 ("file_path", "content")
+                        預設為 None，表示只做存在性確認（寬鬆驗證）
+
+    Returns:
+        bool: tool_input 子欄位驗證是否通過
+
+    Examples:
+        # 使用流程：先驗證頂層欄位，再驗證 tool_input 子欄位
+        >>> if not validate_hook_input(input_data, logger, ("tool_name", "tool_input")):
+        ...     return False
+        >>> tool_input = input_data["tool_input"]
+        >>> if not validate_tool_input(tool_input, logger, ("file_path", "content")):
+        ...     return False
+    """
+    # 防禦性檢查：tool_input 本身
+    if not isinstance(tool_input, dict):
+        if logger:
+            logger.error("tool_input 非 dict 型別: {}".format(type(tool_input)))
+        return False
+
+    # 欄位驗證
+    if required_fields:
+        for field in required_fields:
+            if field not in tool_input:
+                if logger:
+                    logger.error("tool_input 缺少必要欄位: {}".format(field))
+                return False
+            if tool_input.get(field) is None:
+                if logger:
+                    logger.error("tool_input 欄位值為 None: {}".format(field))
+                return False
+
+    if logger:
+        logger.debug("tool_input 驗證通過")
+    return True
+
+
+def is_subagent_environment(input_data: "dict | None") -> bool:
+    """檢查是否為 subagent 環境
+
+    subagent 執行時，Hook 會在 input_data 中包含 agent_id 欄位。
+    此函式用於 Hook 的早期跳過邏輯，避免在 subagent 中輸出 AskUserQuestion 提醒。
+
+    Args:
+        input_data: Hook 收到的 input_data dict
+
+    Returns:
+        bool: 如果 input_data 包含 agent_id（非空），返回 True；否則返回 False
+
+    Examples:
+        >>> if is_subagent_environment(input_data):
+        ...     logger.info("偵測到 subagent 環境，跳過 AskUserQuestion 提醒")
+        ...     print(json.dumps(DEFAULT_OUTPUT, ensure_ascii=False))
+        ...     return EXIT_SUCCESS
+    """
+    if input_data is None:
+        return False
+    return bool(input_data.get("agent_id"))
+
+
+def is_background_dispatch(tool_input: "dict | None") -> bool:
+    """檢查是否為背景代理人派發（run_in_background=true）
+
+    背景代理人的 PostToolUse(Agent) 在代理人「啟動完成」（agentId 返回）時觸發，
+    而非「工作完成」時。所有依賴「工作完成」語義的 PostToolUse(Agent) 類 Hook
+    必須使用此 helper 在背景路徑跳過完成判定邏輯，避免誘發 PM 誤判（PC-070 根因）。
+
+    真正的完成訊號應由 task-notification 事件（或對應 Hook event）處理。
+
+    Args:
+        tool_input: PostToolUse 的 tool_input dict（來自 input_data["tool_input"]）
+
+    Returns:
+        bool: 若 tool_input.run_in_background 為 truthy，回傳 True；否則 False。
+
+    Examples:
+        >>> tool_input = extract_tool_input(input_data, logger)
+        >>> if is_background_dispatch(tool_input):
+        ...     logger.info("背景代理人啟動，跳過完成判定邏輯")
+        ...     return EXIT_SUCCESS
+
+    相關 Ticket：0.18.0-W10-024（active-dispatch-tracker-hook 首例）、
+    0.18.0-W10-060（其他 PostToolUse(Agent) Hook 套用）
+    """
+    if not tool_input:
+        return False
+    return bool(tool_input.get("run_in_background", False))
+
+
+# ============================================================================
+# Hook 輸出生成
+# ============================================================================
+
+
+def generate_hook_output(
+    hook_event_name: str,
+    additional_context: Optional[str] = None,
+    permission_decision: Optional[str] = None,
+    permission_decision_reason: Optional[str] = None,
+) -> dict:
+    """生成符合 Hook 協定的輸出 JSON
+
+    統一的 Hook 輸出生成函式，用於各種 Hook 的協定遵循。
+
+    Hook 協定格式：
+    - 基本輸出：{"hookSpecificOutput": {"hookEventName": "<事件名>"}}
+    - 帶額外上下文：增加 "additionalContext" 欄位
+    - 帶權限決策：增加 "permissionDecision" 和 "permissionDecisionReason" 欄位
+
+    Args:
+        hook_event_name: Hook 事件名稱，如 "UserPromptSubmit", "PreToolUse"
+        additional_context: 可選的額外上下文訊息（如警告、提醒等）
+        permission_decision: 可選的權限決策，"allow" / "deny" / "block"
+        permission_decision_reason: 可選的權限決策理由
+
+    Returns:
+        dict: 符合 Hook 協定的輸出結構
+
+    Examples:
+        >>> generate_hook_output("UserPromptSubmit")
+        {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit'}}
+
+        >>> generate_hook_output("PreToolUse", permission_decision="allow",
+        ...     permission_decision_reason="工具不在檢查範圍")
+        {'hookSpecificOutput': {'hookEventName': 'PreToolUse',
+            'permissionDecision': 'allow',
+            'permissionDecisionReason': '工具不在檢查範圍'}}
+    """
+    output = {
+        "hookSpecificOutput": {
+            "hookEventName": hook_event_name
+        }
+    }
+
+    if additional_context:
+        output["hookSpecificOutput"]["additionalContext"] = additional_context
+
+    if permission_decision:
+        output["hookSpecificOutput"]["permissionDecision"] = permission_decision
+
+    if permission_decision_reason:
+        output["hookSpecificOutput"]["permissionDecisionReason"] = permission_decision_reason
+
+    return output
+
+
+def emit_hook_output(
+    hook_event_name: str,
+    additional_context: Optional[str] = None,
+    permission_decision: Optional[str] = None,
+    permission_decision_reason: Optional[str] = None,
+) -> None:
+    """一步完成 Hook JSON stdout 輸出 — 防止遺漏 json.dumps 格式
+
+    組合 generate_hook_output + json.dumps + print，確保輸出格式正確。
+
+    Args:
+        hook_event_name: Hook 事件名稱
+        additional_context: 可選的額外上下文訊息
+        permission_decision: 可選的權限決策
+        permission_decision_reason: 可選的權限決策理由
+    """
+    output = generate_hook_output(
+        hook_event_name, additional_context,
+        permission_decision, permission_decision_reason,
+    )
+    print(json.dumps(output, ensure_ascii=False))

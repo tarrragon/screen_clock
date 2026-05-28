@@ -1,0 +1,118 @@
+---
+description: 從獨立 repo 拉取最新 .claude 配置 (https://github.com/tarrragon/claude.git)
+---
+
+# 從獨立 Repo 拉取最新 .claude 配置
+
+請執行以下流程，從獨立 repo 拉取最新的 .claude 配置到本專案。
+
+## 拉取內容
+
+- `.claude/` 目錄所有檔案（Hook、Agent、方法論、規則、project-templates）
+
+## 不覆蓋內容
+
+- 根目錄 `CLAUDE.md`（保留專案特定配置）
+
+## 執行流程
+
+1. **確認本地無未提交變更**
+   - 檢查 `.claude` 是否有未提交的變更
+   - 如有變更，詢問用戶是否先提交或暫存
+
+2. **覆蓋確認（強制使用 AskUserQuestion）**
+   - 在執行腳本前，必須使用 AskUserQuestion 工具詢問用戶確認
+   - 顯示即將被覆蓋的內容，讓用戶知情同意
+   - AskUserQuestion 問題格式：
+     ```
+     question: "即將從 tarrragon/claude.git 拉取更新。以下內容將被覆蓋：
+     - .claude/ 目錄所有內容（包含 hooks、agents、methodologies、rules、project-templates 等）
+
+     根目錄 CLAUDE.md 不受影響。腳本會自動備份到 /tmp 臨時目錄。
+     確認繼續？"
+
+     options:
+     - 確認拉取（腳本自動備份到 /tmp）
+     - 先建立穩定備份再拉取（備份到 .claude-backup-{date}）
+     - 取消
+     ```
+
+3. **根據用戶選擇執行**
+   - **確認拉取**：直接執行 `python3 ./.claude/scripts/sync-claude-pull.py`
+   - **先備份再拉取**：先執行以下備份指令，再執行拉取腳本
+     ```bash
+     BACKUP_DIR=".claude-backup-$(date +%Y%m%d-%H%M%S)"
+     cp -r .claude "$BACKUP_DIR/"
+     echo "備份已建立：$BACKUP_DIR"
+     ```
+     然後執行：`python3 ./.claude/scripts/sync-claude-pull.py`
+   - **取消**：中止操作，不執行任何動作
+
+4. **顯示備份位置**
+   - 腳本會輸出備份目錄位置
+   - 告知用戶如需還原可使用備份
+
+5. **自動偵測需要重新安裝的套件**
+   - 使用 `git diff` 自動掃描 `.claude/skills/*/pyproject.toml` 的版本變更
+   - 偵測到變更的套件會在日誌中列出
+   - 實際的套件重新安裝由 `package-version-sync-hook` 在下次 SessionStart 自動執行
+   - Hook 會自動比對 pyproject.toml 版本 vs uv tool list 實際安裝版本
+   - 版本不符時自動執行 `uv tool uninstall + cache clean + tool install --reinstall`
+
+6. **建議測試 Hook 系統**
+   - 提醒用戶測試 Hook 系統是否正常運作
+   - 建議重啟 Claude Code Session 驗證
+
+7. **Hook 完整性驗證（重要）**
+   - sync-pull 可能引入新的 hook 檔案，但尚未在 `settings.json` 中登記
+   - 建議執行以下指令確認未登記的 hook：
+     ```
+     提示用戶：「建議執行 project-init onboard 或在 SessionStart 時檢查 hook 完整性報告，
+     確認 .claude/hooks/ 下所有 hook 都已在 settings.json 登記，
+     若有未登記的 hook 請補充到 settings.json 或加入 exclude list」
+     ```
+   - 或等待下次 session 啟動，SessionStart hook `hook-completeness-check.py` 會自動報告
+
+8. **Post-pull 框架定制引導**
+   - 提示用戶執行 `project-init onboard` 完成框架定制：
+     ```
+     拉取完成。建議執行以下步驟完成框架定制：
+
+     1. 執行 `project-init onboard` — 偵測專案語言、建議停用不適用的 Hook、檢查配置完整性
+     2. 如果是全新專案且根目錄無 CLAUDE.md：
+        - 複製 `.claude/templates/CLAUDE-template.md` 到專案根目錄
+        - 重命名為 `CLAUDE.md`
+        - 填入專案特定資訊
+     3. 執行 `project-init check` 驗證環境
+     ```
+   - 如果偵測到根目錄無 CLAUDE.md，額外提醒從模板建立
+
+## 新專案初始化
+
+如果是新專案，需要手動建立 CLAUDE.md：
+
+1. 複製 `.claude/templates/CLAUDE-template.md` 到根目錄
+2. 重命名為 `CLAUDE.md`
+3. 填入專案特定資訊（專案目標、技術選型、MCP 配置）
+4. 驗證所有連結有效
+
+## 還原方式
+
+如果拉取後發現問題，可使用備份還原：
+
+```bash
+# 備份位置會在拉取時顯示
+cp -r /tmp/備份目錄/.claude .
+```
+
+## 注意事項
+
+- 自動備份當前 .claude 配置到臨時目錄
+- 拉取會完全替換本地 .claude 檔案
+- 不會覆蓋根目錄 CLAUDE.md（專案特定配置）
+- 不再需要 `.claude/installed-packages.json` 靜態追蹤檔案（已刪除）
+- 套件版本變更由 `git diff` 自動偵測，重新安裝由 Hook 自動處理
+- 無需手動執行套件安裝命令，下次 SessionStart 時 Hook 會自動同步
+- 拉取後建議執行 `project-init onboard` 完成框架定制
+- 拉取後建議檢查 settings.local.json 是否需要調整
+- 拉取後建議重啟 Claude Code Session 確保 Hook 正確執行

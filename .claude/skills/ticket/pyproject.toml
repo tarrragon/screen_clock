@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ticket-system"
+version = "1.0.0"
+description = "Unified Ticket System for Claude Code - 整合 create/track/handoff/resume 四大功能的統一 Ticket 管理系統"
+readme = "SKILL.md"
+requires-python = ">=3.9"
+dependencies = ["pyyaml>=5.0"]
+authors = [
+    {name = "Claude Code", email = "claude@anthropic.com"}
+]
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "freezegun>=1.0",
+]
+
+[project.scripts]
+ticket = "ticket_system.scripts.ticket:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ticket_system"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "ticket_system/**/*.py",
+    "pyproject.toml",
+    "SKILL.md",
+]
+
+[tool.pytest.ini_options]
+# W10-017.13 AC4 / TD-E：加入 ticket_system/tests 讓其 149 支測試被 pytest 自動發現
+# （原僅包 tests/，導致 ticket_system/tests 下 track_snapshot / handoff_ready /
+# checkpoint_status 等命令層測試需 CLI 顯式指定路徑才跑）。
+testpaths = ["tests", "ticket_system/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--verbose"

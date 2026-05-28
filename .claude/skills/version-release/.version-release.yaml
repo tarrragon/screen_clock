@@ -1,0 +1,64 @@
+# .version-release.yaml - Chrome Extension 版本管理配置
+
+# 版本定義
+versions:
+  package:
+    source: package.json
+    key: version
+    semantic_version: true
+    description: "專案主版本（用於 Ticket、Wave、發布計劃）"
+
+  manifest:
+    source: manifest.json
+    key: version
+    semantic_version: true
+    independent: false
+    description: "Chrome Extension 發布版本（用於 Chrome Web Store）"
+    sync_policy: "required"
+    sync_recommendation: "必須與 package.json 版本一致"
+
+# 版本同步規則
+sync_rules:
+  on_release:
+    package:
+      required: true
+    manifest:
+      required: true
+      recommendation: "manifest.json 版本必須與 package.json 一致"
+
+  on_development:
+    allow_version_mismatch: false
+    reason: "Chrome Extension 兩個版本來源必須保持同步"
+
+  conflict_detection:
+    manifest_ahead_of_package:
+      severity: "error"
+      message: "manifest.json 版本大於 package.json，必須修正"
+    manifest_behind_package:
+      severity: "error"
+      message: "manifest.json 版本低於 package.json，必須修正"
+
+# 版本偵測策略
+detection:
+  version_files:
+    - path: package.json
+      type: json
+      key: version
+      context: "NPM 專案版本"
+
+    - path: manifest.json
+      type: json
+      key: version
+      context: "Chrome Extension 版本"
+
+  auto_detect_order:
+    - git_branch                      # feature/v0.1
+    - package_json                    # package.json
+    - git_tag                         # v0.1-final
+
+# 發布前檢查項
+preflight_checks:
+  version_sync:
+    enabled: true
+    fail_on_error: true               # 版本不匹配阻塞發布
+    warn_on_mismatch: true
