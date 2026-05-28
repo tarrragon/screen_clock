@@ -8,9 +8,9 @@
 
 **專案名稱**: screen_clock
 
-**專案目標**: 桌面螢幕透明遮罩時鐘。全螢幕透明覆蓋在指定螢幕上，中央顯示時間；視窗點擊穿透（click-through），不阻擋底下程式的鍵盤滑鼠操作。主要目標平台 macOS，次要平台 Windows。
+**專案目標**: 桌面螢幕透明遮罩時鐘。全螢幕透明覆蓋在指定螢幕上，中央顯示時間；視窗點擊穿透（click-through），不阻擋底下程式的鍵盤滑鼠操作。v1.0 之前只支援 macOS；Windows 留待 v1.1.x。
 
-**專案類型**: Flutter Desktop（macOS / Windows）
+**專案類型**: Flutter Desktop（v1.0 前 macOS only；v1.1.x 起加入 Windows）
 
 | 項目 | 值 |
 |------|------|
@@ -53,10 +53,10 @@
 
 | 決策 | 選擇 | 理由 |
 |------|------|------|
-| 平台優先順序 | macOS 主、Windows 次 | macOS 的透明 + click-through 支援較成熟；Windows 的 layered window 需額外處理且風險較高 |
+| 平台優先順序 | v1.0 之前只做 macOS；v1.1.x 起加 Windows | macOS 的透明 + click-through 支援較成熟；Windows 的 layered window 需額外處理且風險較高，延後到 1.0 之後處理 |
 | 視窗管理 | `window_manager` 套件 | 跨 macOS/Windows 提供 frameless、always-on-top、ignore-mouse-events 的統一 API |
 | 透明背景 (macOS) | `MainFlutterWindow.swift` 內設 `isOpaque = false; backgroundColor = .clear` | window_manager 無法在 macOS 完整設定原生視窗透明，需平台原生程式碼補足 |
-| 透明背景 (Windows) | `windows/runner/` 改用 layered window（`WS_EX_LAYERED \| WS_EX_TRANSPARENT`）做後備方案 | 純 `setBackgroundColor(transparent)` 在 Windows 可能無法完全透明，需 layered window |
+| 透明背景 (Windows) | 留待 v1.1.x；屆時於 `windows/runner/` 改用 layered window（`WS_EX_LAYERED \| WS_EX_TRANSPARENT`） | 純 `setBackgroundColor(transparent)` 在 Windows 可能無法完全透明，需 layered window。MVP→v1.0 不處理 |
 | 點擊穿透 | `windowManager.setIgnoreMouseEvents(true)` | 核心需求：底下程式仍可操作 |
 | 互動切換策略 | 預設全穿透；若日後加入可互動 UI（設定面板等），需動態切換：滑鼠進入互動區呼叫 `setIgnoreMouseEvents(false)`，離開後設回 `true` | 全穿透與可互動互斥，需用事件驅動切換而非單一狀態 |
 | 永遠置頂 | `windowManager.setAlwaysOnTop(true)` | 確保時鐘始終可見 |
@@ -75,7 +75,7 @@ override func awakeFromNib() {
 }
 ```
 
-**Windows** — `windows/runner/` 視需要加入 layered window 旗標（`WS_EX_LAYERED | WS_EX_TRANSPARENT`），實作時再評估必要性。
+**Windows** — 推遲到 v1.1.x。屆時於 `windows/runner/` 加入 layered window 旗標（`WS_EX_LAYERED | WS_EX_TRANSPARENT`）。v1.0 之前不處理 Windows。
 
 ### main.dart 啟動骨架
 
@@ -116,9 +116,9 @@ windowManager.waitUntilReadyToShow().then((_) async {
 - **v0.0.x**：Flutter scaffold（已完成）
 - **v0.1.x**：macOS 透明全螢幕視窗 + click-through 基礎能力（最小可行）
 - **v0.2.x**：中央時鐘 widget（時間顯示、字型/顏色基本可調）
-- **v0.3.x**：Windows 平台支援（layered window 透明）
-- **v0.4.x**：多螢幕選擇、目標螢幕指定
-- **v1.0.0**：完整設定面板（樣式、位置、顯示螢幕、開機啟動）
+- **v0.3.x**：多螢幕選擇、目標螢幕指定
+- **v1.0.0**：完整設定面板（樣式、位置、顯示螢幕、開機啟動）— macOS 為唯一支援平台
+- **v1.1.x**：Windows 平台支援（layered window 透明）— 1.0 之前不考慮 Windows
 
 ---
 
