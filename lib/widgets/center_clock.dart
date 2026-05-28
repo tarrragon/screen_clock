@@ -3,28 +3,30 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_constants.dart';
+import '../models/settings_model.dart';
+import '../state/settings_scope.dart';
 
-/// 螢幕中央時鐘 widget。
+/// 螢幕中央時鐘 widget（SPEC-002 + SPEC-005 FR-04 即時預覽）。
 ///
-/// 覆蓋 SPEC-002 全部 FR：
-/// - FR-01 顯示當前本機時間（24 小時制 HH:mm:ss）
-/// - FR-02 每秒自動更新；dispose 取消 timer 避免洩漏
-/// - FR-03 中央定位（外層 [Center]）
-/// - FR-04 預設樣式（120sp 粗體 白色 + 黑邊 stroke）
+/// 樣式從 [SettingsScope] 注入（v1.0.0 前後相容）：
+/// - 若上層提供 SettingsScope → 從中讀取 [SettingsModel]
+/// - 否則 fallback 到 [SettingsModel.defaults] 重現 v0.x 寫死值
 ///
-/// MVP 階段樣式寫死於 [AppSizes] / [AppColors]；
-/// v1.0.0 設定面板上線後改由 SettingsModel 注入。
+/// 時間更新仍走 [Timer.periodic]；setState 只觸發本子樹重繪。
 class CenterClock extends StatefulWidget {
   const CenterClock({super.key});
 
-  /// 把 [DateTime] 格式化為 SPEC-002 FR-01 預設格式 `HH:mm:ss`。
+  /// 把 [DateTime] 格式化為指定 [pattern]。
   ///
-  /// 用 `padLeft(2, '0')` 手寫補零，避免引入 intl 套件依賴
-  /// （SPEC-002 設計約束）。
-  static String formatTime(DateTime time) {
+  /// MVP 階段只接受 `HH:mm:ss` / `HH:mm` 兩種；其他 pattern 視同 `HH:mm:ss`
+  /// 避免引入 intl 套件（SPEC-002 設計約束 / SPEC-005 FR-03 dropdown 限制）。
+  static String formatTime(DateTime time, [String pattern = AppText.timeFormat]) {
     final String hh = time.hour.toString().padLeft(2, '0');
     final String mm = time.minute.toString().padLeft(2, '0');
     final String ss = time.second.toString().padLeft(2, '0');
+    if (pattern == 'HH:mm') {
+      return '$hh:$mm';
+    }
     return '$hh:$mm:$ss';
   }
 
@@ -61,7 +63,8 @@ class _CenterClockState extends State<CenterClock> {
 
   @override
   Widget build(BuildContext context) {
-    final String label = CenterClock.formatTime(_current);
+    final SettingsModel settings = _resolveSettings(context);
+    final String label = CenterClock.formatTime(_current, settings.timeFormat);
     return Center(
       child: Stack(
         alignment: Alignment.center,
@@ -70,25 +73,31 @@ class _CenterClockState extends State<CenterClock> {
           Text(
             label,
             style: TextStyle(
-              fontSize: AppSizes.clockFontSize,
+              fontSize: settings.fontSize,
               fontWeight: FontWeight.w700,
               foreground: Paint()
                 ..style = PaintingStyle.stroke
-                ..strokeWidth = AppSizes.clockStrokeWidth
-                ..color = AppColors.clockStroke,
+                ..strokeWidth = settings.strokeWidth
+                ..color = settings.strokeColor,
             ),
           ),
-          // 填色層：白色字（SPEC-002 FR-04）。
+          // 填色層（SPEC-002 FR-04）。
           Text(
             label,
-            style: const TextStyle(
-              fontSize: AppSizes.clockFontSize,
+            style: TextStyle(
+              fontSize: settings.fontSize,
               fontWeight: FontWeight.w700,
-              color: AppColors.clockFill,
+              color: settings.fillColor,
             ),
           ),
         ],
       ),
     );
+  }
+
+  SettingsModel _resolveSettings(BuildContext context) {
+    final SettingsScope? scope =
+        context.dependOnInheritedWidgetOfExactType<SettingsScope>();
+    return scope?.notifier?.value ?? SettingsModel.defaults();
   }
 }

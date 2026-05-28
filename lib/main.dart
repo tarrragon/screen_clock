@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -7,7 +9,10 @@ import 'models/settings_model.dart';
 import 'platform/display_detector.dart';
 import 'platform/screen_arg.dart';
 import 'services/settings_service.dart';
+import 'state/settings_controller.dart';
+import 'state/settings_scope.dart';
 import 'widgets/center_clock.dart';
+import 'widgets/settings_panel.dart';
 
 final DisplayDetector _detector = DisplayDetector();
 final SettingsService _settingsService = PreferencesSettingsService();
@@ -15,15 +20,23 @@ final SettingsService _settingsService = PreferencesSettingsService();
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
+  await hotKeyManager.unregisterAll();
   final SettingsModel settings = await _settingsService.load();
+  final SettingsController controller = SettingsController(
+    initial: settings,
+    service: _settingsService,
+  );
+  final int displayCount = (await _detector.listDisplays()).length;
   await _applyOverlayWindowProperties(args, settings);
-  runApp(ScreenClockApp(settings: settings));
+  runApp(
+    ScreenClockApp(
+      controller: controller,
+      availableScreenCount: displayCount,
+    ),
+  );
 }
 
 /// 依 SPEC-001 + SPEC-003 序列套用所有遮罩視窗屬性。
-///
-/// 順序：static 屬性 → 解析目標螢幕 → 套用 size/position → show。
-/// Hot-plug 監聽於 show 之後啟動，避免初始化途中觸發切換。
 Future<void> _applyOverlayWindowProperties(
   List<String> args,
   SettingsModel settings,
@@ -35,7 +48,6 @@ Future<void> _applyOverlayWindowProperties(
   await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop);
   await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
 
-  // SPEC-004 FR-04：CLI --screen 優先；缺省時用儲存的 targetScreenIndex。
   final int targetIndex = parseScreenArg(args) ?? settings.targetScreenIndex;
   final Display target = await _detector.resolveTargetDisplay(targetIndex);
   await _coverDisplay(target);
@@ -47,10 +59,6 @@ Future<void> _applyOverlayWindowProperties(
   );
 }
 
-/// 把視窗鋪到指定螢幕（SPEC-001 FR-01 + SPEC-003 FR-03）。
-///
-/// 主螢幕（visiblePosition 為 null）直接用 [AppSizes.windowOrigin]；
-/// 非主螢幕以 visiblePosition 為左上角。
 Future<void> _coverDisplay(Display display) async {
   final Offset position = display.visiblePosition ?? AppSizes.windowOrigin;
   Size size = display.size;
@@ -61,28 +69,160 @@ Future<void> _coverDisplay(Display display) async {
   await windowManager.setPosition(position);
 }
 
-/// SPEC-003 FR-05：目標螢幕拔除時退回主螢幕。
 Future<void> _onTargetScreenLost() async {
   debugPrint('[main] target display lost, fallback to primary');
   final Display primary = await _detector.resolveTargetDisplay(null);
   await _coverDisplay(primary);
 }
 
-class ScreenClockApp extends StatelessWidget {
-  const ScreenClockApp({super.key, required this.settings});
+class ScreenClockApp extends StatefulWidget {
+  const ScreenClockApp({
+    super.key,
+    required this.controller,
+    required this.availableScreenCount,
+  });
 
-  /// 啟動時讀到的設定快照。W2 引入設定面板時會升級為可變狀態。
-  final SettingsModel settings;
+  final SettingsController controller;
+  final int availableScreenCount;
+
+  @override
+  State<ScreenClockApp> createState() => _ScreenClockAppState();
+}
+
+class _ScreenClockAppState extends State<ScreenClockApp> {
+  bool _panelOpen = false;
+  HotKey? _registeredHotKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _registerHotKey();
+  }
+
+  @override
+  void dispose() {
+    final HotKey? key = _registeredHotKey;
+    if (key != null) {
+      hotKeyManager.unregister(key);
+    }
+    _registeredHotKey = null;
+    super.dispose();
+  }
+
+  Future<void> _registerHotKey() async {
+    final HotKey hotKey = HotKey(
+      key: PhysicalKeyboardKey.comma,
+      modifiers: <HotKeyModifier>[
+        HotKeyModifier.meta,
+        HotKeyModifier.alt,
+      ],
+      scope: HotKeyScope.system,
+    );
+    try {
+      await hotKeyManager.register(
+        hotKey,
+        keyDownHandler: (_) => _togglePanel(),
+      );
+      _registeredHotKey = hotKey;
+    } catch (error, stack) {
+      debugPrint('[main] hotkey register failed: $error');
+      debugPrint(stack.toString());
+    }
+  }
+
+  Future<void> _togglePanel() async {
+    if (_panelOpen) {
+      // 由 panel 內 Save / Cancel 觸發；此分支保留給日後可能的程式化 toggle。
+      return;
+    }
+    setState(() => _panelOpen = true);
+    try {
+      await windowManager.setIgnoreMouseEvents(false);
+    } catch (error) {
+      debugPrint('[main] disable click-through failed: $error');
+    }
+  }
+
+  Future<void> _onPanelClosed() async {
+    setState(() => _panelOpen = false);
+    try {
+      await windowManager
+          .setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
+    } catch (error) {
+      debugPrint('[main] restore click-through failed: $error');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppText.appTitle,
-      debugShowCheckedModeBanner: false,
-      home: const Scaffold(
-        backgroundColor: AppColors.overlayBackground,
-        body: CenterClock(),
+    return SettingsScope(
+      controller: widget.controller,
+      child: MaterialApp(
+        title: AppText.appTitle,
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: AppColors.overlayBackground,
+          body: Stack(
+            children: <Widget>[
+              const CenterClock(),
+              if (_panelOpen)
+                _PanelHost(
+                  availableScreenCount: widget.availableScreenCount,
+                  onClosed: _onPanelClosed,
+                ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+}
+
+/// 包覆 [SettingsPanel]，攔截 Navigator 的 pop 行為以恢復 click-through。
+class _PanelHost extends StatelessWidget {
+  const _PanelHost({
+    required this.availableScreenCount,
+    required this.onClosed,
+  });
+
+  final int availableScreenCount;
+  final VoidCallback onClosed;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (didPop) onClosed();
+      },
+      child: _DismissibleOverlay(
+        onDismiss: onClosed,
+        child: SettingsPanel(availableScreenCount: availableScreenCount),
+      ),
+    );
+  }
+}
+
+/// 暗背景遮罩 + Esc 鍵 / 外部點擊關閉。
+class _DismissibleOverlay extends StatelessWidget {
+  const _DismissibleOverlay({required this.onDismiss, required this.child});
+
+  final VoidCallback onDismiss;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Container(color: const Color(0x80000000)),
+          ),
+        ),
+        Center(child: child),
+      ],
     );
   }
 }

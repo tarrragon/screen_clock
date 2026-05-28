@@ -9,12 +9,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:screen_clock/app_constants.dart';
 import 'package:screen_clock/main.dart';
 import 'package:screen_clock/models/settings_model.dart';
+import 'package:screen_clock/services/settings_service.dart';
+import 'package:screen_clock/state/settings_controller.dart';
 
 void main() {
   testWidgets('ScreenClockApp builds with transparent scaffold',
       (WidgetTester tester) async {
+    final SettingsController controller = SettingsController(
+      initial: SettingsModel.defaults(),
+      service: InMemorySettingsService(),
+    );
     await tester.pumpWidget(
-      ScreenClockApp(settings: SettingsModel.defaults()),
+      ScreenClockApp(
+        controller: controller,
+        availableScreenCount: 1,
+      ),
     );
 
     final scaffoldFinder = find.byType(Scaffold);

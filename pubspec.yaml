@@ -46,6 +46,9 @@ dependencies:
   # 設定持久化：SPEC-004 採 shared_preferences
   shared_preferences: ^2.3.2
 
+  # 全域熱鍵：SPEC-005 FR-01 設定面板呼出（Cmd+Opt+,）
+  hotkey_manager: ^0.2.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
