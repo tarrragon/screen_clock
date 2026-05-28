@@ -43,6 +43,9 @@ dependencies:
   # v0.3.0 多螢幕選擇也會用到
   screen_retriever: ^0.2.0
 
+  # 設定持久化：SPEC-004 採 shared_preferences
+  shared_preferences: ^2.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
