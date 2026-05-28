@@ -27,7 +27,7 @@ versions:
   - version: "0.1.0"
     codename: "transparent-overlay"
     description: "macOS 全螢幕透明遮罩視窗（frameless / always-on-top / click-through / no-shadow）"
-    status: "active"
+    status: "completed"
     worklog: "docs/work-logs/v0/v0.1/v0.1.0/"
     notes: |
       覆蓋 SPEC-001 全部 FR。Wave 結構：W1 環境準備、W2 透明遮罩 feature TDD、W3 手動驗收。
@@ -35,7 +35,7 @@ versions:
   - version: "0.2.0"
     codename: "center-clock"
     description: "螢幕中央時鐘 widget（每秒更新、預設樣式、中央定位）"
-    status: "planned"
+    status: "completed"
     worklog: "docs/work-logs/v0/v0.2/v0.2.0/"
     notes: |
       覆蓋 SPEC-002 全部 FR。單一 feature TDD。
@@ -43,7 +43,7 @@ versions:
   - version: "0.3.0"
     codename: "multi-screen"
     description: "多螢幕選擇能力（CLI 引數指定目標螢幕、熱插拔處理）"
-    status: "planned"
+    status: "completed"
     worklog: "docs/work-logs/v0/v0.3/v0.3.0/"
     notes: |
       W1 前置 ANA 評估螢幕偵測方案（screen_retriever vs window_manager），主 feature TDD。
@@ -51,7 +51,7 @@ versions:
   - version: "1.0.0"
     codename: "macos-release"
     description: "macOS 首個正式版（設定持久化、設定面板 UI、開機啟動、code signing / notarization、打包）"
-    status: "planned"
+    status: "completed"
     worklog: "docs/work-logs/v1/v1.0/v1.0.0/"
     notes: |
       4 Wave：W1 設定持久化 / W2 設定面板 UI / W3 開機啟動 / W4 收尾與發布。
