@@ -62,6 +62,7 @@
 | 永遠置頂 | `windowManager.setAlwaysOnTop(true)` | 確保時鐘始終可見 |
 | 視窗外觀 | frameless + 無陰影（`setHasShadow(false)`） | 遮罩風格需要無邊框、無視覺干擾 |
 | 多螢幕選擇 | 待規劃 | 目前先單螢幕（主螢幕）；多螢幕選擇納入未來版本 |
+| 常數集中 | 全專案常數統一於 `lib/app_constants.dart`（`AppText` / `AppSizes` / `AppColors` / `AppDurations` / `AppWindow`） | 嚴禁在任何程式碼中硬編碼字串字面值、尺寸數字、顏色、時間間隔、視窗旗標。所有來自規格的固定值都必須在此檔案命名後引用。v1.0.0 設定面板上線時，使用者可調項目改由 `SettingsModel` 注入；不可調項目保留於本檔 |
 
 ### 必要的平台原生改動
 
@@ -84,13 +85,46 @@ WidgetsFlutterBinding.ensureInitialized();
 await windowManager.ensureInitialized();
 windowManager.waitUntilReadyToShow().then((_) async {
   await windowManager.setAsFrameless();
-  await windowManager.setBackgroundColor(Colors.transparent);
-  await windowManager.setAlwaysOnTop(true);
-  await windowManager.setIgnoreMouseEvents(true);
-  await windowManager.setHasShadow(false);
+  await windowManager.setBackgroundColor(AppColors.overlayBackground);
+  await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop);
+  await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
+  await windowManager.setHasShadow(AppWindow.hasShadow);
   await windowManager.show();
 });
 ```
+
+> 上方範例已示範常數引用方式：`Colors.transparent` 改為 `AppColors.overlayBackground`、`true/false` 改為 `AppWindow.*`。實作時須照此規範。
+
+### 常數集中規範
+
+`lib/app_constants.dart` 是專案唯一的常數來源（single source of truth）。
+
+**禁止行為**：
+
+| 反例 | 正解 |
+|------|------|
+| `Text('Screen Clock')` | `Text(AppText.appTitle)` |
+| `fontSize: 120` | `fontSize: AppSizes.clockFontSize` |
+| `color: Colors.white` | `color: AppColors.clockFill` |
+| `Duration(seconds: 1)` | `AppDurations.clockTick` |
+| `await windowManager.setAlwaysOnTop(true)` | `await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop)` |
+| `Offset(0, 0)` 或 `Offset.zero` 用於視窗原點 | `AppSizes.windowOrigin` |
+
+**例外（允許硬編碼的少數情境）**：
+
+- Dart / Flutter 框架本身的列舉值（如 `FontWeight.w700`、`MainAxisAlignment.center`）
+- 純結構性數字（如 `padLeft(2, '0')` 的位數）
+- 平台原生程式碼（Swift / Win32），常數屬該平台側
+- 測試檔案中的 fixture 值
+
+**判斷準則**：抽常數的目的是讓字面值（literal）在使用處能以**能表達意圖的命名**取代，使程式碼本身說明「為什麼是這個值」，減少對註解的依賴。判斷不在於使用頻率，也不在於是否寫在 SPEC，而在於：
+
+> 在使用處讀到這個字面值時，讀者能否一眼讀懂它的意義？
+
+- 不能（例如 `fontSize: 120` 的 `120`、`Duration(seconds: 1)` 的 `1`、`Color(0xFF...)` 的色碼）→ 抽成有意義命名的常數，讓命名本身替代註解。
+- 可以（例如平台框架的列舉值 `FontWeight.w700`、結構性參數 `padLeft(2, '0')` 的位數、測試 fixture）→ 不必為抽而抽。
+
+簡言之：**字面值是否需要被命名才有意義？** 是 → 抽；否 → 留。
 
 ---
 
@@ -105,9 +139,21 @@ windowManager.waitUntilReadyToShow().then((_) async {
 | `CHANGELOG.md` | 版本變更記錄 |
 | `docs/work-logs/v{version}/tickets/` | Ticket 文件 |
 
-### 專案文件
+### 關鍵原始碼
 
-待專案規模成長後補入規格與設計文件。目前僅有 Flutter scaffold 與本指導文件。
+| 路徑 | 角色 |
+|------|------|
+| `lib/app_constants.dart` | 全專案常數集中檔（單一來源；見 Section 6「常數集中規範」） |
+| `lib/main.dart` | 啟動流程（window_manager 初始化、視窗屬性設定） |
+
+### 需求追蹤
+
+| 文件 | 用途 |
+|------|------|
+| `docs/proposals/PROP-*.md` | 提案層級需求 |
+| `docs/spec/{domain}/*.md` | SPEC 規格 |
+| `docs/usecases/UC-*.md` | 用例 |
+| `docs/proposals-tracking.yaml` | 提案追蹤索引 |
 
 ---
 
