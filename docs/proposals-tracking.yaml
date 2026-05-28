@@ -1,0 +1,29 @@
+proposals:
+  PROP-001:
+    title: "桌面螢幕透明時鐘遮罩"
+    status: draft
+    proposed: "2026-05-29"
+    confirmed: null
+    target_version: "v0.1.0"
+    source: development
+    spec_refs:
+      - spec/platform/transparent-overlay-window.md
+      - spec/display/center-clock.md
+    usecase_refs:
+      - UC-01
+      - UC-02
+      - UC-03
+    ticket_refs: []
+    checklist:
+      - item: "macOS 透明全螢幕視窗（frameless / always-on-top / no-shadow）"
+        status: pending
+        verified_by: null
+      - item: "macOS click-through（滑鼠/鍵盤完全穿透）"
+        status: pending
+        verified_by: null
+      - item: "螢幕中央時鐘 widget（每秒更新、預設樣式）"
+        status: pending
+        verified_by: null
+      - item: "Cmd+Q 退出時 timer 正確 dispose"
+        status: pending
+        verified_by: null
