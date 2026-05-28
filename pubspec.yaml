@@ -39,6 +39,10 @@ dependencies:
   # 對應 SPEC-001 全部 FR
   window_manager: ^0.4.3
 
+  # 螢幕資訊偵測：主螢幕尺寸（SPEC-001 FR-01）；
+  # v0.3.0 多螢幕選擇也會用到
+  screen_retriever: ^0.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_constants.dart';
@@ -21,7 +22,31 @@ Future<void> _applyOverlayWindowProperties() async {
   await windowManager.setHasShadow(AppWindow.hasShadow);
   await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop);
   await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
+  await _coverPrimaryScreen();
   await windowManager.show();
+}
+
+/// 取得主螢幕尺寸並讓視窗貼合（SPEC-001 FR-01）。
+///
+/// 偵測失敗時 fallback 到 [AppSizes.fallbackWindowSize]，
+/// 避免視窗以 0x0 出現而看不見（SPEC-001 FR-01 替代場景 01a）。
+Future<void> _coverPrimaryScreen() async {
+  final Size screenSize = await _resolvePrimaryScreenSize();
+  await windowManager.setSize(screenSize);
+  await windowManager.setPosition(AppSizes.windowOrigin);
+}
+
+Future<Size> _resolvePrimaryScreenSize() async {
+  try {
+    final Display display = await screenRetriever.getPrimaryDisplay();
+    final Size size = display.size;
+    if (size.width <= 0 || size.height <= 0) {
+      return AppSizes.fallbackWindowSize;
+    }
+    return size;
+  } catch (_) {
+    return AppSizes.fallbackWindowSize;
+  }
 }
 
 class ScreenClockApp extends StatelessWidget {
