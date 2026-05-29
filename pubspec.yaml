@@ -19,7 +19,9 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.1
+  # 暫時放寬至 ^3.10.0 以相容本機 Flutter 3.38.10（Dart 3.10.9）。
+  # CLAUDE.md 選型為 ^3.11.1，待本機升級 Flutter 後應改回；需 Ticket 追蹤。
+  sdk: ^3.10.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
