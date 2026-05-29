@@ -4,6 +4,23 @@ All notable changes to **screen_clock** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-29
+
+選單列 agent app 與多桌面行為強化。
+
+### Added
+
+- **選單列 agent app**：app 改為 macOS agent（`LSUIElement`），完全隱藏 Dock 圖示與 app 選單列，改以右上狀態列文字「timer」存在。狀態列選單提供「設定…」「顯示/隱藏時鐘」（標籤動態切換）「離開」。設定面板熱鍵 ⌘⌥`,` 仍可用。
+
+### Changed
+
+- **顯示於所有桌面（Spaces）**：遮罩時鐘設 `canJoinAllSpaces`，出現在每個一般桌面並隨切換桌面跟隨；`visibleOnFullScreen=false` 使全螢幕 app 佔據獨立 Space 時不被遮蓋。
+- **「顯示/隱藏時鐘」採 Flutter 層條件渲染**：不呼叫原生 `windowManager.hide()`（避免對 always-on-top + 全 Spaces 透明視窗操作造成崩潰）；視窗本就透明 + click-through，不繪製時鐘內容即視覺隱藏。
+
+### Chore
+
+- 清除誤入版控的測試垃圾（491 個 `MagicMock/.../*.lock`）與 runtime 排程鎖 `.claude/scheduled_tasks.lock`；`.gitignore` 補上對應規則與 `/dist/`。
+
 ## [1.1.0] - 2026-05-29
 
 新增生命計時模式（即時年齡顯示）。
