@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../age_formatter.dart';
 import '../app_constants.dart';
 import '../models/settings_model.dart';
 import '../state/settings_scope.dart';
@@ -41,11 +42,27 @@ class _CenterClockState extends State<CenterClock> {
   late DateTime _current;
   Timer? _ticker;
 
+  /// 目前 ticker 的更新間隔；模式切換時用來判斷是否需要重建 ticker。
+  Duration? _activeInterval;
+
   @override
   void initState() {
     super.initState();
     _current = DateTime.now();
-    _ticker = Timer.periodic(AppDurations.clockTick, _onTick);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 生命計時模式需要高頻跑數；一般時鐘每秒更新即可。
+    // 依設定挑選間隔，僅在間隔改變時重建 ticker（避免每次 rebuild 重啟）。
+    final SettingsModel settings = _resolveSettings(context);
+    final Duration interval = settings.lifeTimerMode
+        ? AppDurations.lifeTimerTick
+        : AppDurations.clockTick;
+    if (interval != _activeInterval) {
+      _restartTicker(interval);
+    }
   }
 
   @override
@@ -53,6 +70,12 @@ class _CenterClockState extends State<CenterClock> {
     _ticker?.cancel();
     _ticker = null;
     super.dispose();
+  }
+
+  void _restartTicker(Duration interval) {
+    _ticker?.cancel();
+    _activeInterval = interval;
+    _ticker = Timer.periodic(interval, _onTick);
   }
 
   void _onTick(Timer _) {
@@ -67,7 +90,7 @@ class _CenterClockState extends State<CenterClock> {
   @override
   Widget build(BuildContext context) {
     final SettingsModel settings = _resolveSettings(context);
-    final String label = CenterClock.formatTime(_current, settings.timeFormat);
+    final String label = _resolveLabel(settings);
     return Center(
       child: Stack(
         alignment: Alignment.center,
@@ -79,6 +102,9 @@ class _CenterClockState extends State<CenterClock> {
               fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
               fontWeight: FontWeight.w900,
+              // 等寬數字：每個數字佔相同寬度，數字變動時整串寬度與位置恆定，
+              // 避免跑數時欄位左右抖動（需字體支援 tnum；monospace 字體天生具備）。
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               foreground: Paint()
                 ..style = PaintingStyle.stroke
                 // 圓角接合 + 圓端點：避免字形銳角（如「2」）的 miter 尖角
@@ -96,12 +122,22 @@ class _CenterClockState extends State<CenterClock> {
               fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
               fontWeight: FontWeight.w900,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               color: settings.fillColor,
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// 決定要顯示的字串：生命計時模式（且已設出生日）顯示即時年齡，否則顯示時間。
+  String _resolveLabel(SettingsModel settings) {
+    final DateTime? birthDate = settings.birthDate;
+    if (settings.lifeTimerMode && birthDate != null) {
+      return AgeFormatter.format(birthDate, _current);
+    }
+    return CenterClock.formatTime(_current, settings.timeFormat);
   }
 
   SettingsModel _resolveSettings(BuildContext context) {

@@ -16,6 +16,8 @@ class SettingsModel {
     required this.timeFormat,
     required this.targetScreenIndex,
     required this.autoLaunch,
+    this.birthDate,
+    this.lifeTimerMode = false,
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
@@ -28,6 +30,8 @@ class SettingsModel {
       timeFormat: AppText.timeFormat,
       targetScreenIndex: 0,
       autoLaunch: false,
+      birthDate: null,
+      lifeTimerMode: false,
     );
   }
 
@@ -45,10 +49,14 @@ class SettingsModel {
       targetScreenIndex:
           _asInt(json['targetScreenIndex']) ?? d.targetScreenIndex,
       autoLaunch: _asBool(json['autoLaunch']) ?? d.autoLaunch,
+      birthDate: _asDateTime(json['birthDate']) ?? d.birthDate,
+      lifeTimerMode: _asBool(json['lifeTimerMode']) ?? d.lifeTimerMode,
     );
   }
 
-  static const int schemaVersion = 1;
+  /// schemaVersion 2：新增 birthDate / lifeTimerMode（生命計時模式）。
+  /// 舊版（v1）資料缺這兩欄，fromJson 以 default 補齊，向後相容。
+  static const int schemaVersion = 2;
 
   final double fontSize;
   final Color fillColor;
@@ -58,8 +66,14 @@ class SettingsModel {
   final int targetScreenIndex;
   final bool autoLaunch;
 
+  /// 出生日期（生命計時模式用）；未設定為 null。
+  final DateTime? birthDate;
+
+  /// 是否啟用生命計時模式（顯示即時年齡取代時間）。
+  final bool lifeTimerMode;
+
   Map<String, Object> toJson() {
-    return <String, Object>{
+    final Map<String, Object> json = <String, Object>{
       'schemaVersion': schemaVersion,
       'fontSize': fontSize,
       'fillColor': _colorToInt(fillColor),
@@ -68,7 +82,14 @@ class SettingsModel {
       'timeFormat': timeFormat,
       'targetScreenIndex': targetScreenIndex,
       'autoLaunch': autoLaunch,
+      'lifeTimerMode': lifeTimerMode,
     };
+    // birthDate 以 epoch 毫秒儲存；未設定時不寫入（Map 不存 null）。
+    final DateTime? birth = birthDate;
+    if (birth != null) {
+      json['birthDate'] = birth.millisecondsSinceEpoch;
+    }
+    return json;
   }
 
   SettingsModel copyWith({
@@ -79,6 +100,8 @@ class SettingsModel {
     String? timeFormat,
     int? targetScreenIndex,
     bool? autoLaunch,
+    DateTime? birthDate,
+    bool? lifeTimerMode,
   }) {
     return SettingsModel(
       fontSize: fontSize ?? this.fontSize,
@@ -88,6 +111,8 @@ class SettingsModel {
       timeFormat: timeFormat ?? this.timeFormat,
       targetScreenIndex: targetScreenIndex ?? this.targetScreenIndex,
       autoLaunch: autoLaunch ?? this.autoLaunch,
+      birthDate: birthDate ?? this.birthDate,
+      lifeTimerMode: lifeTimerMode ?? this.lifeTimerMode,
     );
   }
 
@@ -101,7 +126,9 @@ class SettingsModel {
         other.strokeWidth == strokeWidth &&
         other.timeFormat == timeFormat &&
         other.targetScreenIndex == targetScreenIndex &&
-        other.autoLaunch == autoLaunch;
+        other.autoLaunch == autoLaunch &&
+        other.birthDate == birthDate &&
+        other.lifeTimerMode == lifeTimerMode;
   }
 
   @override
@@ -113,6 +140,8 @@ class SettingsModel {
         timeFormat,
         targetScreenIndex,
         autoLaunch,
+        birthDate,
+        lifeTimerMode,
       );
 }
 
@@ -140,6 +169,13 @@ bool? _asBool(Object? value) {
 }
 
 String? _asString(Object? value) => value is String ? value : null;
+
+/// 解析 epoch 毫秒（int）為 [DateTime]；型別不符或缺值回傳 null。
+DateTime? _asDateTime(Object? value) {
+  final int? millis = _asInt(value);
+  if (millis == null) return null;
+  return DateTime.fromMillisecondsSinceEpoch(millis);
+}
 
 Color? _asColor(Object? value) {
   final int? argb = _asInt(value);
