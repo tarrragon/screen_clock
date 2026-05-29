@@ -206,7 +206,10 @@ class _PanelHost extends StatelessWidget {
       },
       child: _DismissibleOverlay(
         onDismiss: onClosed,
-        child: SettingsPanel(availableScreenCount: availableScreenCount),
+        child: SettingsPanel(
+          availableScreenCount: availableScreenCount,
+          onClose: onClosed,
+        ),
       ),
     );
   }

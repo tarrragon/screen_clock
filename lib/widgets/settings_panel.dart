@@ -15,10 +15,17 @@ class SettingsPanel extends StatelessWidget {
   const SettingsPanel({
     super.key,
     required this.availableScreenCount,
+    required this.onClose,
   });
 
   /// 目前可選擇的螢幕數，用於 dropdown 上限（SPEC-005 FR-03 + SPEC-003 FR-01）。
   final int availableScreenCount;
+
+  /// 關閉面板的回呼。
+  ///
+  /// 面板是 Stack overlay（非 Navigator route），不能用 `Navigator.pop` 關閉；
+  /// 由上層 `_PanelHost` 注入，內部設 `_panelOpen = false` 並還原 click-through。
+  final VoidCallback onClose;
 
   static const List<String> timeFormats = <String>['HH:mm:ss', 'HH:mm'];
 
@@ -241,7 +248,7 @@ class SettingsPanel extends StatelessWidget {
         TextButton(
           onPressed: () {
             controller.resetToStartup();
-            Navigator.of(context).maybePop();
+            onClose();
           },
           child: const Text('取消'),
         ),
@@ -249,9 +256,7 @@ class SettingsPanel extends StatelessWidget {
         FilledButton(
           onPressed: () async {
             await controller.persist();
-            if (context.mounted) {
-              Navigator.of(context).maybePop();
-            }
+            onClose();
           },
           child: const Text('儲存'),
         ),
