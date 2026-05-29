@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:screen_retriever/screen_retriever.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_constants.dart';
@@ -104,24 +105,105 @@ class ScreenClockApp extends StatefulWidget {
   State<ScreenClockApp> createState() => _ScreenClockAppState();
 }
 
-class _ScreenClockAppState extends State<ScreenClockApp> {
+class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
   bool _panelOpen = false;
+  bool _clockVisible = true;
   HotKey? _registeredHotKey;
 
   @override
   void initState() {
     super.initState();
+    trayManager.addListener(this);
     _registerHotKey();
+    _initTray();
   }
 
   @override
   void dispose() {
+    trayManager.removeListener(this);
     final HotKey? key = _registeredHotKey;
     if (key != null) {
       hotKeyManager.unregister(key);
     }
     _registeredHotKey = null;
     super.dispose();
+  }
+
+  /// 初始化狀態列（選單列）項目：透明 icon + 文字 + 選單。
+  Future<void> _initTray() async {
+    try {
+      // macOS 需先 setIcon 才會建立 status item（見 tray_manager 實作）。
+      await trayManager.setIcon(AppText.trayIconAsset);
+      await trayManager.setTitle(AppText.trayTitle);
+      await trayManager.setContextMenu(_buildTrayMenu());
+    } catch (error, stack) {
+      debugPrint('[main] tray init failed: $error');
+      debugPrint(stack.toString());
+    }
+  }
+
+  /// 依目前時鐘顯示狀態建立選單（顯示/隱藏標籤動態切換）。
+  Menu _buildTrayMenu() {
+    return Menu(
+      items: <MenuItem>[
+        MenuItem(key: 'settings', label: AppText.trayMenuSettings),
+        MenuItem(
+          key: 'toggle_visibility',
+          label: _clockVisible
+              ? AppText.trayMenuHideClock
+              : AppText.trayMenuShowClock,
+        ),
+        MenuItem.separator(),
+        MenuItem(key: 'quit', label: AppText.trayMenuQuit),
+      ],
+    );
+  }
+
+  @override
+  void onTrayIconMouseDown() {
+    trayManager.popUpContextMenu();
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    trayManager.popUpContextMenu();
+  }
+
+  @override
+  void onTrayMenuItemClick(MenuItem menuItem) {
+    switch (menuItem.key) {
+      case 'settings':
+        _openSettingsFromTray();
+      case 'toggle_visibility':
+        _toggleClockVisibility();
+      case 'quit':
+        _quit();
+    }
+  }
+
+  /// 狀態列「設定…」：取得焦點後開啟面板（agent app 需主動 focus）。
+  Future<void> _openSettingsFromTray() async {
+    try {
+      await windowManager.focus();
+    } catch (error) {
+      debugPrint('[main] focus before settings failed: $error');
+    }
+    await _togglePanel();
+  }
+
+  /// 切換時鐘「內容」顯示 / 隱藏，並更新選單標籤。
+  ///
+  /// 不動原生視窗（避免對 always-on-top + 全 Spaces 透明視窗呼叫 hide/show
+  /// 造成崩潰）；視窗本就透明 + click-through，不畫時鐘內容即視覺隱藏。
+  Future<void> _toggleClockVisibility() async {
+    setState(() => _clockVisible = !_clockVisible);
+    await trayManager.setContextMenu(_buildTrayMenu());
+  }
+
+  /// 狀態列「離開」：銷毀視窗 → 觸發 app 終止。
+  Future<void> _quit() async {
+    await trayManager.destroy();
+    await windowManager.destroy();
   }
 
   Future<void> _registerHotKey() async {
@@ -179,7 +261,7 @@ class _ScreenClockAppState extends State<ScreenClockApp> {
           backgroundColor: AppColors.overlayBackground,
           body: Stack(
             children: <Widget>[
-              const CenterClock(),
+              if (_clockVisible) const CenterClock(),
               if (_panelOpen)
                 _PanelHost(
                   availableScreenCount: widget.availableScreenCount,
