@@ -56,4 +56,10 @@ htmlcov/
 .claude/dispatch-active.json
 .claude/dispatch-active.lock
 .claude/hook-state/
+.claude/state/
+.claude/logs/
+.claude/pm-status.json
+.claude/ARCHITECTURE_REVIEW_REQUIRED
+.claude/PM_INTERVENTION_REQUIRED
+.claude/TASK_AVOIDANCE_FIX_MODE
 *.md.lock
