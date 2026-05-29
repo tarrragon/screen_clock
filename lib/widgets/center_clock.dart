@@ -95,7 +95,7 @@ class _CenterClockState extends State<CenterClock> {
             style: TextStyle(
               fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w900,
               color: settings.fillColor,
             ),
           ),
