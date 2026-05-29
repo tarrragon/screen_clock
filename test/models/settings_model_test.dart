@@ -50,6 +50,24 @@ void main() {
       expect(decoded, original);
     });
 
+    test('round-trips birthDate 與 lifeTimerMode', () {
+      final SettingsModel original = SettingsModel.defaults().copyWith(
+        birthDate: DateTime.fromMillisecondsSinceEpoch(946684800000),
+        lifeTimerMode: true,
+      );
+      final SettingsModel decoded =
+          SettingsModel.fromJson(original.toJson());
+      expect(decoded, original);
+      expect(decoded.lifeTimerMode, true);
+      expect(decoded.birthDate,
+          DateTime.fromMillisecondsSinceEpoch(946684800000));
+    });
+
+    test('birthDate 未設定時 toJson 不含該鍵', () {
+      final Map<String, Object> json = SettingsModel.defaults().toJson();
+      expect(json.containsKey('birthDate'), isFalse);
+    });
+
     test('fromJson empty map yields defaults', () {
       expect(SettingsModel.fromJson(const <String, Object?>{}),
           SettingsModel.defaults());

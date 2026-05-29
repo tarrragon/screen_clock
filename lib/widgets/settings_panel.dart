@@ -89,6 +89,10 @@ class SettingsPanel extends StatelessWidget {
                 _buildTargetScreen(controller, current),
                 const SizedBox(height: 12),
                 _buildAutoLaunch(controller, current),
+                const SizedBox(height: 12),
+                _buildLifeTimer(controller, current),
+                const SizedBox(height: 12),
+                _buildBirthDate(context, controller, current),
                 const SizedBox(height: 24),
                 _buildActions(context, controller),
               ],
@@ -274,6 +278,70 @@ class SettingsPanel extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildLifeTimer(
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    return Row(
+      children: <Widget>[
+        const SizedBox(width: 80, child: Text('生命計時')),
+        Switch(
+          value: current.lifeTimerMode,
+          onChanged: (bool v) => controller
+              .update((SettingsModel s) => s.copyWith(lifeTimerMode: v)),
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            '顯示即時年齡取代時間',
+            style: TextStyle(fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBirthDate(
+    BuildContext context,
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    final DateTime? birth = current.birthDate;
+    final String label = birth == null
+        ? '未設定'
+        : '${birth.year}-${_pad2(birth.month)}-${_pad2(birth.day)}';
+    return Row(
+      children: <Widget>[
+        const SizedBox(width: 80, child: Text('出生日期')),
+        OutlinedButton(
+          onPressed: () => _pickBirthDate(context, controller, birth),
+          child: Text(label),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickBirthDate(
+    BuildContext context,
+    SettingsController controller,
+    DateTime? current,
+  ) async {
+    final DateTime today = DateTime.now();
+    final DateTime initial =
+        current ?? DateTime(today.year - 20, today.month, today.day);
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: today,
+    );
+    if (picked != null) {
+      controller.update((SettingsModel s) => s.copyWith(birthDate: picked));
+    }
+  }
+
+  static String _pad2(int value) => value.toString().padLeft(2, '0');
 
   Widget _buildActions(BuildContext context, SettingsController controller) {
     return Row(

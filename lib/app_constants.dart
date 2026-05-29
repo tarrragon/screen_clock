@@ -63,6 +63,24 @@ class AppDurations {
 
   /// SPEC-002 FR-02：時鐘每秒更新一次。
   static const Duration clockTick = Duration(seconds: 1);
+
+  /// 生命計時模式的跑數更新間隔。
+  ///
+  /// 年齡小數第 8 位 ≈ 0.32 秒跳動一次；以 50ms 更新可平順呈現跑數，
+  /// 又不會像逐幀更新那樣過度重繪。
+  static const Duration lifeTimerTick = Duration(milliseconds: 50);
+}
+
+/// 生命計時（即時年齡）相關常數。
+class AppAge {
+  AppAge._();
+
+  /// 平均西曆年天數（每 400 年 97 個閏日 → 365 + 97/400 = 365.2425）。
+  /// 作為「一年」長度基準，使年齡換算不受個別閏年跳動影響。
+  static const double daysPerYear = 365.2425;
+
+  /// 年齡小數位數（8 位 → 剛好 4 組兩位數，配對無餘數）。
+  static const int decimalPlaces = 8;
 }
 
 class AppWindow {
