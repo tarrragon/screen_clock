@@ -20,7 +20,10 @@ class CenterClock extends StatefulWidget {
   ///
   /// MVP 階段只接受 `HH:mm:ss` / `HH:mm` 兩種；其他 pattern 視同 `HH:mm:ss`
   /// 避免引入 intl 套件（SPEC-002 設計約束 / SPEC-005 FR-03 dropdown 限制）。
-  static String formatTime(DateTime time, [String pattern = AppText.timeFormat]) {
+  static String formatTime(
+    DateTime time, [
+    String pattern = AppText.timeFormat,
+  ]) {
     final String hh = time.hour.toString().padLeft(2, '0');
     final String mm = time.minute.toString().padLeft(2, '0');
     final String ss = time.second.toString().padLeft(2, '0');
@@ -73,10 +76,15 @@ class _CenterClockState extends State<CenterClock> {
           Text(
             label,
             style: TextStyle(
+              fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w900,
               foreground: Paint()
                 ..style = PaintingStyle.stroke
+                // 圓角接合 + 圓端點：避免字形銳角（如「2」）的 miter 尖角
+                // 互相穿越造成線條交錯重疊（預設 StrokeJoin.miter 的問題）。
+                ..strokeJoin = StrokeJoin.round
+                ..strokeCap = StrokeCap.round
                 ..strokeWidth = settings.strokeWidth
                 ..color = settings.strokeColor,
             ),
@@ -85,8 +93,9 @@ class _CenterClockState extends State<CenterClock> {
           Text(
             label,
             style: TextStyle(
+              fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w900,
               color: settings.fillColor,
             ),
           ),
@@ -96,8 +105,8 @@ class _CenterClockState extends State<CenterClock> {
   }
 
   SettingsModel _resolveSettings(BuildContext context) {
-    final SettingsScope? scope =
-        context.dependOnInheritedWidgetOfExactType<SettingsScope>();
+    final SettingsScope? scope = context
+        .dependOnInheritedWidgetOfExactType<SettingsScope>();
     return scope?.notifier?.value ?? SettingsModel.defaults();
   }
 }

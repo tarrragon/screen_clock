@@ -16,6 +16,16 @@ class AppText {
 
   /// 24 小時制；SPEC-002 FR-01 預設格式。
   static const String timeFormat = 'HH:mm:ss';
+
+  /// 時鐘字型（Google Fonts 家族名稱）。
+  ///
+  /// 測試可用的字體，不會有邊框重疊或這銳角重疊的狀況
+  /// Oswald
+  /// Roboto Mono
+  /// Orbitron
+  /// Share Tech Mono
+  /// Fredoka
+  static const String clockFontFamily = 'Oswald';
 }
 
 class AppSizes {
@@ -39,10 +49,10 @@ class AppColors {
   AppColors._();
 
   /// SPEC-002 FR-04 預設樣式：白底。
-  static const Color clockFill = Colors.white;
+  static const Color clockFill = Color(0x0Cffffff);
 
   /// SPEC-002 FR-04 預設樣式：黑邊。
-  static const Color clockStroke = Colors.black;
+  static const Color clockStroke = Color(0x0A0A0A0A);
 
   /// SPEC-001 FR-02：視窗背景真透明（alpha=0）。
   static const Color overlayBackground = Colors.transparent;

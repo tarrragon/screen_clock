@@ -76,6 +76,25 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # 內嵌時鐘候選字型（OFL 授權，本地 assets，零網路依賴）。
+  # 皆為 variable font，FontWeight 由 wght 軸提供。
+  fonts:
+    - family: Fredoka
+      fonts:
+        - asset: assets/fonts/Fredoka.ttf
+    - family: Orbitron
+      fonts:
+        - asset: assets/fonts/Orbitron.ttf
+    - family: Oswald
+      fonts:
+        - asset: assets/fonts/Oswald.ttf
+    - family: Roboto Mono
+      fonts:
+        - asset: assets/fonts/RobotoMono.ttf
+    - family: Share Tech Mono
+      fonts:
+        - asset: assets/fonts/ShareTechMono.ttf
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
