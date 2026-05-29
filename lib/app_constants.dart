@@ -100,4 +100,13 @@ class AppWindow {
 
   /// SPEC-001 FR-05：滑鼠 click-through。
   static const bool ignoreMouseEvents = true;
+
+  /// 顯示於所有桌面（macOS Spaces）。
+  /// 設 canJoinAllSpaces，使遮罩時鐘出現在每個桌面、切換桌面時跟隨，
+  /// 而非綁定在啟動時的單一桌面。
+  static const bool visibleOnAllWorkspaces = true;
+
+  /// 是否在全螢幕 app 之上仍可見（fullScreenAuxiliary）。
+  /// 設 false：全螢幕 app 佔據獨立 Space 時，遮罩時鐘不侵入、不遮蓋全螢幕視窗。
+  static const bool visibleOnFullScreen = false;
 }
