@@ -56,6 +56,12 @@ Future<void> _applyOverlayWindowProperties(
   await windowManager.setHasShadow(AppWindow.hasShadow);
   await windowManager.setAlwaysOnTop(AppWindow.isAlwaysOnTop);
   await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
+  // 顯示於所有一般桌面（Spaces），切換桌面時遮罩時鐘跟隨；
+  // visibleOnFullScreen=false → 不侵入全螢幕 app 的獨立 Space。
+  await windowManager.setVisibleOnAllWorkspaces(
+    AppWindow.visibleOnAllWorkspaces,
+    visibleOnFullScreen: AppWindow.visibleOnFullScreen,
+  );
 
   final int targetIndex = parseScreenArg(args) ?? settings.targetScreenIndex;
   final Display target = await _detector.resolveTargetDisplay(targetIndex);
