@@ -4,6 +4,19 @@ All notable changes to **screen_clock** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-05-29
+
+設定面板修復與色彩控制強化。
+
+### Fixed
+
+- **設定面板儲存/取消無法關閉**：面板為 Stack overlay（非 Navigator route），原按鈕誤用 `Navigator.maybePop()` 導致無作用、面板關不掉且 click-through 未還原。改由 `_PanelHost` 注入 `onClose` callback，儲存/取消皆正確收起面板並還原 click-through。
+- **開機啟動 MissingPluginException**：`launch_at_startup` 在 macOS 需手動接 method channel handler（套件不自動註冊），先前漏做此整合。於 `MainFlutterWindow.swift` 補上 `launch_at_startup` channel，以 `SMAppService`（macOS 13+，含版本守衛）實作 register/unregister；Dart 端無需改動。
+
+### Changed
+
+- **色盤 RGB 與不透明度分離**：8 個預設色改為明確色碼；選色只換 RGB、保留欄位現有 alpha（填色 / 描邊各自的透明度不再被覆蓋）；選中標記改以 RGB 比較。新增不透明度滑桿（0-100%），可調出半透明效果並還原預設。
+
 ## [1.0.2] - 2026-05-29
 
 時鐘描邊乾淨化與字型本地化。
