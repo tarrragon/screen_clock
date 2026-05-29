@@ -53,6 +53,7 @@ dependencies:
 
   # 開機自動啟動：SPEC-006（macOS SMAppService / launchd 抽象）
   launch_at_startup: ^0.5.1
+  tray_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +76,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # 狀態列（選單列）佔位透明圖示：tray_manager 在 macOS 需先 setIcon 才會
+  # 建立 status item，狀態列僅顯示文字時用此透明圖避免可見圖示。
+  assets:
+    - assets/tray/transparent.png
 
   # 內嵌時鐘候選字型（OFL 授權，本地 assets，零網路依賴）。
   # 皆為 variable font，FontWeight 由 wght 軸提供。

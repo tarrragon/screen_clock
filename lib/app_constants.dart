@@ -17,6 +17,18 @@ class AppText {
   /// 24 小時制；SPEC-002 FR-01 預設格式。
   static const String timeFormat = 'HH:mm:ss';
 
+  /// 狀態列（選單列）顯示文字。
+  static const String trayTitle = 'timer';
+
+  /// 狀態列佔位透明圖示路徑（macOS 需先 setIcon 才會建立 status item）。
+  static const String trayIconAsset = 'assets/tray/transparent.png';
+
+  /// 狀態列選單標籤。
+  static const String trayMenuSettings = '設定…';
+  static const String trayMenuShowClock = '顯示時鐘';
+  static const String trayMenuHideClock = '隱藏時鐘';
+  static const String trayMenuQuit = '離開';
+
   /// 時鐘字型（Google Fonts 家族名稱）。
   ///
   /// 測試可用的字體，不會有邊框重疊或這銳角重疊的狀況
