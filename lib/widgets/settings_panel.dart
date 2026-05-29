@@ -15,22 +15,31 @@ class SettingsPanel extends StatelessWidget {
   const SettingsPanel({
     super.key,
     required this.availableScreenCount,
+    required this.onClose,
   });
 
   /// 目前可選擇的螢幕數，用於 dropdown 上限（SPEC-005 FR-03 + SPEC-003 FR-01）。
   final int availableScreenCount;
 
+  /// 關閉面板的回呼。
+  ///
+  /// 面板是 Stack overlay（非 Navigator route），不能用 `Navigator.pop` 關閉；
+  /// 由上層 `_PanelHost` 注入，內部設 `_panelOpen = false` 並還原 click-through。
+  final VoidCallback onClose;
+
   static const List<String> timeFormats = <String>['HH:mm:ss', 'HH:mm'];
 
+  /// 預設色盤（不透明 RGB 基色，色碼即 Material 對應色）。
+  /// 實際套用的透明度由各欄位現有 alpha + 不透明度滑桿決定，不寫死於此。
   static const List<Color> presetColors = <Color>[
-    Colors.white,
-    Colors.black,
-    Colors.red,
-    Colors.orange,
-    Colors.yellow,
-    Colors.green,
-    Colors.blue,
-    Colors.purple,
+    Color(0xFFFFFFFF), // 白
+    Color(0xFF000000), // 黑
+    Color(0xFFF44336), // 紅
+    Color(0xFFFF9800), // 橙
+    Color(0xFFFFEB3B), // 黃
+    Color(0xFF4CAF50), // 綠
+    Color(0xFF2196F3), // 藍
+    Color(0xFF9C27B0), // 紫
   ];
 
   @override
@@ -144,25 +153,57 @@ class SettingsPanel extends StatelessWidget {
     required Color current,
     required ValueChanged<Color> onPick,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        SizedBox(width: 80, child: Text(label)),
-        Expanded(
-          child: Wrap(
-            spacing: 8,
-            children: <Widget>[
-              for (final Color preset in presetColors)
-                _ColorSwatch(
-                  color: preset,
-                  selected: preset == current,
-                  onTap: () => onPick(preset),
-                ),
-            ],
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            SizedBox(width: 80, child: Text(label)),
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                children: <Widget>[
+                  for (final Color preset in presetColors)
+                    _ColorSwatch(
+                      color: preset,
+                      selected: _sameRgb(preset, current),
+                      // 只換 RGB，保留目前 alpha（填色 0C / 描邊 0A 不被覆蓋）。
+                      onTap: () => onPick(preset.withValues(alpha: current.a)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: <Widget>[
+            const SizedBox(width: 80, child: Text('不透明度', style: TextStyle(fontSize: 12))),
+            Expanded(
+              child: Slider(
+                min: 0,
+                max: 1,
+                value: current.a,
+                label: '${(current.a * 100).round()}%',
+                divisions: 100,
+                // 只換 alpha，保留目前 RGB。
+                onChanged: (double v) => onPick(current.withValues(alpha: v)),
+              ),
+            ),
+            SizedBox(
+              width: 40,
+              child: Text('${(current.a * 100).round()}%'),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  /// 比較兩色 RGB 是否相同（忽略 alpha），用於色盤選中標記。
+  static bool _sameRgb(Color a, Color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b;
   }
 
   Widget _buildTimeFormat(
@@ -241,7 +282,7 @@ class SettingsPanel extends StatelessWidget {
         TextButton(
           onPressed: () {
             controller.resetToStartup();
-            Navigator.of(context).maybePop();
+            onClose();
           },
           child: const Text('取消'),
         ),
@@ -249,9 +290,7 @@ class SettingsPanel extends StatelessWidget {
         FilledButton(
           onPressed: () async {
             await controller.persist();
-            if (context.mounted) {
-              Navigator.of(context).maybePop();
-            }
+            onClose();
           },
           child: const Text('儲存'),
         ),
