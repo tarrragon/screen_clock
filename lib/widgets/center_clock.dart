@@ -102,6 +102,9 @@ class _CenterClockState extends State<CenterClock> {
               fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
               fontWeight: FontWeight.w900,
+              // 等寬數字：每個數字佔相同寬度，數字變動時整串寬度與位置恆定，
+              // 避免跑數時欄位左右抖動（需字體支援 tnum；monospace 字體天生具備）。
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               foreground: Paint()
                 ..style = PaintingStyle.stroke
                 // 圓角接合 + 圓端點：避免字形銳角（如「2」）的 miter 尖角
@@ -119,6 +122,7 @@ class _CenterClockState extends State<CenterClock> {
               fontFamily: AppText.clockFontFamily,
               fontSize: settings.fontSize,
               fontWeight: FontWeight.w900,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               color: settings.fillColor,
             ),
           ),

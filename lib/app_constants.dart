@@ -20,12 +20,13 @@ class AppText {
   /// 時鐘字型（Google Fonts 家族名稱）。
   ///
   /// 測試可用的字體，不會有邊框重疊或這銳角重疊的狀況
+  /// 但是非等寬字體會讓字的寬度跳動，使用 monospace 的字體才能避免
   /// Oswald
   /// Roboto Mono
   /// Orbitron
   /// Share Tech Mono
   /// Fredoka
-  static const String clockFontFamily = 'Oswald';
+  static const String clockFontFamily = 'Roboto Mono';
 }
 
 class AppSizes {
@@ -64,11 +65,11 @@ class AppDurations {
   /// SPEC-002 FR-02：時鐘每秒更新一次。
   static const Duration clockTick = Duration(seconds: 1);
 
-  /// 生命計時模式的跑數更新間隔。
+  /// 生命計時模式的跑數更新間隔（約 60fps）。
   ///
-  /// 年齡小數第 8 位 ≈ 0.32 秒跳動一次；以 50ms 更新可平順呈現跑數，
-  /// 又不會像逐幀更新那樣過度重繪。
-  static const Duration lifeTimerTick = Duration(milliseconds: 50);
+  /// 16ms 逐幀更新讓跑數最平順；年齡小數末位 ≈ 0.3 秒跳動，此頻率足以
+  /// 平滑呈現且不漏更新。
+  static const Duration lifeTimerTick = Duration(milliseconds: 16);
 }
 
 /// 生命計時（即時年齡）相關常數。
@@ -80,6 +81,8 @@ class AppAge {
   static const double daysPerYear = 365.2425;
 
   /// 年齡小數位數（8 位 → 剛好 4 組兩位數，配對無餘數）。
+  /// 須為偶數以維持兩位數配對。8 位末位 ≈ 0.3 秒跳動，肉眼可辨；
+  /// 更高位數（如 10 位）末位過快難以辨識，反失意義。
   static const int decimalPlaces = 8;
 }
 
