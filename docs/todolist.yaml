@@ -56,6 +56,16 @@ versions:
     notes: |
       4 Wave：W1 設定持久化 / W2 設定面板 UI / W3 開機啟動 / W4 收尾與發布。
 
+  - version: "1.0.1"
+    codename: "transparency-hotfix"
+    description: "透明遮罩黑底修正：MainFlutterWindow 補設 flutterViewController.backgroundColor=.clear（Flutter 3.7+ macOS embedder regression）"
+    status: "active"
+    worklog: "docs/work-logs/v1/v1.0/v1.0.1/"
+    notes: |
+      發布後於本機 Flutter 3.38.10 暴露：SPEC-001 FR-02 透明背景失效顯示黑底。
+      根因為原生端只設 NSWindow 透明，漏設 FlutterViewController 透明層。
+      附帶事項：pubspec SDK 約束本機暫放寬 ^3.11.1 → ^3.10.0 以相容 Flutter 3.38.10。
+
 # ============================================================
 # 開發核心原則
 # ============================================================
