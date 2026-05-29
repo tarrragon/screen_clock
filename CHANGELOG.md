@@ -4,6 +4,20 @@ All notable changes to **screen_clock** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-29
+
+新增生命計時模式（即時年齡顯示）。
+
+### Added
+
+- **生命計時模式**：在設定面板設定出生日期並開啟「生命計時」開關後，時鐘改顯示即時年齡，取代時間。年齡以平均西曆年（365.2425 天）換算，顯示格式為「年齡兩位數 + 4 組兩位小數」、空格分隔、無標點（例 `18 15 97 91 75`，前兩位為整數年齡、其後為小數位）。
+- **設定面板新欄位**：出生日期選擇器（1900 ~ 今日）與生命計時模式開關。
+
+### Changed
+
+- **跑數防抖與平順度**：年齡跑數以 16ms（約 60fps）更新；加入等寬數字（`FontFeature.tabularFigures()`），數字變動時整串寬度與位置恆定不抖動。搭配 monospace 字體（如 Roboto Mono）效果最佳。
+- **SettingsModel schema 升至 2**：新增 `birthDate` / `lifeTimerMode` 欄位，向後相容舊版設定（缺欄位以預設補齊）。
+
 ## [1.0.3] - 2026-05-29
 
 設定面板修復與色彩控制強化。
