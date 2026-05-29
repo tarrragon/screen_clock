@@ -66,3 +66,7 @@ htmlcov/
 .claude/PM_INTERVENTION_REQUIRED
 .claude/TASK_AVOIDANCE_FIX_MODE
 *.md.lock
+.claude/scheduled_tasks.lock
+
+# 測試副作用洩漏：mock 物件被當路徑使用時生成的字面目錄（純垃圾）
+**/MagicMock/
