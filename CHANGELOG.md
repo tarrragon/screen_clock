@@ -4,6 +4,16 @@ All notable changes to **screen_clock** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+時鐘描邊乾淨化與字型本地化。
+
+### Changed
+
+- **時鐘描邊去交錯**：描邊 `Paint` 加 `StrokeJoin.round` + `StrokeCap.round`，消除字形銳角（如「2」）的 miter 尖角互相穿越造成的線條交錯重疊。
+- **字型本地內嵌（零網路依賴）**：改用本地 `assets/fonts/` 內嵌 5 套 OFL 字型（Oswald / Roboto Mono / Orbitron / Share Tech Mono / Fredoka），透過 Flutter 原生 `fontFamily` 載入；`AppText.clockFontFamily` 新增為字型切換單一來源。移除 runtime 下載的 `google_fonts` 套件與 macOS network entitlement，app 完全離線運作，不再要求網路權限。
+- **雙層描邊字重對齊**：填色層字重對齊描邊層為 `w900`，確保兩層字形幾何一致（雙層描邊技法前提）。
+
 ## [1.0.1] - 2026-05-29
 
 macOS 透明遮罩黑底 hotfix。
