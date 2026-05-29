@@ -4,6 +4,18 @@ All notable changes to **screen_clock** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-05-29
+
+macOS 透明遮罩黑底 hotfix。
+
+### Fixed
+
+- **透明遮罩黑底（1.0.1-W1-001）**：`MainFlutterWindow.swift` 於建立 `FlutterViewController` 後補設 `flutterViewController.backgroundColor = .clear`。Flutter 3.7+ macOS embedder 的 FlutterView backing layer 預設不透明，會自繪黑底蓋住透明 NSWindow；只設 NSWindow 透明不足，須同步清 FlutterViewController 背景（flutter/flutter #119132）。修復後桌面內容可透視，click-through 與 always-on-top 不受影響。
+
+### Changed
+
+- **Dart SDK 約束暫放寬**：`pubspec.yaml` environment.sdk 由 `^3.11.1` 放寬至 `^3.10.0`，以相容本機 Flutter 3.38.10（Dart 3.10.9）。待本機升級 Flutter 後還原（追蹤 ticket 1.0.1-W1-002）。
+
 ## [1.0.0] - 2026-05-29
 
 第一個 macOS 正式版。
