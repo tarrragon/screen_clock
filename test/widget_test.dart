@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_clock/app_constants.dart';
 import 'package:screen_clock/main.dart';
+import 'package:screen_clock/platform/fullscreen_detector.dart';
 import 'package:screen_clock/models/settings_model.dart';
 import 'package:screen_clock/services/auto_launch_service.dart';
 import 'package:screen_clock/services/settings_service.dart';
@@ -25,6 +26,7 @@ void main() {
       ScreenClockApp(
         controller: controller,
         availableScreenCount: 1,
+        fullscreenDetector: FullscreenDetector(),
       ),
     );
 

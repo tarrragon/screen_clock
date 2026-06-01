@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app_constants.dart';
 import 'models/settings_model.dart';
 import 'platform/display_detector.dart';
+import 'platform/fullscreen_detector.dart';
 import 'platform/screen_arg.dart';
 import 'services/auto_launch_service.dart';
 import 'services/settings_service.dart';
@@ -42,6 +43,7 @@ Future<void> main(List<String> args) async {
     ScreenClockApp(
       controller: controller,
       availableScreenCount: displayCount,
+      fullscreenDetector: FullscreenDetector(),
     ),
   );
 }
@@ -96,10 +98,12 @@ class ScreenClockApp extends StatefulWidget {
     super.key,
     required this.controller,
     required this.availableScreenCount,
+    required this.fullscreenDetector,
   });
 
   final SettingsController controller;
   final int availableScreenCount;
+  final FullscreenDetector fullscreenDetector;
 
   @override
   State<ScreenClockApp> createState() => _ScreenClockAppState();
@@ -107,8 +111,18 @@ class ScreenClockApp extends StatefulWidget {
 
 class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
   bool _panelOpen = false;
+
+  /// 使用者手動顯示意願（狀態列「顯示 / 隱藏時鐘」）。
   bool _clockVisible = true;
+
+  /// 目標螢幕是否被假全螢幕（影片 / 簡報 / 遊戲）視窗覆蓋。
+  /// 由原生 [FullscreenDetector] 回報；被覆蓋時時鐘讓位（ticket 1.2.1-W2-001）。
+  bool _coveredByFullscreen = false;
+
   HotKey? _registeredHotKey;
+
+  /// 實際是否繪製時鐘：使用者要顯示 且 未被假全螢幕覆蓋。
+  bool get _shouldRenderClock => _clockVisible && !_coveredByFullscreen;
 
   @override
   void initState() {
@@ -116,17 +130,28 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
     trayManager.addListener(this);
     _registerHotKey();
     _initTray();
+    widget.fullscreenDetector.start(
+      onCoverageChanged: _onFullscreenCoverageChanged,
+    );
   }
 
   @override
   void dispose() {
     trayManager.removeListener(this);
+    widget.fullscreenDetector.stop();
     final HotKey? key = _registeredHotKey;
     if (key != null) {
       hotKeyManager.unregister(key);
     }
     _registeredHotKey = null;
     super.dispose();
+  }
+
+  /// 假全螢幕覆蓋狀態變化：被覆蓋時讓位，退出後復現。
+  /// 不影響使用者手動顯示意願 [_clockVisible]，兩者以 [_shouldRenderClock] 合成。
+  void _onFullscreenCoverageChanged(bool covered) {
+    if (!mounted) return;
+    setState(() => _coveredByFullscreen = covered);
   }
 
   /// 初始化狀態列（選單列）項目：透明 icon + 文字 + 選單。
@@ -261,7 +286,7 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
           backgroundColor: AppColors.overlayBackground,
           body: Stack(
             children: <Widget>[
-              if (_clockVisible) const CenterClock(),
+              if (_shouldRenderClock) const CenterClock(),
               if (_panelOpen)
                 _PanelHost(
                   availableScreenCount: widget.availableScreenCount,

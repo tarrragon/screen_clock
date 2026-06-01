@@ -122,3 +122,24 @@ class AppWindow {
   /// 設 false：全螢幕 app 佔據獨立 Space 時，遮罩時鐘不侵入、不遮蓋全螢幕視窗。
   static const bool visibleOnFullScreen = false;
 }
+
+/// 假全螢幕（影片 / 簡報 / 遊戲）覆蓋偵測相關常數。
+///
+/// 對應 ticket 1.2.1-W2-001：native fullscreen（綠燈鈕、獨立 Space）由
+/// [AppWindow.visibleOnFullScreen] 處理；假全螢幕是鋪滿螢幕的「普通視窗」，
+/// 不建獨立 Space，須由原生 CGWindowList 覆蓋判定偵測，經此 channel 回報
+/// Dart 端切換時鐘顯示。
+class AppFullscreenDetect {
+  AppFullscreenDetect._();
+
+  /// 原生端回報假全螢幕覆蓋狀態的 method channel 名稱。
+  /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
+  static const String channelName = 'screen_clock/fullscreen_detect';
+
+  /// 原生 → Dart：覆蓋狀態變化通知方法名。
+  /// 參數 `covered`（bool）：目標螢幕是否被假全螢幕視窗鋪滿。
+  static const String onCoverageChangedMethod = 'onCoverageChanged';
+
+  /// 原生 → Dart 參數鍵：是否被覆蓋。
+  static const String coveredArgKey = 'covered';
+}
