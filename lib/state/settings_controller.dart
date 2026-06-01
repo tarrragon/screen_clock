@@ -4,6 +4,9 @@ import '../models/settings_model.dart';
 import '../services/auto_launch_service.dart';
 import '../services/settings_service.dart';
 
+/// 設定轉換規則：收當前設定、回傳改好的新設定（通常以 [SettingsModel.copyWith] 實作）。
+typedef SettingsMutator = SettingsModel Function(SettingsModel current);
+
 /// 設定的可變狀態（SPEC-005 FR-04 + SPEC-006 FR-01）。
 ///
 /// 採內建 [ValueNotifier] 取代第三方狀態管理套件，維持 MVP 依賴簡潔。
@@ -43,9 +46,14 @@ class SettingsController extends ValueNotifier<SettingsModel> {
     }
   }
 
-  /// 修改單一欄位的便利方法（避免外部寫死大量 copyWith 呼叫）。
-  void update(SettingsModel Function(SettingsModel current) mutate) {
-    final SettingsModel next = mutate(value);
+  /// 套用一條「目前設定 → 新設定」的轉換規則（避免外部寫死大量 copyWith 呼叫）。
+  ///
+  /// 傳入的 [transform] 收當前設定、回傳改好的新設定；本方法負責取值、去重
+  /// （值未變不重設）、賦回並通知監聽者重繪。
+  ///
+  /// 範例：`controller.update((s) => s.copyWith(fillColor: c));`
+  void update(SettingsMutator transform) {
+    final SettingsModel next = transform(value);
     if (next != value) {
       value = next;
     }
