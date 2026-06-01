@@ -109,7 +109,8 @@ flutter analyze    # 必須 0 issue
 ## 已知限制
 
 - 多螢幕情境下，非主螢幕的 menu bar 區域可能不被遮罩覆蓋（`Display.visiblePosition` 限制）
-- 全螢幕應用（Keynote 播放、瀏覽器全螢幕）佔據獨立 Space 時，遮罩時鐘不顯示於其上（v1.2.0 起的設計行為，刻意不侵入全螢幕內容）
+- macOS native 全螢幕（視窗左上綠燈鈕進入、佔據獨立 Space）時，遮罩時鐘不顯示於其上（v1.2.0 起的設計行為，`visibleOnFullScreen=false` 刻意不侵入該獨立 Space）
+- 假全螢幕（影片播放全螢幕、Keynote 播放、遊戲等「鋪滿螢幕的普通視窗」，不建立獨立 Space）目前**仍會被遮罩時鐘覆蓋**；`visibleOnFullScreen` 僅作用於 native 全螢幕的獨立 Space，對此類視窗不適用。覆蓋偵測讓位機制規劃於 v1.2.1（追蹤：`1.2.1-W2-001`）
 - 遮罩時鐘顯示於所有一般桌面（Spaces）並隨切換桌面跟隨（v1.2.0）
 - Mission Control / Stage Manager 切換時遮罩可能短暫變成可見視窗（macOS 對 always-on-top 透明視窗的處理）
 - 系統匯入 / 變更時區後需重啟 app 才能反映

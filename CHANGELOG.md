@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
-- **顯示於所有桌面（Spaces）**：遮罩時鐘設 `canJoinAllSpaces`，出現在每個一般桌面並隨切換桌面跟隨；`visibleOnFullScreen=false` 使全螢幕 app 佔據獨立 Space 時不被遮蓋。
+- **顯示於所有桌面（Spaces）**：遮罩時鐘設 `canJoinAllSpaces`，出現在每個一般桌面並隨切換桌面跟隨；`visibleOnFullScreen=false` 使 macOS **native 全螢幕**（綠燈鈕、佔據獨立 Space）的 app 不被遮蓋。註：`.fullScreenAuxiliary` 僅作用於 native 全螢幕的獨立 Space；假全螢幕（影片/簡報/遊戲等鋪滿螢幕的普通視窗）不適用，仍會被遮蓋，遺留至 v1.2.1 處理。
 - **「顯示/隱藏時鐘」採 Flutter 層條件渲染**：不呼叫原生 `windowManager.hide()`（避免對 always-on-top + 全 Spaces 透明視窗操作造成崩潰）；視窗本就透明 + click-through，不繪製時鐘內容即視覺隱藏。
 
 ### Chore
