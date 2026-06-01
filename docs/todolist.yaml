@@ -8,7 +8,7 @@
 meta:
   project: "screen_clock"
   architecture: "Flutter Desktop（v1.0 前 macOS only；v1.1.x 起加 Windows）"
-  last_updated: "2026-05-29"
+  last_updated: "2026-06-01"
   maintainer: "rosemary-project-manager"
 
 # ============================================================
@@ -59,12 +59,59 @@ versions:
   - version: "1.0.1"
     codename: "transparency-hotfix"
     description: "透明遮罩黑底修正：MainFlutterWindow 補設 flutterViewController.backgroundColor=.clear（Flutter 3.7+ macOS embedder regression）"
-    status: "active"
+    status: "completed"
     worklog: "docs/work-logs/v1/v1.0/v1.0.1/"
     notes: |
       發布後於本機 Flutter 3.38.10 暴露：SPEC-001 FR-02 透明背景失效顯示黑底。
       根因為原生端只設 NSWindow 透明，漏設 FlutterViewController 透明層。
       附帶事項：pubspec SDK 約束本機暫放寬 ^3.11.1 → ^3.10.0 以相容 Flutter 3.38.10。
+
+  - version: "1.0.2"
+    codename: "stroke-font-polish"
+    description: "時鐘描邊乾淨化（StrokeJoin/Cap round 去交錯）與字型本地內嵌（移除 google_fonts 與網路權限）"
+    status: "completed"
+    worklog: "docs/work-logs/v1/v1.0/v1.0.2/"
+    notes: |
+      補登版本索引（CHANGELOG [1.0.2] 2026-05-29）。發布時未建 worklog 結構。
+      雙層描邊字重對齊 w900；AppText.clockFontFamily 成為字型切換單一來源。
+
+  - version: "1.0.3"
+    codename: "settings-panel-fix"
+    description: "設定面板儲存/取消無法關閉修復、開機啟動 MissingPluginException 修復、色盤 RGB 與不透明度分離"
+    status: "completed"
+    worklog: "docs/work-logs/v1/v1.0/v1.0.3/"
+    notes: |
+      補登版本索引（CHANGELOG [1.0.3] 2026-05-29）。發布時未建 worklog 結構。
+      面板改由 _PanelHost 注入 onClose callback；launch_at_startup 補 method channel（SMAppService）。
+
+  - version: "1.1.0"
+    codename: "life-timer"
+    description: "生命計時模式（即時年齡顯示，平均西曆年換算）、設定面板出生日期欄位、跑數防抖（60fps + tabularFigures）"
+    status: "completed"
+    worklog: "docs/work-logs/v1/v1.1/v1.1.0/"
+    notes: |
+      補登版本索引（CHANGELOG [1.1.0] 2026-05-29）。發布時未建 worklog 結構。
+      SettingsModel schema 升至 2（新增 birthDate / lifeTimerMode，向後相容）。
+
+  - version: "1.2.0"
+    codename: "menubar-multidesktop"
+    description: "選單列 agent app（LSUIElement，隱藏 Dock，狀態列文字 timer）、顯示於所有桌面（canJoinAllSpaces）、顯示/隱藏採 Flutter 層條件渲染"
+    status: "completed"
+    worklog: "docs/work-logs/v1/v1.2/v1.2.0/"
+    notes: |
+      補登版本索引（CHANGELOG [1.2.0] 2026-05-29）。發布時未建 worklog 結構。
+      visibleOnFullScreen=false 僅對 native fullscreen（獨立 Space）有效；對假全螢幕（影片/簡報/遊戲）無效，遺留至 1.2.1 處理。
+
+  - version: "1.2.1"
+    codename: "fullscreen-occlusion-fix"
+    description: "假全螢幕（影片/簡報/遊戲，不建獨立 Space）遮蔽偵測：fullScreenAuxiliary 對其無效，需新增原生覆蓋偵測機制讓時鐘讓位；含 runtime 層生效驗證方法設計"
+    status: "active"
+    worklog: "docs/work-logs/v1/v1.2/v1.2.1/"
+    notes: |
+      源於用戶回報：全螢幕播放影片/簡報/遊戲時遮罩時鐘仍覆蓋其上。
+      根因：v1.2.0 的 visibleOnFullScreen=false（fullScreenAuxiliary）只管 native fullscreen 獨立 Space，
+      假全螢幕為鋪滿螢幕的普通視窗，該設定不適用。README.md:112 描述亦誤（誤稱假全螢幕佔據獨立 Space）。
+      W1 ANA 探索偵測方案並設計可實機驗證的驗收方法，避免再次 false positive（quality-baseline 規則 1 邊界）。
 
 # ============================================================
 # 開發核心原則
