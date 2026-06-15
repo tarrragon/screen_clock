@@ -235,4 +235,55 @@ void main() {
       expect(captured, isEmpty);
     });
   });
+
+  group('onCancelled 回呼（W4-004：通知 UI 捕捉無結果）', () {
+    test('逾時觸發 onCancelled，不觸發 onCaptured', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      final List<int> captured = <int>[];
+      int cancelled = 0;
+      await controller.startButtonCapture(
+        onCaptured: captured.add,
+        onCancelled: () => cancelled++,
+        timeout: const Duration(milliseconds: 10),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(captured, isEmpty);
+      expect(cancelled, 1);
+    });
+
+    test('外部 cancelButtonCapture 觸發 onCancelled', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      int cancelled = 0;
+      await controller.startButtonCapture(
+        onCaptured: (_) {},
+        onCancelled: () => cancelled++,
+      );
+      await controller.cancelButtonCapture();
+
+      expect(cancelled, 1);
+    });
+
+    test('成功捕捉時不觸發 onCancelled', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      final List<int> captured = <int>[];
+      int cancelled = 0;
+      await controller.startButtonCapture(
+        onCaptured: captured.add,
+        onCancelled: () => cancelled++,
+      );
+
+      await sendButtonCaptured(4);
+
+      expect(captured, <int>[4]);
+      expect(cancelled, 0);
+    });
+  });
 }
