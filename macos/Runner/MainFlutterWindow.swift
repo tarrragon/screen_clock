@@ -285,6 +285,10 @@ final class InputBindingBridge {
   private var draggingAction: [String: Any]?
   private var lastDragY: CGFloat = 0
 
+  /// 偵測捕捉模式旗標（SPEC-007 FR-06）：為 true 時，下一個 otherMouseDown
+  /// 經 onButtonCaptured 回報 buttonNumber 並消費該事件，不分派綁定動作。
+  private var capturingButton = false
+
   init(messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(
       name: "screen_clock/input_binding",
@@ -313,6 +317,23 @@ final class InputBindingBridge {
       let arguments = call.arguments as? [String: Any]
       let bindings = arguments?["bindings"] as? [[String: Any]] ?? []
       applyBindings(bindings)
+      result(nil)
+
+    case "beginCaptureButton":
+      // 進入偵測捕捉模式：需確保 CGEventTap active（即使目前無綁定），
+      // 才能攔截到下一個側鍵。未授權時不建立 tap（由 Dart 端先請求授權）。
+      capturingButton = true
+      if AXIsProcessTrusted() {
+        ensureTap()
+      }
+      result(nil)
+
+    case "endCaptureButton":
+      // 離開捕捉模式：若目前無綁定則拆除 tap，還原「無綁定不留 tap」不變式。
+      capturingButton = false
+      if bindingsByButton.isEmpty {
+        teardownTap()
+      }
       result(nil)
 
     default:
@@ -411,6 +432,11 @@ final class InputBindingBridge {
 
     switch type {
     case .otherMouseDown:
+      // 捕捉模式優先於綁定分派：捕捉中任何側鍵按下都經 onButtonCaptured
+      // 回報並消費，不觸發既有綁定動作（與是否有綁定無關）。
+      if capturingButton {
+        return reportCapturedButton(event)
+      }
       let button = event.getIntegerValueField(.mouseEventButtonNumber)
       return handleButtonDown(button: button, event: event)
 
@@ -445,6 +471,25 @@ final class InputBindingBridge {
       return nil
     }
     return Unmanaged.passUnretained(event)
+  }
+
+  /// 捕捉模式：取下一個側鍵編號，經 onButtonCaptured 回報 Dart 並消費該事件。
+  ///
+  /// 一次性：回報後立刻關閉 capturingButton 旗標，避免連續側鍵連報。
+  /// channel.invokeMethod 須在 main thread；CGEventTap 回呼在非 main thread，
+  /// 故以 DispatchQueue.main.async 包裹。捕捉是罕見一次性事件（非拖曳熱路徑），
+  /// main thread async 發 channel 可接受（NFR-01）。回傳 nil 消費此次按下，
+  /// 避免原綁定的上一頁 / 下一頁等動作被觸發。
+  private func reportCapturedButton(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+    let button = event.getIntegerValueField(.mouseEventButtonNumber)
+    capturingButton = false
+    DispatchQueue.main.async { [weak self] in
+      self?.channel.invokeMethod(
+        "onButtonCaptured",
+        arguments: ["buttonNumber": Int(button)]
+      )
+    }
+    return nil
   }
 
   /// 側鍵放開：若正在拖曳則離開並消費，否則放行。
