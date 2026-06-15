@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_clock/app_constants.dart';
+import 'package:screen_clock/input/input_binding_controller.dart';
 import 'package:screen_clock/main.dart';
 import 'package:screen_clock/platform/fullscreen_detector.dart';
 import 'package:screen_clock/models/settings_model.dart';
@@ -27,6 +28,7 @@ void main() {
         controller: controller,
         availableScreenCount: 1,
         fullscreenDetector: FullscreenDetector(),
+        inputBindingController: InputBindingController(),
       ),
     );
 

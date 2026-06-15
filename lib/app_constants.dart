@@ -182,6 +182,10 @@ class AppInputBinding {
   /// DragScrollAction 預設靈敏度（位移到滾輪量的中等倍率）。
   static const double defaultDragScrollSensitivity = 1;
 
+  /// 開箱即用預設綁定的滑鼠按鍵編號（spike 1.3.0-W1-001 實測側鍵 = button 4）。
+  /// SettingsModel.defaults() 以此按鍵綁定拖曳滾動，讓功能首次啟動即可用。
+  static const int defaultDragScrollButton = 4;
+
   /// 原生 ↔ Dart 滑鼠輸入綁定 method channel 名稱（SPEC-007 FR-07）。
   /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
   static const String channelName = 'screen_clock/input_binding';

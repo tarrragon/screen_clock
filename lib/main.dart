@@ -6,6 +6,7 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_constants.dart';
+import 'input/input_binding_controller.dart';
 import 'models/settings_model.dart';
 import 'platform/display_detector.dart';
 import 'platform/fullscreen_detector.dart';
@@ -44,6 +45,7 @@ Future<void> main(List<String> args) async {
       controller: controller,
       availableScreenCount: displayCount,
       fullscreenDetector: FullscreenDetector(),
+      inputBindingController: InputBindingController(),
     ),
   );
 }
@@ -99,11 +101,13 @@ class ScreenClockApp extends StatefulWidget {
     required this.controller,
     required this.availableScreenCount,
     required this.fullscreenDetector,
+    required this.inputBindingController,
   });
 
   final SettingsController controller;
   final int availableScreenCount;
   final FullscreenDetector fullscreenDetector;
+  final InputBindingController inputBindingController;
 
   @override
   State<ScreenClockApp> createState() => _ScreenClockAppState();
@@ -133,11 +137,21 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
     widget.fullscreenDetector.start(
       onCoverageChanged: _onFullscreenCoverageChanged,
     );
+    // SPEC-007 FR-03：下傳綁定啟動原生 CGEventTap 分派；設定變更時重傳。
+    widget.inputBindingController.start(widget.controller.value.bindings);
+    widget.controller.addListener(_onSettingsChanged);
+  }
+
+  /// 設定變更（含綁定）時，將最新綁定重新下傳原生，使分派即時生效。
+  void _onSettingsChanged() {
+    widget.inputBindingController.syncBindings(widget.controller.value.bindings);
   }
 
   @override
   void dispose() {
     trayManager.removeListener(this);
+    widget.controller.removeListener(_onSettingsChanged);
+    widget.inputBindingController.stop();
     widget.fullscreenDetector.stop();
     final HotKey? key = _registeredHotKey;
     if (key != null) {

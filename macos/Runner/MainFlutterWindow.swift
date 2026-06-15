@@ -255,20 +255,35 @@ final class FullscreenCoverageDetector {
   }
 }
 
-/// 滑鼠輸入綁定原生橋接（ticket 1.3.0-W2-001，SPEC-007 FR-07）。
+/// 滑鼠輸入綁定原生橋接（ticket 1.3.0-W2-001 + W2-003，SPEC-007 FR-03/FR-07）。
 ///
-/// 提供 Dart 端輔助使用授權查詢 / 請求與綁定下傳：
+/// 提供 Dart 端輔助使用授權查詢 / 請求與綁定下傳，並依綁定清單建立 CGEventTap
+/// 攔截側鍵事件分派動作（拖曳滾動 / 快捷鍵）：
 /// - queryPermission → 回傳 AXIsProcessTrusted()（是否已授權）。
 /// - requestPermission → AXIsProcessTrustedWithOptions 觸發系統提示，回傳當下狀態。
-/// - updateBindings → 收下綁定清單暫存；本階段不建立 CGEventTap（留 W2-003）。
+/// - updateBindings → 收下綁定清單快照；已授權時即時建立 / 更新 CGEventTap。
+///
+/// 分派規則（依 buttonNumber 比對綁定）：
+/// - DragScroll 綁定 → down 進入拖曳並消費；move 依方向 / 靈敏度合成滾輪；up 離開並消費。
+/// - Hotkey 綁定 → 本階段先消費 + log（HotkeyAction 執行留 W3）。
+/// - 未綁定 → 放行。
 ///
 /// 授權狀態變化以 onPermissionChanged 回報 Dart。channel 與方法名須與
 /// lib/app_constants.dart 的 AppInputBinding 字面一致。
 final class InputBindingBridge {
   private let channel: FlutterMethodChannel
 
-  /// 已下傳的綁定清單暫存（本階段僅儲存，tap 建立留 W2-003）。
-  private var storedBindings: [[String: Any]] = []
+  /// 已下傳的綁定快照：buttonNumber → 動作描述（type + 參數）。
+  private var bindingsByButton: [Int64: [String: Any]] = [:]
+
+  /// CGEventTap 與 run loop source（已授權時建立；綁定變更時沿用同一 tap）。
+  private var eventTap: CFMachPort?
+  private var runLoopSource: CFRunLoopSource?
+  private let scrollSource = CGEventSource(stateID: .hidSystemState)
+
+  /// 拖曳滾動狀態：目前正在拖曳的綁定（nil 表示未拖曳）。
+  private var draggingAction: [String: Any]?
+  private var lastDragY: CGFloat = 0
 
   init(messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(
@@ -278,6 +293,10 @@ final class InputBindingBridge {
     self.channel.setMethodCallHandler { [weak self] (call, result) in
       self?.handle(call: call, result: result)
     }
+  }
+
+  deinit {
+    teardownTap()
   }
 
   private func handle(call: FlutterMethodCall, result: FlutterResult) {
@@ -292,12 +311,182 @@ final class InputBindingBridge {
 
     case "updateBindings":
       let arguments = call.arguments as? [String: Any]
-      storedBindings = arguments?["bindings"] as? [[String: Any]] ?? []
-      NSLog("[input-binding] updateBindings: \(storedBindings.count) 筆已暫存")
+      let bindings = arguments?["bindings"] as? [[String: Any]] ?? []
+      applyBindings(bindings)
       result(nil)
 
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  /// 收下綁定快照並在已授權時建立 / 更新 CGEventTap。
+  ///
+  /// 無綁定時拆除 tap（避免無謂攔截）；有綁定但未授權時不建立（由 Dart 端
+  /// 觸發授權提示後重新下傳）。
+  private func applyBindings(_ bindings: [[String: Any]]) {
+    bindingsByButton.removeAll()
+    for binding in bindings {
+      guard let button = binding["buttonNumber"] as? Int,
+        let action = binding["action"] as? [String: Any]
+      else { continue }
+      bindingsByButton[Int64(button)] = action
+    }
+    NSLog("[input-binding] updateBindings: \(bindingsByButton.count) 筆綁定")
+
+    if bindingsByButton.isEmpty {
+      teardownTap()
+      return
+    }
+    guard AXIsProcessTrusted() else {
+      NSLog("[input-binding] 尚未授權，CGEventTap 暫不建立")
+      return
+    }
+    ensureTap()
+  }
+
+  /// 建立 CGEventTap（沿用 spike 的 mask + 消費邏輯）；已存在則沿用。
+  private func ensureTap() {
+    if eventTap != nil { return }
+    let mask: CGEventMask =
+      (1 << CGEventType.otherMouseDown.rawValue)
+      | (1 << CGEventType.otherMouseUp.rawValue)
+      | (1 << CGEventType.mouseMoved.rawValue)
+      | (1 << CGEventType.otherMouseDragged.rawValue)
+      | (1 << CGEventType.leftMouseDragged.rawValue)
+      | (1 << CGEventType.rightMouseDragged.rawValue)
+
+    let userInfo = Unmanaged.passUnretained(self).toOpaque()
+    guard
+      let tap = CGEvent.tapCreate(
+        tap: .cgSessionEventTap,
+        place: .headInsertEventTap,
+        options: .defaultTap,
+        eventsOfInterest: mask,
+        callback: { (_, type, event, refcon) -> Unmanaged<CGEvent>? in
+          guard let refcon = refcon else {
+            return Unmanaged.passUnretained(event)
+          }
+          let bridge = Unmanaged<InputBindingBridge>
+            .fromOpaque(refcon).takeUnretainedValue()
+          return bridge.handleTapEvent(type: type, event: event)
+        },
+        userInfo: userInfo
+      )
+    else {
+      NSLog("[input-binding] CGEventTap 建立失敗（確認授權）")
+      return
+    }
+    let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+    CGEvent.tapEnable(tap: tap, enable: true)
+    eventTap = tap
+    runLoopSource = source
+    NSLog("[input-binding] CGEventTap 已啟用")
+  }
+
+  /// 拆除 CGEventTap 並釋放 run loop source。
+  private func teardownTap() {
+    if let source = runLoopSource {
+      CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+    }
+    if let tap = eventTap {
+      CGEvent.tapEnable(tap: tap, enable: false)
+    }
+    runLoopSource = nil
+    eventTap = nil
+    draggingAction = nil
+  }
+
+  /// CGEventTap 回呼：依綁定分派側鍵事件（回呼維持輕量，NFR-01）。
+  private func handleTapEvent(
+    type: CGEventType,
+    event: CGEvent
+  ) -> Unmanaged<CGEvent>? {
+    // tap 被系統因逾時 / 使用者輸入停用時自動重新啟用。
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+      if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+      return Unmanaged.passUnretained(event)
+    }
+
+    switch type {
+    case .otherMouseDown:
+      let button = event.getIntegerValueField(.mouseEventButtonNumber)
+      return handleButtonDown(button: button, event: event)
+
+    case .otherMouseUp:
+      return handleButtonUp(event: event)
+
+    case .mouseMoved, .otherMouseDragged, .leftMouseDragged, .rightMouseDragged:
+      return handleDragMove(event: event)
+
+    default:
+      return Unmanaged.passUnretained(event)
+    }
+  }
+
+  /// 側鍵按下：命中綁定則分派（DragScroll 進入拖曳 / Hotkey 消費 log），消費事件。
+  private func handleButtonDown(
+    button: Int64,
+    event: CGEvent
+  ) -> Unmanaged<CGEvent>? {
+    guard let action = bindingsByButton[button] else {
+      return Unmanaged.passUnretained(event)
+    }
+    let type = action["type"] as? String
+    if type == "dragScroll" {
+      draggingAction = action
+      lastDragY = event.location.y
+      return nil
+    }
+    if type == "hotkey" {
+      // HotkeyAction 執行留 W3；本階段先消費並記錄，避免側鍵觸發瀏覽器上下頁。
+      NSLog("[input-binding] hotkey 綁定觸發（執行留 W3），消費事件")
+      return nil
+    }
+    return Unmanaged.passUnretained(event)
+  }
+
+  /// 側鍵放開：若正在拖曳則離開並消費，否則放行。
+  private func handleButtonUp(event: CGEvent) -> Unmanaged<CGEvent>? {
+    if draggingAction != nil {
+      draggingAction = nil
+      return nil
+    }
+    return Unmanaged.passUnretained(event)
+  }
+
+  /// 拖曳移動：拖曳中依方向 / 靈敏度合成滾輪並消費，否則放行。
+  private func handleDragMove(event: CGEvent) -> Unmanaged<CGEvent>? {
+    guard let action = draggingAction else {
+      return Unmanaged.passUnretained(event)
+    }
+    let y = event.location.y
+    let dy = y - lastDragY  // 螢幕座標 y 向下為正：往下拖 → dy > 0
+    lastDragY = y
+    if dy != 0 {
+      postScroll(dy: dy, action: action)
+    }
+    // 拖曳期間移動事件一併消費，避免同時驅動游標位移。
+    return nil
+  }
+
+  /// 依綁定方向 / 靈敏度合成垂直滾輪事件注入游標下方 app。
+  private func postScroll(dy: CGFloat, action: [String: Any]) {
+    let sensitivity = (action["sensitivity"] as? Double) ?? 1.0
+    let inverted = (action["direction"] as? String) == "inverted"
+    // natural：往下拖 = 往下捲（spike 驗證需對 dy 取負）。
+    let directed = inverted ? dy : -dy
+    var amount = Int32(directed * sensitivity)
+    if amount == 0 { amount = directed > 0 ? 1 : -1 }
+    let scroll = CGEvent(
+      scrollWheelEvent2Source: scrollSource,
+      units: .pixel,
+      wheelCount: 1,
+      wheel1: amount,
+      wheel2: 0,
+      wheel3: 0
+    )
+    scroll?.post(tap: .cghidEventTap)
   }
 }

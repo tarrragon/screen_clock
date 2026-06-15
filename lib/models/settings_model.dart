@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_constants.dart';
+import '../input/mouse_action.dart';
 import '../input/mouse_binding.dart';
 
 /// 使用者設定資料模型（SPEC-004 FR-01）。
@@ -24,6 +25,9 @@ class SettingsModel {
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
+  ///
+  /// bindings 預設含一筆側鍵拖曳滾動（SPEC-007 FR-03），讓功能首次啟動即可用：
+  /// 按住 button 4 上下拖曳 → 捲動游標下方視窗（natural 方向、預設靈敏度）。
   factory SettingsModel.defaults() {
     return const SettingsModel(
       fontSize: AppSizes.clockFontSize,
@@ -35,7 +39,12 @@ class SettingsModel {
       autoLaunch: false,
       birthDate: null,
       lifeTimerMode: false,
-      bindings: <MouseBinding>[],
+      bindings: <MouseBinding>[
+        MouseBinding(
+          buttonNumber: AppInputBinding.defaultDragScrollButton,
+          action: DragScrollAction(),
+        ),
+      ],
     );
   }
 

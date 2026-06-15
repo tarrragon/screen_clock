@@ -70,9 +70,14 @@ void main() {
       expect(json.containsKey('birthDate'), isFalse);
     });
 
-    test('fromJson empty map yields defaults', () {
-      expect(SettingsModel.fromJson(const <String, Object?>{}),
-          SettingsModel.defaults());
+    test('fromJson empty map yields defaults (no bindings key → empty list)',
+        () {
+      // 空 JSON 缺 bindings 鍵，依向後相容解析為空清單（見 v2 相容測試）；
+      // 其餘純量欄位回退 defaults。故與 defaults().copyWith(空綁定) 相等。
+      expect(
+        SettingsModel.fromJson(const <String, Object?>{}),
+        SettingsModel.defaults().copyWith(bindings: const <MouseBinding>[]),
+      );
     });
 
     test('fromJson tolerates invalid types', () {
@@ -84,7 +89,10 @@ void main() {
         'timeFormat': 42,
       };
       final SettingsModel decoded = SettingsModel.fromJson(garbage);
-      expect(decoded, SettingsModel.defaults());
+      expect(
+        decoded,
+        SettingsModel.defaults().copyWith(bindings: const <MouseBinding>[]),
+      );
     });
   });
 
@@ -102,8 +110,18 @@ void main() {
       expect(SettingsModel.schemaVersion, 3);
     });
 
-    test('defaults to an empty bindings list', () {
-      expect(SettingsModel.defaults().bindings, isEmpty);
+    test('defaults to a single side-button drag-scroll binding', () {
+      final List<MouseBinding> bindings = SettingsModel.defaults().bindings;
+      expect(bindings, hasLength(1));
+      final MouseBinding binding = bindings.single;
+      expect(binding.buttonNumber, AppInputBinding.defaultDragScrollButton);
+      expect(binding.action, isA<DragScrollAction>());
+      final DragScrollAction action = binding.action as DragScrollAction;
+      expect(action.direction, ScrollDirection.natural);
+      expect(
+        action.sensitivity,
+        AppInputBinding.defaultDragScrollSensitivity,
+      );
     });
 
     test('round-trips bindings (drag scroll + hotkey)', () {
@@ -163,7 +181,9 @@ void main() {
     });
 
     test('copyWith with bindings does not mutate the original', () {
-      final SettingsModel original = SettingsModel.defaults();
+      final SettingsModel original = SettingsModel.defaults().copyWith(
+        bindings: const <MouseBinding>[],
+      );
       final SettingsModel updated = original.copyWith(
         bindings: <MouseBinding>[
           const MouseBinding(buttonNumber: 3, action: DragScrollAction()),
