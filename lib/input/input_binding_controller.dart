@@ -58,6 +58,23 @@ class InputBindingController {
     await _channel.updateBindings(bindings);
   }
 
+  /// 主動查詢輔助使用授權狀態並寫入對外 notifier（SPEC-007 FR-07）。
+  ///
+  /// 面板開啟時呼叫：start() 僅在「有綁定」時經 _ensurePermission 更新授權狀態，
+  /// 空綁定情境（即使系統已授權）notifier 仍停在 false，須主動刷新才反映真實授權。
+  Future<void> refreshPermission() async {
+    _permissionGranted.value = await _channel.queryPermission();
+  }
+
+  /// 觸發系統輔助使用授權提示後刷新狀態（SPEC-007 FR-07）。
+  ///
+  /// 供面板「開啟系統授權」按鈕呼叫；提示後使用者於系統設定的最終操作結果
+  /// 由原生經 onPermissionChanged 回報，這裡再刷新一次確保 notifier 同步。
+  Future<void> requestPermission() async {
+    await _channel.requestPermission();
+    await refreshPermission();
+  }
+
   /// 停止監聽並釋放原生 handler。捕捉進行中時一併結束。
   void stop() {
     if (!_started) return;

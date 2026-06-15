@@ -1,31 +1,59 @@
 import 'package:flutter/material.dart';
 
+import '../app_constants.dart';
+import '../input/input_binding_controller.dart';
+import '../input/mouse_action.dart';
+import '../input/mouse_binding.dart';
 import '../models/settings_model.dart';
 import '../state/settings_controller.dart';
 import '../state/settings_scope.dart';
 
-/// 設定面板（SPEC-005 FR-03 / FR-04）。
+/// 設定面板（SPEC-005 FR-03 / FR-04 + SPEC-007 FR-07 / FR-08）。
 ///
-/// 七個欄位對應 [SettingsModel]；變更走 [SettingsController.update]
+/// 九個樣式欄位對應 [SettingsModel]；變更走 [SettingsController.update]
 /// → InheritedNotifier rebuild → CenterClock 即時預覽。
+///
+/// 綁定管理區（FR-07/FR-08）：監聽 [InputBindingController.permissionGranted]
+/// 顯示授權狀態與引導；列出現有綁定並可即時刪除。樣式欄位走 Save/Cancel
+/// 暫存模型，綁定刪除走即時持久化（FR-08）與 Save/Cancel 解耦。
 ///
 /// 「儲存」呼叫 [SettingsController.persist] 後關閉；
 /// 「取消」呼叫 [SettingsController.resetToStartup] 後關閉。
-class SettingsPanel extends StatelessWidget {
+class SettingsPanel extends StatefulWidget {
   const SettingsPanel({
     super.key,
     required this.availableScreenCount,
+    required this.inputBindingController,
     required this.onClose,
   });
 
   /// 目前可選擇的螢幕數，用於 dropdown 上限（SPEC-005 FR-03 + SPEC-003 FR-01）。
   final int availableScreenCount;
 
+  /// 滑鼠綁定控制器，供權限引導（FR-07）與綁定清單刪除（FR-08）使用。
+  final InputBindingController inputBindingController;
+
   /// 關閉面板的回呼。
   ///
   /// 面板是 Stack overlay（非 Navigator route），不能用 `Navigator.pop` 關閉；
   /// 由上層 `_PanelHost` 注入，內部設 `_panelOpen = false` 並還原 click-through。
   final VoidCallback onClose;
+
+  @override
+  State<SettingsPanel> createState() => _SettingsPanelState();
+}
+
+class _SettingsPanelState extends State<SettingsPanel> {
+  @override
+  void initState() {
+    super.initState();
+    // SPEC-007 FR-07：面板開啟主動刷新授權狀態（空綁定時 notifier 可能仍為 false）。
+    widget.inputBindingController.refreshPermission();
+  }
+
+  int get availableScreenCount => widget.availableScreenCount;
+
+  VoidCallback get onClose => widget.onClose;
 
   static const List<String> timeFormats = <String>['HH:mm:ss', 'HH:mm'];
 
@@ -55,47 +83,55 @@ class SettingsPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(
           width: 480,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '設定',
-                  style: Theme.of(context).textTheme.titleLarge,
+          // 綁定區使面板變高，外層 app 視窗高度有限，包可滾動容器避免 overflow。
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 560),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '設定',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFontSize(controller, current),
+                    const SizedBox(height: 12),
+                    _buildStrokeWidth(controller, current),
+                    const SizedBox(height: 12),
+                    _buildColorPicker(
+                      label: '填色',
+                      current: current.fillColor,
+                      onPick: (Color c) => controller.update(
+                          (SettingsModel s) => s.copyWith(fillColor: c)),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildColorPicker(
+                      label: '描邊色',
+                      current: current.strokeColor,
+                      onPick: (Color c) => controller.update(
+                          (SettingsModel s) => s.copyWith(strokeColor: c)),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTimeFormat(controller, current),
+                    const SizedBox(height: 12),
+                    _buildTargetScreen(controller, current),
+                    const SizedBox(height: 12),
+                    _buildAutoLaunch(controller, current),
+                    const SizedBox(height: 12),
+                    _buildLifeTimer(controller, current),
+                    const SizedBox(height: 12),
+                    _buildBirthDate(context, controller, current),
+                    const SizedBox(height: 24),
+                    _buildBindingSection(controller, current),
+                    const SizedBox(height: 24),
+                    _buildActions(context, controller),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                _buildFontSize(controller, current),
-                const SizedBox(height: 12),
-                _buildStrokeWidth(controller, current),
-                const SizedBox(height: 12),
-                _buildColorPicker(
-                  label: '填色',
-                  current: current.fillColor,
-                  onPick: (Color c) => controller
-                      .update((SettingsModel s) => s.copyWith(fillColor: c)),
-                ),
-                const SizedBox(height: 12),
-                _buildColorPicker(
-                  label: '描邊色',
-                  current: current.strokeColor,
-                  onPick: (Color c) => controller
-                      .update((SettingsModel s) => s.copyWith(strokeColor: c)),
-                ),
-                const SizedBox(height: 12),
-                _buildTimeFormat(controller, current),
-                const SizedBox(height: 12),
-                _buildTargetScreen(controller, current),
-                const SizedBox(height: 12),
-                _buildAutoLaunch(controller, current),
-                const SizedBox(height: 12),
-                _buildLifeTimer(controller, current),
-                const SizedBox(height: 12),
-                _buildBirthDate(context, controller, current),
-                const SizedBox(height: 24),
-                _buildActions(context, controller),
-              ],
+              ),
             ),
           ),
         ),
@@ -342,6 +378,133 @@ class SettingsPanel extends StatelessWidget {
   }
 
   static String _pad2(int value) => value.toString().padLeft(2, '0');
+
+  /// 滑鼠綁定管理區（SPEC-007 FR-07 權限引導 + FR-08 清單/刪除）。
+  Widget _buildBindingSection(
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          AppText.bindingSectionTitle,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        _buildPermissionRow(),
+        const SizedBox(height: 8),
+        _buildBindingList(controller, current),
+      ],
+    );
+  }
+
+  /// FR-07：監聽授權狀態，已授權顯示狀態文字，未授權顯示引導 + 開啟系統授權按鈕。
+  Widget _buildPermissionRow() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.inputBindingController.permissionGranted,
+      builder: (BuildContext context, bool granted, Widget? _) {
+        if (granted) {
+          return Text(
+            AppText.permissionGrantedStatus,
+            style: const TextStyle(fontSize: 13),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              AppText.permissionDeniedGuide,
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            OutlinedButton(
+              onPressed: widget.inputBindingController.requestPermission,
+              child: const Text(AppText.permissionGrantButton),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// FR-08：列出現有綁定，每筆顯示按鍵編號 + 動作摘要與刪除鈕。
+  Widget _buildBindingList(
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    if (current.bindings.isEmpty) {
+      return const Text(
+        AppText.bindingListEmpty,
+        style: TextStyle(fontSize: 12),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final MouseBinding binding in current.bindings)
+          _buildBindingRow(controller, binding),
+      ],
+    );
+  }
+
+  Widget _buildBindingRow(SettingsController controller, MouseBinding binding) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            '${AppText.bindingButtonPrefix} ${binding.buttonNumber}'
+            '・${_actionSummary(binding.action)}',
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        IconButton(
+          key: ValueKey<String>('delete-binding-${binding.buttonNumber}'),
+          tooltip: AppText.bindingDeleteTooltip,
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _deleteBinding(controller, binding.buttonNumber),
+        ),
+      ],
+    );
+  }
+
+  /// FR-08：刪除指定按鍵綁定後即時持久化（與 Save/Cancel 暫存模型解耦）。
+  /// persist 後 main.dart 的 _onSettingsChanged 會自動 syncBindings 下傳原生。
+  Future<void> _deleteBinding(
+    SettingsController controller,
+    int buttonNumber,
+  ) async {
+    controller.update(
+      (SettingsModel s) => s.copyWith(
+        bindings: s.bindings
+            .where((MouseBinding b) => b.buttonNumber != buttonNumber)
+            .toList(),
+      ),
+    );
+    await controller.persist();
+  }
+
+  /// 動作摘要文案（集中字面於 AppText，禁硬編中文於 widget）。
+  String _actionSummary(MouseAction action) {
+    return switch (action) {
+      DragScrollAction(:final ScrollDirection direction, :final double sensitivity) =>
+        '${AppText.bindingActionDragScroll}'
+            '・${_directionLabel(direction)}'
+            '・${AppText.bindingSensitivityPrefix} '
+            '${sensitivity.toStringAsFixed(1)}',
+      HotkeyAction(:final int keyCode, :final List<int> modifiers) =>
+        '${AppText.bindingActionHotkey}'
+            '・${AppText.bindingKeyCodePrefix} $keyCode'
+            '・${AppText.bindingModifierPrefix} ${modifiers.length}',
+    };
+  }
+
+  String _directionLabel(ScrollDirection direction) {
+    return switch (direction) {
+      ScrollDirection.natural => AppText.bindingDirectionNatural,
+      ScrollDirection.inverted => AppText.bindingDirectionInverted,
+    };
+  }
 
   Widget _buildActions(BuildContext context, SettingsController controller) {
     return Row(

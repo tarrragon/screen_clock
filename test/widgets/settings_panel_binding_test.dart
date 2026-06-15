@@ -8,6 +8,7 @@
 // - FR-08 刪除某筆綁定即時寫入 SettingsModel.bindings 且呼叫 persist
 // - 面板開啟時主動呼叫 refreshPermission
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -136,6 +137,7 @@ void main() {
       inputController = _FakeInputBindingController(granted: false);
       await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
 
+      await tester.ensureVisible(find.text(AppText.permissionGrantButton));
       await tester.tap(find.text(AppText.permissionGrantButton));
       await tester.pump();
       expect(inputController.requestCalls, greaterThanOrEqualTo(1));
@@ -177,6 +179,7 @@ void main() {
           find.byKey(const ValueKey<String>('delete-binding-4'));
       expect(deleteButtons, findsOneWidget);
 
+      await tester.ensureVisible(deleteButtons);
       await tester.tap(deleteButtons);
       await tester.pump();
 

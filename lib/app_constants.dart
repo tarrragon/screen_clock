@@ -39,6 +39,52 @@ class AppText {
   /// Share Tech Mono
   /// Fredoka
   static const String clockFontFamily = 'Roboto Mono';
+
+  // --- 設定面板：滑鼠綁定管理區（SPEC-007 FR-07/FR-08，ticket 1.3.0-W4-003）---
+
+  /// 綁定管理區標題。
+  static const String bindingSectionTitle = '滑鼠綁定';
+
+  /// 輔助使用授權：已授權狀態文字（FR-07）。
+  static const String permissionGrantedStatus = '輔助使用：已授權';
+
+  /// 輔助使用授權：未授權引導文字（FR-07）。
+  /// 指引使用者於系統設定開啟授權，否則綁定無法生效。
+  static const String permissionDeniedGuide =
+      '需於系統設定 → 隱私權與安全性 → 輔助使用開啟授權，綁定才會生效';
+
+  /// 輔助使用授權：觸發系統授權提示的按鈕標籤（FR-07）。
+  static const String permissionGrantButton = '開啟系統授權';
+
+  /// 綁定清單為空時的提示文字（FR-08）。
+  static const String bindingListEmpty = '尚無綁定';
+
+  /// 刪除單筆綁定的按鈕語意標籤（tooltip）。
+  static const String bindingDeleteTooltip = '刪除綁定';
+
+  /// 滑鼠按鍵摘要前綴；後接按鍵編號（如「側鍵 4」）。
+  static const String bindingButtonPrefix = '側鍵';
+
+  /// 拖曳滾動動作摘要前綴（後接方向 / 靈敏度）。
+  static const String bindingActionDragScroll = '拖曳滾動';
+
+  /// 拖曳滾動方向：自然。
+  static const String bindingDirectionNatural = '自然';
+
+  /// 拖曳滾動方向：反向。
+  static const String bindingDirectionInverted = '反向';
+
+  /// 拖曳滾動靈敏度摘要前綴（後接倍率數值）。
+  static const String bindingSensitivityPrefix = '靈敏度';
+
+  /// 快捷鍵動作摘要前綴（後接鍵碼 / 修飾鍵數）。
+  static const String bindingActionHotkey = '快捷鍵';
+
+  /// 快捷鍵鍵碼摘要前綴（後接鍵碼數值）。
+  static const String bindingKeyCodePrefix = '鍵碼';
+
+  /// 快捷鍵修飾鍵數摘要前綴（後接修飾鍵數量）。
+  static const String bindingModifierPrefix = '修飾鍵';
 }
 
 class AppSizes {
