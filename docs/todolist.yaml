@@ -121,7 +121,7 @@ versions:
     codename: "mouse-button-binding"
     description: "滑鼠按鍵綁定 domain：按住側鍵拖曳模擬滾動 + 側鍵綁定鍵盤快捷鍵；原生 CGEventTap 全域攔截、移除 App Sandbox、輔助使用權限、設定面板偵測捕捉"
     status: "active"
-    worklog: null
+    worklog: "docs/work-logs/v1/v1.3/v1.3.0/"
     notes: |
       源於 PROP-002：開發者滑鼠滾輪損壞，欲在既有常駐 app 內以「按住側鍵拖動」取代滾輪。
       範圍：可擴充綁定 domain（一筆 = 實體鍵 → 動作），本版兩種動作（拖曳滾動 + 快捷鍵），
