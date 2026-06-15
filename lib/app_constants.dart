@@ -85,6 +85,32 @@ class AppText {
 
   /// 快捷鍵修飾鍵數摘要前綴（後接修飾鍵數量）。
   static const String bindingModifierPrefix = '修飾鍵';
+
+  // --- 設定面板：新增綁定流程與偵測捕捉（SPEC-007 FR-06/FR-08，ticket 1.3.0-W4-004）---
+
+  /// 開啟新增綁定流程的按鈕標籤。
+  static const String bindingAddButton = '新增綁定';
+
+  /// 偵測捕捉階段：提示使用者按下要綁定的滑鼠側鍵。
+  static const String bindingCapturePrompt = '請按下要綁定的滑鼠側鍵…';
+
+  /// 新增流程：取消按鈕標籤（放棄新增、退出流程）。
+  static const String bindingFlowCancel = '取消';
+
+  /// 新增流程：確認新增按鈕標籤（寫入綁定並持久化）。
+  static const String bindingFlowConfirm = '確認新增';
+
+  /// 動作型別選擇區標題。
+  static const String bindingActionTypeLabel = '動作型別';
+
+  /// 已捕捉到側鍵後的摘要前綴（後接按鍵編號）。
+  static const String bindingCapturedPrefix = '已偵測：側鍵';
+
+  /// Hotkey 參數階段：提示使用者按下快捷鍵組合。
+  static const String bindingHotkeyCapturePrompt = '請按下快捷鍵組合…';
+
+  /// Hotkey 參數階段：尚未擷取到組合時的佔位文字。
+  static const String bindingHotkeyNotCaptured = '尚未擷取組合';
 }
 
 class AppSizes {

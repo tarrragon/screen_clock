@@ -33,6 +33,10 @@ class InputBindingController {
   /// 進行中的側鍵捕捉回呼；null 代表目前未在捕捉。
   ValueChanged<int>? _captureCallback;
 
+  /// 進行中的捕捉取消回呼；逾時或外部取消（無結果結束）時觸發，供 UI 重置
+  /// capturing 視覺。成功捕捉（[_onButtonCaptured]）不觸發此回呼。
+  VoidCallback? _captureCancelledCallback;
+
   /// 捕捉逾時計時器；逾時自動結束捕捉，避免長期停留捕捉狀態。
   Timer? _captureTimer;
 
@@ -97,26 +101,34 @@ class InputBindingController {
   ///
   /// 登記 [onCaptured]，請原生開始監聽下一個側鍵；[timeout] 內未捕捉到任何
   /// 側鍵則自動結束。捕捉進行中再次呼叫會先結束前一個 session（防重入）。
+  ///
+  /// [onCancelled]（選用）於逾時或外部 [cancelButtonCapture] 取消（無結果結束）
+  /// 時觸發，供 UI 重置 capturing 視覺；成功捕捉到側鍵不觸發 [onCancelled]。
   Future<void> startButtonCapture({
     required ValueChanged<int> onCaptured,
+    VoidCallback? onCancelled,
     Duration timeout = AppDurations.buttonCaptureTimeout,
   }) async {
     if (_captureCallback != null) {
       await cancelButtonCapture();
     }
     _captureCallback = onCaptured;
+    _captureCancelledCallback = onCancelled;
     _captureTimer = Timer(timeout, cancelButtonCapture);
     await _channel.beginCaptureButton();
   }
 
-  /// 取消捕捉：通知原生離開捕捉模式，並清除登記的回呼與計時器。
+  /// 取消捕捉：通知原生離開捕捉模式，清除登記的回呼與計時器，並觸發
+  /// onCancelled（無結果結束）讓 UI 退出 capturing 視覺。
   Future<void> cancelButtonCapture() async {
     if (_captureCallback == null) return;
+    final VoidCallback? onCancelled = _captureCancelledCallback;
     _clearCapture();
+    onCancelled?.call();
     await _channel.endCaptureButton();
   }
 
-  /// 原生回報捕捉到側鍵：分派給登記的回呼後自動結束捕捉。
+  /// 原生回報捕捉到側鍵：分派給登記的回呼後自動結束捕捉（不觸發 onCancelled）。
   void _onButtonCaptured(int buttonNumber) {
     final ValueChanged<int>? callback = _captureCallback;
     if (callback == null) return;
@@ -125,11 +137,12 @@ class InputBindingController {
     unawaited(_channel.endCaptureButton());
   }
 
-  /// 清除捕捉登記與計時器（不發原生呼叫）。
+  /// 清除捕捉登記與計時器（不發原生呼叫、不觸發 onCancelled）。
   void _clearCapture() {
     _captureTimer?.cancel();
     _captureTimer = null;
     _captureCallback = null;
+    _captureCancelledCallback = null;
   }
 
   /// 授權狀態變化：更新對外 notifier；剛取得授權時補下傳一次綁定，
