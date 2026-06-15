@@ -73,10 +73,14 @@ void main() {
     test('fromJson empty map yields defaults (no bindings key → empty list)',
         () {
       // 空 JSON 缺 bindings 鍵，依向後相容解析為空清單（見 v2 相容測試）；
-      // 其餘純量欄位回退 defaults。故與 defaults().copyWith(空綁定) 相等。
+      // 缺 bindingsSeeded 鍵代表未遷移舊資料 → false（W3-002 seed migration）；
+      // 其餘純量欄位回退 defaults。
       expect(
         SettingsModel.fromJson(const <String, Object?>{}),
-        SettingsModel.defaults().copyWith(bindings: const <MouseBinding>[]),
+        SettingsModel.defaults().copyWith(
+          bindings: const <MouseBinding>[],
+          bindingsSeeded: false,
+        ),
       );
     });
 
@@ -91,7 +95,10 @@ void main() {
       final SettingsModel decoded = SettingsModel.fromJson(garbage);
       expect(
         decoded,
-        SettingsModel.defaults().copyWith(bindings: const <MouseBinding>[]),
+        SettingsModel.defaults().copyWith(
+          bindings: const <MouseBinding>[],
+          bindingsSeeded: false,
+        ),
       );
     });
   });
@@ -191,6 +198,51 @@ void main() {
       );
       expect(updated.bindings.length, 1);
       expect(original.bindings, isEmpty);
+    });
+  });
+
+  group('SettingsModel.bindingsSeeded (W3-002 seed migration)', () {
+    test('defaults() is already seeded (fresh install needs no migration)', () {
+      expect(SettingsModel.defaults().bindingsSeeded, isTrue);
+    });
+
+    test('fromJson without bindingsSeeded key defaults to false (legacy data)',
+        () {
+      final SettingsModel decoded =
+          SettingsModel.fromJson(const <String, Object?>{'fontSize': 64.0});
+      expect(decoded.bindingsSeeded, isFalse);
+    });
+
+    test('toJson serialises the bindingsSeeded flag under key bindingsSeeded',
+        () {
+      final Map<String, Object> json = SettingsModel.defaults().toJson();
+      expect(json['bindingsSeeded'], true);
+    });
+
+    test('round-trips bindingsSeeded for both true and false', () {
+      final SettingsModel seeded = SettingsModel.defaults();
+      expect(SettingsModel.fromJson(seeded.toJson()).bindingsSeeded, isTrue);
+
+      final SettingsModel notSeeded =
+          SettingsModel.defaults().copyWith(bindingsSeeded: false);
+      expect(
+        SettingsModel.fromJson(notSeeded.toJson()).bindingsSeeded,
+        isFalse,
+      );
+    });
+
+    test('copyWith flips bindingsSeeded while preserving other fields', () {
+      final SettingsModel original = SettingsModel.defaults();
+      final SettingsModel updated = original.copyWith(bindingsSeeded: false);
+      expect(updated.bindingsSeeded, isFalse);
+      expect(updated.fontSize, original.fontSize);
+      expect(updated.bindings, original.bindings);
+    });
+
+    test('participates in equality and hashCode', () {
+      final SettingsModel seeded = SettingsModel.defaults();
+      final SettingsModel notSeeded = seeded.copyWith(bindingsSeeded: false);
+      expect(seeded == notSeeded, isFalse);
     });
   });
 }
