@@ -22,6 +22,7 @@ class SettingsModel {
     this.birthDate,
     this.lifeTimerMode = false,
     this.bindings = const <MouseBinding>[],
+    this.bindingsSeeded = false,
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
@@ -45,6 +46,7 @@ class SettingsModel {
           action: DragScrollAction(),
         ),
       ],
+      bindingsSeeded: true,
     );
   }
 
@@ -65,6 +67,8 @@ class SettingsModel {
       birthDate: _asDateTime(json['birthDate']) ?? d.birthDate,
       lifeTimerMode: _asBool(json['lifeTimerMode']) ?? d.lifeTimerMode,
       bindings: _bindingsFromJson(json[AppSettingsKeys.bindingsKey]),
+      bindingsSeeded:
+          _asBool(json[AppSettingsKeys.bindingsSeededKey]) ?? false,
     );
   }
 
@@ -89,6 +93,11 @@ class SettingsModel {
   /// 滑鼠按鍵綁定清單（SPEC-007 FR-02）；同 buttonNumber 已去重。
   final List<MouseBinding> bindings;
 
+  /// 一次性預設綁定 seed migration 旗標（W3-002）。
+  ///
+  /// false 代表舊資料尚未遷移；load 時若為 false 會評估補入預設綁定並標記為 true。
+  final bool bindingsSeeded;
+
   Map<String, Object> toJson() {
     final Map<String, Object> json = <String, Object>{
       'schemaVersion': schemaVersion,
@@ -109,6 +118,7 @@ class SettingsModel {
     json[AppSettingsKeys.bindingsKey] = <Map<String, Object>>[
       for (final MouseBinding binding in bindings) binding.toJson(),
     ];
+    json[AppSettingsKeys.bindingsSeededKey] = bindingsSeeded;
     return json;
   }
 
@@ -123,6 +133,7 @@ class SettingsModel {
     DateTime? birthDate,
     bool? lifeTimerMode,
     List<MouseBinding>? bindings,
+    bool? bindingsSeeded,
   }) {
     return SettingsModel(
       fontSize: fontSize ?? this.fontSize,
@@ -137,6 +148,7 @@ class SettingsModel {
       bindings: bindings != null
           ? dedupeBindingsByButton(bindings)
           : this.bindings,
+      bindingsSeeded: bindingsSeeded ?? this.bindingsSeeded,
     );
   }
 
@@ -153,7 +165,8 @@ class SettingsModel {
         other.autoLaunch == autoLaunch &&
         other.birthDate == birthDate &&
         other.lifeTimerMode == lifeTimerMode &&
-        listEquals(other.bindings, bindings);
+        listEquals(other.bindings, bindings) &&
+        other.bindingsSeeded == bindingsSeeded;
   }
 
   @override
@@ -168,6 +181,7 @@ class SettingsModel {
         birthDate,
         lifeTimerMode,
         Object.hashAll(bindings),
+        bindingsSeeded,
       );
 }
 

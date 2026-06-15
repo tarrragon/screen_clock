@@ -217,4 +217,7 @@ class AppSettingsKeys {
 
   /// 綁定清單欄（schema v3 新增）。
   static const String bindingsKey = 'bindings';
+
+  /// 一次性 seed migration 旗標欄（W3-002）；缺鍵代表未遷移舊資料。
+  static const String bindingsSeededKey = 'bindingsSeeded';
 }

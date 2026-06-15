@@ -43,7 +43,8 @@ class PreferencesSettingsService implements SettingsService {
         );
         return SettingsModel.defaults();
       }
-      return SettingsModel.fromJson(decoded);
+      final SettingsModel loaded = SettingsModel.fromJson(decoded);
+      return _migrateBindingSeed(loaded);
     } catch (error, stack) {
       debugPrint(
         '[SettingsService] load failed; using defaults; error=$error',
@@ -51,6 +52,25 @@ class PreferencesSettingsService implements SettingsService {
       debugPrint(stack.toString());
       return SettingsModel.defaults();
     }
+  }
+
+  /// 一次性預設綁定 seed migration（W3-002）。
+  ///
+  /// 舊資料缺 bindingsSeeded 旗標（false）時：僅當綁定為空才補入預設綁定，
+  /// 避免覆蓋 schema v3 早期使用者的自訂綁定；無論如何標記 seeded 並持久化，
+  /// 使後續清空綁定不再重新 seed。
+  Future<SettingsModel> _migrateBindingSeed(SettingsModel loaded) async {
+    if (loaded.bindingsSeeded) {
+      return loaded;
+    }
+    final SettingsModel migrated = loaded.copyWith(
+      bindings: loaded.bindings.isEmpty
+          ? SettingsModel.defaults().bindings
+          : loaded.bindings,
+      bindingsSeeded: true,
+    );
+    await save(migrated);
+    return migrated;
   }
 
   @override
