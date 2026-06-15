@@ -181,6 +181,30 @@ class AppInputBinding {
 
   /// DragScrollAction 預設靈敏度（位移到滾輪量的中等倍率）。
   static const double defaultDragScrollSensitivity = 1;
+
+  /// 原生 ↔ Dart 滑鼠輸入綁定 method channel 名稱（SPEC-007 FR-07）。
+  /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
+  static const String channelName = 'screen_clock/input_binding';
+
+  /// Dart → 原生：查詢輔助使用授權狀態，回傳 bool（AXIsProcessTrusted）。
+  static const String queryPermissionMethod = 'queryPermission';
+
+  /// Dart → 原生：觸發系統授權提示（AXIsProcessTrustedWithOptions）。
+  /// 回傳查詢當下的授權 bool（提示後使用者操作仍需經 onPermissionChanged 通知）。
+  static const String requestPermissionMethod = 'requestPermission';
+
+  /// Dart → 原生：下傳綁定清單（List of binding JSON map）。
+  /// 本階段原生端僅儲存，不建立 event tap（tap 整合留 W2-003）。
+  static const String updateBindingsMethod = 'updateBindings';
+
+  /// 原生 → Dart：授權狀態變化通知，參數 [grantedArgKey]（bool）。
+  static const String onPermissionChangedMethod = 'onPermissionChanged';
+
+  /// updateBindings 參數鍵：綁定清單。
+  static const String bindingsArgKey = 'bindings';
+
+  /// onPermissionChanged 參數鍵：是否已授權。
+  static const String grantedArgKey = 'granted';
 }
 
 /// SettingsModel 中 bindings 欄的 JSON 鍵（SPEC-007 FR-02）。

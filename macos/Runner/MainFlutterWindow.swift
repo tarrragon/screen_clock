@@ -1,3 +1,4 @@
+import ApplicationServices
 import Cocoa
 import FlutterMacOS
 import ServiceManagement
@@ -32,6 +33,13 @@ class MainFlutterWindow: NSWindow {
     )
     self.fullscreenDetector?.start()
 
+    // ticket 1.3.0-W2-001：滑鼠輸入綁定原生橋接（SPEC-007 FR-07）。
+    // 提供輔助使用授權查詢 / 請求與綁定下傳骨架；本階段僅儲存綁定，
+    // CGEventTap 建立留 W2-003。
+    self.inputBindingBridge = InputBindingBridge(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
+
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     super.awakeFromNib()
@@ -39,6 +47,9 @@ class MainFlutterWindow: NSWindow {
 
   /// 假全螢幕覆蓋偵測器（強參考持有，隨視窗生命週期存活）。
   private var fullscreenDetector: FullscreenCoverageDetector?
+
+  /// 滑鼠輸入綁定原生橋接（強參考持有，隨視窗生命週期存活）。
+  private var inputBindingBridge: InputBindingBridge?
 
   /// 接上 `launch_at_startup` method channel。
   ///
@@ -241,5 +252,52 @@ final class FullscreenCoverageDetector {
       && windowRect.minY <= targetRect.minY + tolerance
       && windowRect.maxX >= targetRect.maxX - tolerance
       && windowRect.maxY >= targetRect.maxY - tolerance
+  }
+}
+
+/// 滑鼠輸入綁定原生橋接（ticket 1.3.0-W2-001，SPEC-007 FR-07）。
+///
+/// 提供 Dart 端輔助使用授權查詢 / 請求與綁定下傳：
+/// - queryPermission → 回傳 AXIsProcessTrusted()（是否已授權）。
+/// - requestPermission → AXIsProcessTrustedWithOptions 觸發系統提示，回傳當下狀態。
+/// - updateBindings → 收下綁定清單暫存；本階段不建立 CGEventTap（留 W2-003）。
+///
+/// 授權狀態變化以 onPermissionChanged 回報 Dart。channel 與方法名須與
+/// lib/app_constants.dart 的 AppInputBinding 字面一致。
+final class InputBindingBridge {
+  private let channel: FlutterMethodChannel
+
+  /// 已下傳的綁定清單暫存（本階段僅儲存，tap 建立留 W2-003）。
+  private var storedBindings: [[String: Any]] = []
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.channel = FlutterMethodChannel(
+      name: "screen_clock/input_binding",
+      binaryMessenger: messenger
+    )
+    self.channel.setMethodCallHandler { [weak self] (call, result) in
+      self?.handle(call: call, result: result)
+    }
+  }
+
+  private func handle(call: FlutterMethodCall, result: FlutterResult) {
+    switch call.method {
+    case "queryPermission":
+      result(AXIsProcessTrusted())
+
+    case "requestPermission":
+      let options =
+        [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+      result(AXIsProcessTrustedWithOptions(options))
+
+    case "updateBindings":
+      let arguments = call.arguments as? [String: Any]
+      storedBindings = arguments?["bindings"] as? [[String: Any]] ?? []
+      NSLog("[input-binding] updateBindings: \(storedBindings.count) 筆已暫存")
+      result(nil)
+
+    default:
+      result(FlutterMethodNotImplemented)
+    }
   }
 }
