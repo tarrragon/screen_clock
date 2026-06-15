@@ -304,6 +304,7 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
               if (_panelOpen)
                 _PanelHost(
                   availableScreenCount: widget.availableScreenCount,
+                  inputBindingController: widget.inputBindingController,
                   onClosed: _onPanelClosed,
                 ),
             ],
@@ -318,10 +319,12 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
 class _PanelHost extends StatelessWidget {
   const _PanelHost({
     required this.availableScreenCount,
+    required this.inputBindingController,
     required this.onClosed,
   });
 
   final int availableScreenCount;
+  final InputBindingController inputBindingController;
   final VoidCallback onClosed;
 
   @override
@@ -335,6 +338,7 @@ class _PanelHost extends StatelessWidget {
         onDismiss: onClosed,
         child: SettingsPanel(
           availableScreenCount: availableScreenCount,
+          inputBindingController: inputBindingController,
           onClose: onClosed,
         ),
       ),
