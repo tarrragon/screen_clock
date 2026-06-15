@@ -19,6 +19,7 @@ from ticket_system.lib.constants import (
     STATUS_COMPLETED,
     STATUS_BLOCKED,
     STATUS_CLOSED,
+    STATUS_LABELS,
     TERMINAL_STATUSES,
     CLOSE_REASONS,
     CLOSE_REASON_RETROSPECTIVE_UNKNOWN,
@@ -78,6 +79,7 @@ def _build_worklog_path_for_stage(version: str) -> str:
     return str(_build_worklog_path(version))
 from ticket_system.lib.ui_constants import SEPARATOR_PRIMARY
 from ticket_system.lib.project_root import resolve_project_cwd
+from ticket_system.lib.blocker_resolution import is_fully_unblocked
 from ticket_system.commands.claim_verification import (
     collect_ac_verifications,
     prompt_user_decision,
@@ -507,15 +509,12 @@ class TicketLifecycle:
     def claim_with_verification(
         self,
         ticket_id: str,
-        skip_verify: bool = False,
         auto_yes: bool = False,
     ) -> int:
         """整合 AC 自動驗證的 claim 主流程入口（PROP-010 方案 2）。
 
         決策樹：
 
-        - ``skip_verify=True`` → 略過驗證、走既有 ``claim``；
-          若 ``auto_yes=True`` 同時為真，額外 stderr 提示 ``--yes`` 被忽略。
         - ``collect_ac_verifications`` 拋 ``ValueError`` → 降級直接 claim。
         - Ticket 無 AC（S1） → 直接 claim。
         - ``run_all_verifications`` 拋 ``KeyboardInterrupt`` → return 130。
@@ -524,31 +523,24 @@ class TicketLifecycle:
         - ``summary.status == 'has_failures'``（S3） → render + prompt。
           y → claim；n → return 1。
 
+        W4-019: 已移除 ``skip_verify`` 參數（W3-092 + W4-015 兩輪觀察期
+        累計 24hr / 75 commits / 5 ticket cycles 驗證：外部依賴 = 0、
+        runtime deprecation 觸發 = 0）。如需單獨執行驗證（不 claim）請改用
+        ``ticket track verify <id>`` 子命令；如需跳過驗證直接 claim，
+        不傳 ``--verify`` 旗標即為預設行為（W3-046 後 claim 預設不驗證）。
+
         Args:
             ticket_id: Ticket ID。
-            skip_verify: ``--skip-verify`` flag，完全略過驗證。
             auto_yes: ``--yes`` flag，非互動模式自動選 y。
 
         Returns:
             0 / 1 / 130 exit code。
         """
-        # --skip-verify + --yes 衝突：提示 --yes 被忽略
-        if skip_verify and auto_yes:
-            print(
-                "[Warning] --yes 已被忽略（同時指定 --skip-verify 時不執行驗證，"
-                "--yes 無作用）",
-                file=sys.stderr,
-            )
-
-        if skip_verify:
-            print("[AC verification] 已跳過（--skip-verify）")
-            return self.claim(ticket_id)
-
-        # 非 tty 且無任何 flag：fail-closed 拒絕 claim（§B.4）
+        # 非 tty 且無 --yes：fail-closed 拒絕 claim（§B.4）
         if not sys.stdin.isatty() and not auto_yes:
             print(
-                "[AC verification] 非互動環境且未指定 --yes / --skip-verify，"
-                "已取消；請顯式傳 flag 表明意圖",
+                "[AC verification] 非互動環境且未指定 --yes，"
+                "已取消；請顯式傳 --yes 表明意圖",
                 file=sys.stderr,
             )
             return 1
@@ -610,6 +602,58 @@ class TicketLifecycle:
         if decision == "y":
             return self.claim(ticket_id)
         return 1
+
+    def verify_only(self, ticket_id: str) -> int:
+        """W4-019：執行 AC verification 但不 claim（與 claim 解耦）。
+
+        提供 ``ticket track verify <id>`` 子命令的後端實作。語意為「我只想
+        看 AC 驗證結果，不變更 ticket 狀態」，補足 W3-046 後 claim 預設
+        不驗證所造成的查詢缺口（PM 想巡檢 AC 漂移卻不想 claim）。
+
+        Args:
+            ticket_id: Ticket ID。
+
+        Returns:
+            0: 驗證流程正常完成（不論 pass/fail，視為查詢成功）。
+            1: 無法解析 AC / 執行失敗。
+            130: 用戶以 Ctrl-C 中斷。
+        """
+        try:
+            pairs = collect_ac_verifications(ticket_id)
+        except ValueError as err:
+            print(
+                f"[AC verification] AC 解析失敗：{err}",
+                file=sys.stderr,
+            )
+            return 1
+
+        if not pairs:
+            print(
+                f"[AC verification] Ticket {ticket_id}：無 AC，跳過驗證"
+            )
+            return 0
+
+        cwd = resolve_project_cwd()
+        try:
+            results = run_all_verifications(pairs, cwd)
+        except KeyboardInterrupt:
+            print(
+                "[AC verification] 中斷：未變更 Ticket 狀態",
+                file=sys.stderr,
+            )
+            return 130
+
+        summary = summarize_results(results)
+        rendered = render_results(summary, results, ticket_id)
+        if rendered:
+            print(rendered)
+        else:
+            print(
+                f"[AC verification] Ticket {ticket_id}："
+                f"{summary.total} 項 AC，{summary.passed} 通過，"
+                f"{summary.failed} 失敗"
+            )
+        return 0
 
     def complete(
         self,
@@ -847,7 +891,13 @@ class TicketLifecycle:
 
     def release(self, ticket_id: str) -> int:
         """
-        釋放 Ticket - 將進行中的 Ticket 狀態變更為被阻塞
+        釋放 Ticket - 將進行中的 Ticket 退回等待態。
+
+        W3-082：目標狀態依 blockedBy 決定，取代先前一律設為 blocked 的語意缺口。
+        - blockedBy 為空（trigger ticket、主動讓出的 ready ticket）→ 退回 pending 休眠態。
+        - blockedBy 非空（確實被其他 ticket 擋著）→ 設為 blocked。
+        blocked 語意是「被其他 ticket 擋著」；無 blocker 卻設 blocked 會讓 dashboard
+        與後續接手者誤判該 ticket 有依賴未解。
 
         Args:
             ticket_id: Ticket ID，例如 "0.31.0-W4-001"
@@ -875,16 +925,22 @@ class TicketLifecycle:
                 print(f"[Warning] {ticket_id} 已被阻塞，無法釋放")
                 return 1
 
+            # W3-082：依 blockedBy 是否為空決定目標狀態（沿用同檔 blockedBy 慣例）
+            blocked_by = ticket.get("blockedBy") or []
+            target_status = STATUS_BLOCKED if blocked_by else STATUS_PENDING
+
             # 釋放 Ticket
-            ticket["status"] = STATUS_BLOCKED
+            ticket["status"] = target_status
             ticket["assigned"] = False
             ticket["started_at"] = None
 
             ticket_path = resolve_ticket_path(ticket, self.version, ticket_id)
             save_ticket(ticket, ticket_path)
 
+        # 狀態顯示名集中於 STATUS_LABELS（禁散落字面，W3-082）
+        status_label = STATUS_LABELS.get(target_status, target_status)
         print(format_info(InfoMessages.TICKET_RELEASED, ticket_id=ticket_id))
-        print(f"   狀態: 被阻塞")
+        print(f"   狀態: {status_label}")
         return 0
 
     def close(
@@ -1013,52 +1069,6 @@ def _check_pending_children(
     return suggestions
 
 
-def _is_fully_unblocked(
-    ticket: Dict[str, Any],
-    ticket_map: Dict[str, Any],
-    *,
-    include_closed_as_resolved: bool,
-) -> bool:
-    """
-    判斷 ticket 的所有 blocker 是否皆已解除（AND 語義）。
-
-    共用 predicate，由 `_check_unblocked_tickets` 與 `_can_cascade_unblock`
-    delegate。語義差異透過參數揭露：
-
-    - blockedBy 為空 → True（無阻塞即視為解除）。
-    - 找不到 blocker（ticket_map 無此 id）→ False（資料不一致時保守保留 blocked
-      / 不建議解鎖）。兩個原始實作皆為此行為（前者透過 `{}.get("status")` 為
-      None 失敗比對、後者顯式 return False）。
-    - include_closed_as_resolved=True：blocker status 為 completed 或 closed
-      皆視為已解除（cascade unblock 場景，與 lifecycle skip 規則一致）。
-    - include_closed_as_resolved=False：僅 completed 視為已解除（建議列表場景，
-      保留原有 conservative 行為）。
-
-    Args:
-        ticket: 待檢查的 ticket dict（需含 blockedBy）。
-        ticket_map: 版本內所有 ticket 的 id → dict 映射。
-        include_closed_as_resolved: 是否將 closed 也視為解除狀態。
-
-    Returns:
-        True 表示所有 blocker 皆已解除。
-    """
-    blocked_by = ticket.get("blockedBy") or []
-    if not blocked_by:
-        return True
-    resolved_statuses = (
-        (STATUS_COMPLETED, STATUS_CLOSED)
-        if include_closed_as_resolved
-        else (STATUS_COMPLETED,)
-    )
-    for blocker_id in blocked_by:
-        blocker = ticket_map.get(blocker_id)
-        if blocker is None:
-            return False
-        if blocker.get("status") not in resolved_statuses:
-            return False
-    return True
-
-
 def _check_unblocked_tickets(
     ticket_id: str,
     all_tickets: List[Dict[str, Any]],
@@ -1072,7 +1082,7 @@ def _check_unblocked_tickets(
         blocked_by = t.get("blockedBy", [])
         if ticket_id in blocked_by and t.get("status") in ["pending", "blocked"]:
             # 僅 completed 視為解除（保留原行為，不含 closed）
-            if _is_fully_unblocked(t, ticket_map, include_closed_as_resolved=False):
+            if is_fully_unblocked(t, ticket_map, include_closed_as_resolved=False):
                 suggestions.append({
                     "priority": 2,
                     "ticket_id": t.get("id"),
@@ -1443,7 +1453,7 @@ def _can_cascade_unblock(
     Returns:
         True 表示可解鎖（blocked → pending），False 表示保留 blocked
     """
-    return _is_fully_unblocked(child, ticket_map, include_closed_as_resolved=True)
+    return is_fully_unblocked(child, ticket_map, include_closed_as_resolved=True)
 
 
 # ============================================================================
@@ -1683,11 +1693,16 @@ def _handle_pending_children_block(
 def _auto_stage_git_add(paths: List[str]) -> None:
     """W11-035：薄封裝 subprocess.run 以便測試替身 patch 此 symbol，
     避免污染全域 subprocess.run（會影響 get_project_root 等 git 呼叫）。
+
+    W7-003.1：加 5s timeout，git hang（等認證 / index.lock）時不無限等待。
+    逾時拋 subprocess.TimeoutExpired，由呼叫端 ``_auto_stage_completion_files``
+    的 except 涵蓋（graceful degrade，不中斷 complete 流程）。
     """
     subprocess.run(
         ["git", "add", *paths],
         capture_output=True,
         check=False,
+        timeout=5,
     )
 
 
@@ -1859,7 +1874,7 @@ def _cascade_unblock_children(
 
     呼叫契約（W11-002.5 / ANA W5-022）：
     - **caller 必須在呼叫前已將 parent 落盤為 completed**：cascade 透過
-      ``_can_cascade_unblock`` → ``_is_fully_unblocked`` 檢查 child.blockedBy
+      ``_can_cascade_unblock`` → ``is_fully_unblocked`` 檢查 child.blockedBy
       中每個 blocker（含 parent）的 status；若 parent 尚未 save，fallback 路徑
       （ticket_map=None → list_tickets）會從 disk 讀到舊 status，導致 child
       不會被解鎖。``execute_complete`` 已先 ``save_ticket(parent)`` 才呼叫本函式
@@ -1975,13 +1990,15 @@ def execute_claim(args: argparse.Namespace, version: str) -> int:
     """
     認領 Ticket - 函式包裝層（向後相容）
 
-    使用 TicketLifecycle 物件執行實際操作。若傳入 ``--skip-verify`` 或
-    ``--yes``（或進入 AC 驗證流程的其他情境），委派 ``claim_with_verification``；
-    兩者皆為預設 False 時仍走原 ``claim``（但本版本統一走驗證入口以確保
-    S3/S4 行為一致，未帶 flag 時驗證層會依 tty 狀態決策）。
+    使用 TicketLifecycle 物件執行實際操作。``--verify`` 旗標明示啟用時走
+    ``claim_with_verification``；否則走預設 ``claim``（不執行 AC 驗證）。
 
     PROP-010 方案 4：claim 前若 Ticket 建立已超過 INFO 閾值（7 天），
     輸出 stale 提示供 PM 重新評估。
+
+    W4-019: 已移除 ``--skip-verify`` 旗標（W3-092 + W4-015 兩輪觀察期累計
+    24hr / 75 commits / 5 ticket cycles 驗證：外部依賴 = 0、runtime
+    deprecation 觸發 = 0）。需單獨驗證請改用 ``ticket track verify <id>``。
     """
     # Stale 提示（pending 超過 7 天；靜默失敗不影響 claim 主流程）
     try:
@@ -1994,24 +2011,19 @@ def execute_claim(args: argparse.Namespace, version: str) -> int:
         sys.stderr.write(f"[staleness] claim 前檢查異常：{exc}\n")
 
     lifecycle = TicketLifecycle(version)
-    skip_verify = bool(getattr(args, "skip_verify", False))
     auto_yes = bool(getattr(args, "yes", False))
     verify_opt_in = bool(getattr(args, "verify", False))
 
     # W3-046 (Strategy B): 預設不執行 AC verification，避免 claim 觸發 npm test
     # 全套件造成同 wave 並行 claim 衝突（PC-078 根本解）。--verify 旗標明示啟用
     # 才走 claim_with_verification（保留除錯場景）。
-    # --skip-verify 變成 no-op（保留向後相容；歷史腳本不報錯）。
-    if verify_opt_in and not skip_verify:
+    # W4-019: --skip-verify 旗標已移除（兩輪觀察期 trigger 達成）；單獨驗證
+    # 請改用 ticket track verify 子命令（與 claim 解耦）。
+    if verify_opt_in:
         rc = lifecycle.claim_with_verification(
-            args.ticket_id, skip_verify=skip_verify, auto_yes=auto_yes
+            args.ticket_id, auto_yes=auto_yes
         )
     else:
-        if skip_verify and (auto_yes or verify_opt_in):
-            sys.stderr.write(
-                "[Warning] --skip-verify 與 --yes/--verify 同時指定；"
-                "新預設已不執行驗證，--skip-verify 為 no-op\n"
-            )
         rc = lifecycle.claim(args.ticket_id)
 
     # W17-002.2：claim 成功後自動抽取 Context Bundle（異常降級；idempotent merge 自然防止重複）

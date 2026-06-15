@@ -101,6 +101,18 @@ tests/unit/scripts/validate-manifest.test.js:29:  const createMockFsAdapter = (e
 
 ---
 
+## 抽象層級分析（必填）
+
+| 欄位 | 內容 |
+|------|------|
+| 症狀層級 | 實作層（共用 helper 變死碼 / 同名異介面 helper 跨測試檔共存） |
+| 根因層級 | 協作層（跨 PR / 跨作者缺乏 helper 演化觸發重新設計的機制；無命名一致性約束讓同名 helper 累積介面分歧） |
+| 跨層路徑 | 實作層（症狀：dead code + 命名衝突）→ 協作層（根因：機制缺失，向上 1 層） |
+| 防護層級 | 協作層：code review checklist（新增 local helper 前 grep 同名、共用 helper 修改後 grep consumer）；工具層：ESLint cross-file 同名異 signature 偵測 + 死碼掃描（建議項），落地至 `tests/helpers/` code review 流程 |
+| 跨層警示 | 禁止提升至認知層（非個人疏忽）；root cause 是缺乏機制約束的結構性演化問題，非任何一位維護者的失誤；禁止縮減至純工具層（ESLint / 靜態分析只是輔助偵測，無法替代協作層設計原則） |
+
+---
+
 ## 相關 Pattern
 
 - IMP-064: Local re-import mock trap（函式體 local re-import 建 local binding 遮蔽 module-level）— 同屬「測試端 local fork」家族
@@ -112,7 +124,7 @@ tests/unit/scripts/validate-manifest.test.js:29:  const createMockFsAdapter = (e
 
 - [ ] W1-079 落地時驗證子模式 A 修復路徑（標 deprecated + 評估抽出）
 - [ ] W1-080 落地時驗證子模式 B 修復路徑（命名差異化 + 共用工廠）
-- [ ] 若再有第三案例（同 session pattern）→ 升級為方法論層（`.claude/methodologies/test-helper-design-methodology.md`）
+- [ ] 若再有第三案例（同 session pattern）→ 升級為方法論層（於 methodologies/ 新增對應方法論）
 
 ---
 

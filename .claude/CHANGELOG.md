@@ -1,3 +1,554 @@
+## [1.48.4] - 2026-06-16
+
+### Summary
+fix: get_tickets_dir 加既有 flat 結構讀取相容（issue #1 問題4）; fix: save_ticket 保留檔尾換行 + race 測試 win32 skip（跨平台收尾）; fix: hook-completeness 新增反向檢查（幽靈註冊+跨檔重複偵測） (+3 more)
+
+Changes: 6 fix
+
+- fix: get_tickets_dir 加既有 flat 結構讀取相容（issue #1 問題4）
+- fix: save_ticket 保留檔尾換行 + race 測試 win32 skip（跨平台收尾）
+- fix: hook-completeness 新增反向檢查（幽靈註冊+跨檔重複偵測）
+- fix: uv-tool-staleness install 指令改絕對路徑免 cd（PowerShell 相容）
+- fix: project-init Python 偵測多候選+uv fallback、安裝指引 OS 感知（Windows 跨平台）
+- fix: file_lock 改用 filelock 取代 fcntl（Windows 跨平台 P0）
+
+---
+
+## [1.48.3] - 2026-06-15
+
+### Summary
+清理遠端孤兒：傳播過時 legacy 文件與 dead 範本之刪除
+
+移除 agent 協作規範舊副本、tdd 協作流程 legacy 副本、ticket-system 範本
+（本地已刪除，--clean 傳播至遠端避免 full overlay 復發孤兒）
+
+---
+
+## [1.48.2] - 2026-06-15
+
+### Summary
+--help
+
+---
+
+## [1.48.1] - 2026-06-14
+
+### Summary
+fix: 非阻塞 reap 收割殘留 stale .md.lock
+
+Changes: 1 fix
+
+- fix: 非阻塞 reap 收割殘留 stale .md.lock
+
+---
+
+## [1.48.0] - 2026-06-14
+
+### Summary
+feat: SessionStart agent 定義標準執法掃描 hook; docs: campaign 收尾 gate broken-link 修復 + methodology-index 補齊; docs: 瘦身 five-document-system-methodology 336→202 (+34 more)
+
+Changes: 1 feat, 36 docs
+
+- feat: SessionStart agent 定義標準執法掃描 hook
+- docs: campaign 收尾 gate broken-link 修復 + methodology-index 補齊
+- docs: 瘦身 five-document-system-methodology 336→202
+- docs: 瘦身 business-layer-i18n 方法論 354->145 行 + 衛星檔
+- docs: 瘦身 personalized-consultation-methodology 431->275 + 衛星檔
+- docs: 瘦身 cognitive-load-design-methodology 419->139 + 衛星檔外移 + rule 去重
+- docs: 合併 multi-perspective(419) → parallel-evaluation 方案 A
+- docs: 整併 hook 家族 3 檔為 1 主檔 + 2 衛星檔
+- docs: 瘦身 frontmatter-ticket-tracking-methodology 561→232 行
+- docs: 瘦身 5w1h-self-awareness-methodology 605->265 行
+- docs: 瘦身 problem-awareness-evaluation-methodology 698->227
+- docs: 瘦身 acceptance-criteria-methodology 701→297 行 + 外移衛星檔
+- docs: 校準審查 B2 修正 — 衛星檔回指補 intent 情境句
+- docs: 瘦身 package-import-methodology 736→86 行 + 衛星檔外移
+- docs: 移除 thyme 品質檢查清單冗餘標題，路由併入品質標準章節
+- docs: 批 C TRIM 通用4階段骨架（thyme-ext/ginger/basil-event）
+- docs: 批 B 外移 SD/SE/DBA 輸出範本至 references/
+- docs: 批A ROUTE 三檔流程外移（thyme-doc/pepper/basil-hook）
+- docs: 外移 parsley Phase3b+Phase4 交接通用骨架至 tdd skill
+- docs: 外移 fennel Phase3b 通用骨架至 tdd/phase3-implementation skill
+- docs: 外移 cinnamon Phase4 重構流程到 tdd/phase4-refactor
+- docs: 外移 oregano 資料提取流程到 data-extraction skill
+- docs: 外移 lavender Phase1 通用六階段流程至 tdd/phase1
+- docs: 外移 sage Phase2 流程到 tdd/phase2/rules
+- docs: 建立 data-extraction skill（oregano 流程外移目標）
+- docs: 補強 malformed-tool-call-detector docstring 架構邊界說明
+- docs: 整併瘦身 group-ticket-design(156→83)+ticket-lifecycle-management(178→144)
+- docs: 整併瘦身 atomic-ticket(884→366)+ticket-design-dispatch(1168→180)
+- docs: 整併瘦身 layered-ticket 家族 4 檔 → 30 秒核心
+- docs: 去重整併 TDD/testing 家族其餘 5 檔
+- docs: 整併瘦身 tdd-collaboration-flow 完整流程外移 tdd skill
+- docs: thyme-python C3 品質清單 + C4 IMP-003 路由化
+- docs: 清理 C1 輕量 5 檔搜尋工具路由化 + DEPRECATED 2 檔確認
+- docs: 清理 oregano/sage/star-anise/sumac C1+C6
+- docs: 清理中檔 linux/saffron/mint/project-compliance/clove 的 C1/C5（linux 含 C6）
+- docs: 清理 parsley/cinnamon/lavender 重檔 C1/C5/C6 錯置
+- docs: 統一 ANA 衍生票血緣模型為 children（Option A）+ 修跨檔矛盾
+
+---
+
+## [1.47.0] - 2026-06-12
+
+### Summary
+feat: 回流 blog 實戰改良版寫作 skill（compositional-writing + 新增 multi-round-review）; docs: multi-round-review R4 收斂 + ANA 收口（方法論 ）; docs: multi-round-review Round 3 修正（框架側 8 檔） (+4 more)
+
+Changes: 1 feat, 6 docs
+
+- feat: 回流 blog 實戰改良版寫作 skill（compositional-writing + 新增 multi-round-review）
+- docs: multi-round-review R4 收斂 + ANA 收口（方法論 ）
+- docs: multi-round-review Round 3 修正（框架側 8 檔）
+- docs: multi-round-review Round 2 修正（框架側）
+- docs: multi-round-review Round 1 修正（框架側）
+- docs: README 註記寫作 skill 訓練上游（blog repo git URL）
+- docs: 新增 DOC-V1-001 位置編號引用靜默失效 error-pattern + 審查票
+
+---
+
+## [1.46.2] - 2026-06-12
+
+### Summary
+docs: 知識載體責任分配方法論落地 + 盤點 ticket spawn
+
+Changes: 1 docs
+
+- docs: 知識載體責任分配方法論落地 + 盤點 ticket spawn
+
+---
+
+## [1.46.1] - 2026-06-12
+
+### Summary
+docs: 新增 PC-V1-006 規則變更未盤點既有規則矛盾即上線; docs: 防膨脹機制正規化三缺口收口
+
+Changes: 2 docs
+
+- docs: 新增 PC-V1-006 規則變更未盤點既有規則矛盾即上線
+- docs: 防膨脹機制正規化三缺口收口
+
+---
+
+## [1.46.0] - 2026-06-12
+
+### Summary
+feat: file-size-guardian 擴充 auto-load 集合 token 預算量測; feat: sync-pull 衝突處理標準化; fix: 校準 file-size-guardian CHARS_PER_TOKEN 係數 3 → 1.3 (+9 more)
+
+Changes: 2 feat, 1 fix, 2 docs, 7 chore
+
+- feat: file-size-guardian 擴充 auto-load 集合 token 預算量測
+- feat: sync-pull 衝突處理標準化
+- fix: 校準 file-size-guardian CHARS_PER_TOKEN 係數 3 → 1.3
+- docs: 新增 IMP-V1-001 估算係數未經實測校準即上線 error-pattern
+- docs: 新增 PC-V1-005 acceptance 量化目標未考慮 substance 密度上限
+- chore: 測試檔執行權限修正（HookCheck IMP-054 自動 chmod +x）
+- chore: 三檔 token 收斂瘦身
+- chore: 六檔 auto-load 文件輕量修剪（減量 20.8%）
+- chore: 三檔主文外移 references/，core/ 降速查 stub
+- chore: CLAUDE.md 收斂至 149 行 + project-conventions @ 改純路徑
+- chore: test-assertion-design-rules 主文外移 references/ 降 stub
+- chore: sync-pull — .version-release.yaml 納入 local-only 排除 + VERSION/CHANGELOG 採上游解衝突
+
+---
+
+## [1.45.1] - 2026-06-12
+
+### Summary
+fix: .version-release.yaml 納入 local-only 排除 + gitignore 補顯式條目; chore: 保留本地框架變更（sync-pull 前快照）
+
+Changes: 1 fix, 1 chore
+
+- fix: .version-release.yaml 納入 local-only 排除 + gitignore 補顯式條目
+- chore: 保留本地框架變更（sync-pull 前快照）
+
+---
+
+## [1.45.0] - 2026-06-12
+
+### Summary
+feat: identity-guard 呼叫端傳遞 command 參數（telemetry per-command 歸因）; feat: identity-guard telemetry pass/exempt 路徑落盤; feat: dispatch hook 嵌套深度感知強制層 (+76 more)
+
+Changes: 15 feat, 1 refactor, 30 fix, 21 docs, 11 chore, 1 test
+
+- feat: identity-guard 呼叫端傳遞 command 參數（telemetry per-command 歸因）
+- feat: identity-guard telemetry pass/exempt 路徑落盤
+- feat: dispatch hook 嵌套深度感知強制層
+- feat: ticket CLI 嵌套深度防護（depth 命令 + create --parent warning）
+- feat: identity-guard warn/deny telemetry 落盤
+- feat: ticket CLI 寫入命令 --as 身份申報與 who.current 對照（warn-only 過渡）
+- feat: create Tier 2 高相似度阻擋層 + bulk-create 警告層補齊
+- feat: argparse 縮寫歧義模式化治理
+- feat: create 必填欄位一次列全 + --how 縮寫歧義友善提示
+- feat: create UX — 必填欄位一次列全 + --how 友善提示
+- feat: bash-edit-guard 加裸 cd warn 偵測
+- feat: bash-rules git -C 首選 + 輸出可疑協議 + IMP-056 受眾修補
+- feat: PC-166 升級唯讀 stdout 虛構 + 反污染協議規則固化
+- feat: error-pattern flat 號 negative gate hook
+- feat: 整合 blocker_resolution 共用 predicate 至 lifecycle/runqueue
+- refactor: collision guard 內聚 get_next_seq 並覆蓋 bulk_create
+- fix: basil model 行清理（移除行內註解）+ ANA 結論與驗證票
+- fix: set-where 同步更新 where.files
+- fix: SubagentStop 自激迴圈斷路器 + WAIT 廣播 dedup
+- fix: 效能測試 pytest -m perf 標記隔離
+- fix: agent-commit-verification porcelain 首行截斷與豁免繞過
+- fix: append-log 派發前章節允許 pending 直寫，消除 PM bookkeeping --force 常態化
+- fix: 移除 handoff-auto-resume-stop-hook Stop 事件雙重註冊（PC-148）
+- fix: append-log 自動補建缺失 Schema 章節 + 前置檢核聚合
+- fix: ticket create ID 分配 fcntl file lock
+- fix: worktree skill dev deps 改用 PEP 735 dependency-groups 宣告
+- fix: ticket-quality-gate hook tool-aware 輸入驗證分流
+- fix: AGENT_PRELOAD 加 [PM-ONLY] 前綴忽略規則 + Stop 類 hook 注入訊息加前綴
+- fix: emit_hook_output 加 audience 受眾過濾 + 10 gap hook 遷移統一出口
+- fix: 4 個 PostToolUse hook 加入 subagent 偵測早期跳過
+- fix: 修復 uv-tool-staleness hook 的 registry 佈局假設
+- fix: worktree-auto-commit hook 防 race 代捕 + 訊息富化
+- fix: ticket_generator 配號改經 resolve_available_seq 補 collision guard
+- fix: conftest autouse 隔離 project root 防 ticket 測試 lock 污染真實 work-logs
+- fix: 修復 ticket create auto-seq 衝突（三層缺陷鏈）
+- fix: identity guard 僅對 str as_value 生效，修復 Mock-args 測試回歸
+- fix: Stop hook 加 subagent context 偵測消除最終訊息劫持
+- fix: 強健化 ana_spawn_consistency_checker 表格變體偵測
+- fix: error-pattern flat-gate 數字開頭描述段繞過修復
+- fix: 修復 bash-edit-guard 裸 cd 偵測五項盲區
+- fix: conftest autouse fixture 隔離 hook 測試日誌至 tmp_path
+- fix: decision-tree 全缺併入 checklist 一次列全（A2 同手法）
+- fix: checklist 驗證補空字串 why/how_strategy 漏判
+- fix: 建票路徑 checklist 執法一致性（batch-create/generate 補 warning）
+- fix: 收窄裸 cd guard 絕對路徑排除為僅 repo-root 還原
+- fix: basil Layer 2 修正（規則3補Consequence + PC-166移除inline ticket ID）
+- docs: footer 同號條目歸位標註 + PRELOAD 禁用詞摘要顯性說明（basil P2 殘項）
+- docs: 收尾 --as 全覆蓋與建票 who 對齊 SOP（PRELOAD + dispatch-template ）
+- docs: PC-V1-002 補入執行 agent 違抗決策權保留約束案例變體
+- docs: hook 開發受眾評估 checklist 規則（PC-V1-004 防護 B）
+- docs: PC-143 追加案例 3 — ANA 規劃 dated model ID 拼接錯誤
+- docs: 卸載零使用 bundled plugins + 防復裝清單
+- docs: agent-dispatch-template 新增嵌套派發派發端指引章節
+- docs: parallel-dispatch.md 新增嵌套派發整合條款
+- docs: 新增 PC-V1-003 聯想式參照個案修補消音 error-pattern
+- docs: 升級 PC-069 批量腳本衛生規範
+- docs: AGENT_PRELOAD 新增規則 9 嵌套派發資訊協議
+- docs: Phase 4 兩視角回填 + 兩處註解一致性立即修正
+- docs: PRELOAD 2.4 雙判準 — who.current 機械對照為主判準
+- docs: 探針派發防護落地 — 唯讀探針 SOP + 引用非指派邊界 + PC-V1-002
+- docs: ghost branch 宿主機制補證收斂 — 同進程同 turn 雙執行流
+- docs: confabulation 規則檔群交叉引用與版本標記稽核
+- docs: SKILL.md 標註頂層命令 vs track 子命令層級慣例
+- docs: 固化「單點執法、多入口繞過」反模式（/043/029 學習）
+- docs: tool-output-trust 新增規則 5 記錄/世界平面二相性
+- docs: PC-166 跨境用語修正（並發→並行/導出→匯出/批量→批次）
+- docs: PC-166 整合 ghost branch 鑑識判據（防護 D 延伸）
+- chore: 收編前 session 遺留的測試檔 exec bit 變更（644→755）
+- chore: 清理 23 個 agent 檔 model 行行內註解
+- chore: spawn 3 IMP children + worktree egg-info 隨 pyproject 再生成
+- chore: ticket bookkeeping — metadata sync + /070 結案 + .1 spawn + set-where 補欄
+- chore: 補上 2 個 hook 測試檔執行權限（HookCheck 自動 chmod +x, IMP-054）
+- chore: 補 commit hook 測試檔執行權限修正（HookCheck IMP-054 自動 chmod）
+- chore: ANA 完成 — PC-V1-004 落地 + 三張防護 spawn ticket
+- chore: fallbackModel 設定 + 16 agent opus 改 inherit 統一
+- chore: 跨 session 同日二度撞號案例追加 + 防護排程
+- chore: CC 2.1.164-2.1.172 release impact review 評估落地
+- chore: 測試檔執行權限修正（HookCheck IMP-054 自動 chmod +x）
+- test: 清理 create 驗證測試債（--force why 豁免覆蓋 + 死 errno 收斂）
+
+---
+
+## [1.44.6] - 2026-06-09
+
+### Summary
+docs(PC-V1-001): sync-push 無 --help 未知參數觸發真實推送 near-miss（首個來源前綴格式 error-pattern，編號體系上線）
+
+---
+
+## [1.44.5] - 2026-06-09
+
+### Summary
+error-pattern 來源前綴編號體系：新規方法論 + 專案代號註冊表 + PC-ID regex 拓寬 + allocator/negative-gate + V1 flat base A+B+D remediation + 跨專案 detect 腳本（補正 v1.44.4 commit 訊息）
+
+---
+
+## [1.44.4] - 2026-06-09
+
+### Summary
+--help
+
+---
+
+## [1.44.3] - 2026-06-09
+
+### Summary
+fix: .gitignore generic **/hook-logs/ 根治巢狀涵蓋缺口
+
+Changes: 1 fix
+
+- fix: .gitignore generic **/hook-logs/ 根治巢狀涵蓋缺口
+
+---
+
+## [1.44.2] - 2026-06-09
+
+### Summary
+fix: 修復 ticket skill 4 個既有測試失敗; fix: conftest autouse fixture 隔離 HOOK_LOGS_DIR 杜絕巢狀 hook-logs 污染; fix: sync exec-bit 還原涵蓋 settings.json 註冊的 skill 根目錄執行檔 (+2 more)
+
+Changes: 4 fix, 1 chore
+
+- fix: 修復 ticket skill 4 個既有測試失敗
+- fix: conftest autouse fixture 隔離 HOOK_LOGS_DIR 杜絕巢狀 hook-logs 污染
+- fix: sync exec-bit 還原涵蓋 settings.json 註冊的 skill 根目錄執行檔
+- fix: 修復 evaluate-session.py exec bit + 建 ticket 追蹤 sync 邊界遺漏
+- chore: pull .claude 框架改進（PC-180 + sync-push SOP + PC-162 延伸）
+
+---
+
+## [1.44.1] - 2026-06-08
+
+### Summary
+chore: round-trip 驗證收尾 + SOP/PC-162 DOC + spawn; other: 新增 PC-180：雙專案 sync 混淆共享納入與本地保留範圍; other: 採納跨專案 ticket 系統共用 predicate 與 worklog 冪等測試
+
+Changes: 1 chore, 2 other
+
+- chore: round-trip 驗證收尾 + SOP/PC-162 DOC + spawn
+- other: 新增 PC-180：雙專案 sync 混淆共享納入與本地保留範圍
+- other: 採納跨專案 ticket 系統共用 predicate 與 worklog 冪等測試
+
+---
+
+## [1.44.0] - 2026-06-08
+
+### Summary
+feat: 新增未 commit ticket md 偵測 hook（ 方案 4）; feat: auto-commit index.lock retry（sleep 1s 重試一次）; fix: execution_log_checker 偵測 ANA 重現實驗結果空殼 (+1 more)
+
+Changes: 2 feat, 1 fix, 1 test
+
+- feat: 新增未 commit ticket md 偵測 hook（ 方案 4）
+- feat: auto-commit index.lock retry（sleep 1s 重試一次）
+- fix: execution_log_checker 偵測 ANA 重現實驗結果空殼
+- test: 添加 uncommitted-ticket-md-reminder-hook 測試套件
+
+---
+
+## [1.43.0] - 2026-06-08
+
+### Summary
+feat: dispatch hook 新增 stale-origin 警示（非阻擋）; fix: 修復 test_scenario_1_invalid_section fixture 設計缺陷; fix: 修復 ticket-skill 測試基礎設施 G1+G2+G3 (+10 more)
+
+Changes: 1 feat, 5 fix, 5 docs, 2 chore
+
+- feat: dispatch hook 新增 stale-origin 警示（非阻擋）
+- fix: 修復 test_scenario_1_invalid_section fixture 設計缺陷
+- fix: 修復 ticket-skill 測試基礎設施 G1+G2+G3
+- fix: cascade 解鎖擴展至 blocker→dependents
+- fix: runqueue 動態解析 blocker 完成狀態（修正 B）
+- fix: 解耦 dispatch-validation hook 測試對已移除 ticket md 的依賴
+- docs: 新增 PC-179 worktree agent 完成後 cwd 污染致 merge 誤判
+- docs: 補強 bash 規則二有界列舉禁截斷 carve-out + 新建 PC-177
+- docs: 派發 SOP 加入 push-before-dispatch + agent-writes-to-ticket
+- docs: PC-148 擴充變體 B（hook 搬移後 settings.local.json 殘留舊路徑）
+- docs: 新增 PC-178 UI 功能測試綠但 runtime 不可達
+- chore: 移除 632 MagicMock 測試污染 + scoped gitignore（G3 repo-hygiene）
+- chore: 授予 suggest-compact.py 執行權限（用戶請求）
+
+---
+
+## [1.42.0] - 2026-06-05
+
+### Summary
+feat: 7 過載代理人 model sonnet→inherit（sonnet 1m 訂閱停用）; chore: sync-pull 同步框架配置（base 138bf04e，27 delta 無衝突）
+
+Changes: 1 feat, 1 chore
+
+- feat: 7 過載代理人 model sonnet→inherit（sonnet 1m 訂閱停用）
+- chore: sync-pull 同步框架配置（base 138bf04e，27 delta 無衝突）
+
+---
+
+## [1.41.0] - 2026-06-05
+
+### Summary
+feat: SubagentStop hook 改用 additionalContext + 版本相容 fallback; feat: command-entrance-gate-hook 引導式互動 + 描述性前綴/merge 誤判修補; fix: 移除過時 Flutter-monorepo 測試解除 collection error (+11 more)
+
+Changes: 2 feat, 2 fix, 8 docs, 2 chore
+
+- feat: SubagentStop hook 改用 additionalContext + 版本相容 fallback
+- feat: command-entrance-gate-hook 引導式互動 + 描述性前綴/merge 誤判修補
+- fix: 移除過時 Flutter-monorepo 測試解除 collection error
+- fix: version-release release 收尾完整性（CHANGELOG finalize + todolist 自動 completed）
+- docs: 新增 PC-176 + 補強 PC-172（codegraph 跨電腦乒乓兩個錯誤學習）
+- docs: src 字串輸出變更 acceptance 必含測試套件規則
+- docs: ANA 全量 grep/regex 範圍驗證完整性規範
+- docs: 新增 IMP-079 批次替換工具誤傷偵測目標字面 error-pattern
+- docs: 新增 PC-175 框架跨 sync 攜帶來源專案類型專屬資產
+- docs: search-tools-guide 速查表版本無關化，杜絕 MCP 工具名漂移
+- docs: PC-174 根因段補顯式 Consequence
+- docs: 新增 PC-174 命令閘門誤判描述性陳述 + 硬阻擋應改引導式
+- chore: #9 PC-157 $TMPDIR workaround 驗證 + 版本註記
+- chore: CC 2.1.162/2.1.163 release 影響評估 ANA
+
+---
+
+## [1.40.1] - 2026-06-04
+
+### Summary
+fix: 統一 settings template serena MCP 權限前綴; docs: 新增 PC-173 框架 MCP 工具名與實機暴露漂移; docs: 修正 project-init/search-tools-guide MCP 工具名漂移 (+3 more)
+
+Changes: 1 fix, 3 docs, 2 chore
+
+- fix: 統一 settings template serena MCP 權限前綴
+- docs: 新增 PC-173 框架 MCP 工具名與實機暴露漂移
+- docs: 修正 project-init/search-tools-guide MCP 工具名漂移
+- docs: 新增 PC-172 wrapper command 參數推斷未經 runtime 驗證
+- chore: 對齊 .gitignore handoff 規則與 sync manifest GITIGNORE_EXPECTED
+- chore: 修正 sync_exclude_manifest.py + test 檔執行權限為 755
+
+---
+
+## [1.40.0] - 2026-06-03
+
+### Summary
+feat: session-start hook gitignore↔manifest 交叉驗證; feat: sync-pull import-time PC 編號撞號偵測與自動重編號; feat: push git-archive 改造（C1+K）取代磁碟 copy_filtered (+11 more)
+
+Changes: 5 feat, 1 refactor, 5 fix, 3 docs
+
+- feat: session-start hook gitignore↔manifest 交叉驗證
+- feat: sync-pull import-time PC 編號撞號偵測與自動重編號
+- feat: push git-archive 改造（C1+K）取代磁碟 copy_filtered
+- feat: pull 三方合併改造（A3+L+M）取代全量 overlay
+- feat: sync-state 加單一 last_synced_base_sha + status 顯示
+- refactor: 建 sync 排除分類 SSOT manifest，根治 push/status 漂移
+- fix: pull robustness — preserve fail-loud (H) + 備份排除工具產物 (Q)
+- fix: exec-bit 還原遞迴覆蓋 skills/*/hooks/（缺陷 G）
+- fix: push clean-check 改 should_exclude 過濾 porcelain + .gitignore 補齊漂移項
+- fix: push 機密洩漏防護 abort gitignored/untracked .claude 檔
+- fix: 修復 track list priority 排序 datetime.date vs str 混型 TypeError
+- docs: D2 PC 編號區段 policy + sync README base snapshot 更新
+- docs: 修正 README-subtree-sync.md 與程式碼對齊三處矛盾
+- docs: 新增 PC-171（上游 PC-165 重編號避免本地撞號）
+
+---
+
+## [1.39.2] - 2026-06-03
+
+### Summary
+chore: 更新 sync-state（sync-push bookkeeping）
+
+Changes: 1 chore
+
+- chore: 更新 sync-state（sync-push bookkeeping）
+
+---
+
+## [1.39.1] - 2026-06-03
+
+### Summary
+fix: app shell 新增資料管理導航入口; chore: sync-pull .claude framework 更新（claude.git）; chore: 移除誤入的 worktree gitlink
+
+Changes: 1 fix, 2 chore
+
+- fix: app shell 新增資料管理導航入口
+- chore: sync-pull .claude framework 更新（claude.git）
+- chore: 移除誤入的 worktree gitlink
+
+---
+
+## [1.39.0] - 2026-06-03
+
+### Summary
+feat: vendoring impeccable 設計 skill 至框架（納入 sync）; feat: config 化 version-release CLI 硬編碼假設支援 all-on-main; feat: 新增 parallel-claim-audit-hook 記錄 claim 時同 wave 快照（非阻擋） (+16 more)
+
+Changes: 4 feat, 13 docs, 2 chore
+
+- feat: vendoring impeccable 設計 skill 至框架（納入 sync）
+- feat: config 化 version-release CLI 硬編碼假設支援 all-on-main
+- feat: 新增 parallel-claim-audit-hook 記錄 claim 時同 wave 快照（非阻擋）
+- feat: 新增 cc-release-impact-review skill
+- docs: ARCH-015 整合四測矩陣 + 選項 3 決策落地
+- docs: ARCH-015 實測回填 — CC 2.1.161 #15 解鎖 worktree 內 .claude/ 編輯
+- docs: CC 2.1.161 框架影響評估 + 三衍生落地
+- docs: 標註 CC 2.1.161 #18 修復（subagent 卡 running 已消解）
+- docs: 更新 ARCH-015 標註 CC 2.1.161 #15 修復資訊（worktree 背景編輯解鎖）
+- docs: 第三方 CC skill vendoring 四陷阱（process-compliance）
+- docs: 文件化 subagent claim 推薦用法（半成功 root cause 已治本，不需 code fix）
+- docs: Layer 2 修正 — 三明示補全與正向錨點前置
+- docs: SOP 化 cc runtime worktree base 過舊處理流程
+- docs: 釐清 frontmatter exempt marker 不一致（ 已消解）
+- docs: 收尾 workflow 評估（不引入）+ MCP env 補記
+- docs: AUQ 規則新增維度 A 前置關卡（對齊 CC ）
+- docs: 落地 框架調整（worktree 清理 SOP + PC-059 釐清 + OTEL 補記）
+- chore: 提交遺留 mode 變更 test_parallel_claim_audit_hook.py (644->755)
+- chore: 推進 last-reviewed 至 2.1.160
+
+---
+
+## [1.38.1] - 2026-06-01
+
+### Summary
+fix: 修復 command-entrance-gate-hook 三層誤判（組合 F）; fix: migrate 反向引用更新保留被引用 ticket body
+
+Changes: 2 fix
+
+- fix: 修復 command-entrance-gate-hook 三層誤判（組合 F）
+- fix: migrate 反向引用更新保留被引用 ticket body
+
+---
+
+## [1.38.0] - 2026-06-01
+
+### Summary
+feat: 移除 --skip-verify flag + 拆 ticket track verify 子命令; feat: 擴 VALID_SECTIONS 加 Task Summary + Completion Info; feat: Phase 3 GREEN hook 訊息中性化 + Phase 4 評估 (+23 more)
+
+Changes: 6 feat, 2 refactor, 2 fix, 14 docs, 2 test
+
+- feat: 移除 --skip-verify flag + 拆 ticket track verify 子命令
+- feat: 擴 VALID_SECTIONS 加 Task Summary + Completion Info
+- feat: Phase 3 GREEN hook 訊息中性化 + Phase 4 評估
+- feat: dashboard 醒目標記 trigger-bound ticket
+- feat: saffron + agent-definition-standard 跨 ticket 物件操作禁令
+- feat: standalone --skip-verify 加 deprecation warning + AC2/AC3/AC4 評估
+- refactor: 移除 light evaluation_level enum ( 結論落地)
+- refactor: IMP-078 認知負擔重構（363→251 行 / 10→7 H2 / API SSOT 整併）
+- fix: post-test-hook 綠燈字面誤判修復
+- fix: worktree skill project_root 推導改用雙策略 fallback
+- docs: PC-166 補「情境因子 vs 根因」區分章節
+- docs: record merge interruption + --no-verify empty merge commit pattern (.3 incident)
+- docs: 建立 PC-168 flaky baseline lucky streak + quality-baseline 規則 1 邊界並列引用
+- docs: 建立 W4 session SOP 驗證 case study 並固化 8 case source data
+- docs: 新增「分析代理人 worktree 內無 commit ticket body」error pattern
+- docs: 補追 stale ticket cleanup 案例 + SOP
+- docs: Phase 4 評估結論 + load_top_ready docstring 小修
+- docs: 升級 PC-077 為 behavior-loop-details 派發決策矩陣
+- docs: Layer 2 審查修正 proposal-evaluation-gate.md
+- docs: IMP-075/076/077 補抽象層級分析章節
+- docs: IMP-078 + PC-165 並列關係雙向修訂（3 項）
+- docs: IMP-078 hot-fix（Rule 8 marker + bundle crypto + global.gc + no-restricted-imports）
+- docs: 新建 IMP-078 CE-Node 環境前提誤判 error-pattern
+- docs: PC-166 新增防護 D 區分 confabulation vs 異地真實執行
+- test: Phase 2 RED 新增 hook 訊息中性化測試
+- test: Phase 2 RED + spawn
+
+---
+
+## [1.37.0] - 2026-05-29
+
+### Summary
+feat: 新增 uv-tool ownership-guard hook 防跨專案全域工具污染; fix: phase4-hook 跳過 Context Bundle auto-extracted 區塊; fix: --acceptance 分隔符支援反斜線跳脫 + 拆條警告 (+10 more)
+
+Changes: 1 feat, 5 fix, 6 docs, 1 chore
+
+- feat: 新增 uv-tool ownership-guard hook 防跨專案全域工具污染
+- fix: phase4-hook 跳過 Context Bundle auto-extracted 區塊
+- fix: --acceptance 分隔符支援反斜線跳脫 + 拆條警告
+- fix: 修復 no_bare_status allowlist 行號漂移並去耦合
+- fix: 修復 error_channel + hook_health 兩 pre-existing 測試失敗
+- fix: release 依 blockedBy 決定目標狀態（空回 pending 非一律 blocked）
+- docs: 套用 basil Layer 2 審查修正 PC-166
+- docs: 記錄 PM confabulation 事件並建立 PC-166 防護
+- docs: 套用 basil Layer 2 審查 Warning 修正
+- docs: PC-142 新增 case 5 frontmatter 引用 + 防護同步 修復
+- docs: 新增規則六「長背景任務可觀測性」至 bash-tool-usage-rules
+- docs: 移除 basil-hook-architect.md 殘留 ticket ID 引用（規則 8 清理）
+- chore: 固化 uv-tool ownership-guard hook 執行權限位
+
+---
+
 ## [1.36.1] - 2026-05-29
 
 ### Summary

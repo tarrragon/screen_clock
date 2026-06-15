@@ -320,6 +320,9 @@ Hook 進程可從以下環境變數和 JSON payload 欄位取得 session/runtime
 | env | `$CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN` | v2.1.132+ | `=1` 時 opt-out 全螢幕渲染（影響終端型 hook 行為） |
 | stdin payload | `effort.level` | v2.1.133+ | hook JSON 輸入新增頂層欄位 |
 | MCP stdio server env | `CLAUDE_PROJECT_DIR` | v2.1.139+ | MCP stdio server 子進程現可取得 |
+| MCP stdio server env | `CLAUDE_CODE_SESSION_ID` / `CLAUDECODE` | v2.1.154+ | MCP stdio server 子進程現可取得 session id 與 `CLAUDECODE=1` 標記，可用於將工具呼叫遙測關聯到特定 session（如 dispatch_stats / 日誌） |
+
+> **可選增強（非強制）**：上述 MCP session 關聯能力為可選用途。hook / MCP 不必使用 session id；僅在需要把工具呼叫遙測關聯到特定 session 時採用。預設不依賴此能力即可正常運作。
 
 **effort 感知範例**：
 
@@ -446,6 +449,48 @@ shebang 保留供終端機直接執行時使用。
 
 ---
 
+## 標準 Hook 結構（完整骨架）
+
+新建 Python Hook 時可複製以下骨架。涵蓋 shebang、`sys.path` 注入、helper 透過參數接收 logger、`run_hook_safely` 包裝 `__main__` 入口。強制要求（導入 hook_utils、named logger、main 返回 int、logger 於 `main()` 內初始化）見 `.claude/agents/basil-hook-architect.md`「hook_utils 統一日誌規範」章節。
+
+```python
+#!/usr/bin/env python3
+"""Hook 描述。"""
+
+import sys
+from pathlib import Path
+
+# 加入 hook_utils 路徑（相同目錄）
+sys.path.insert(0, str(Path(__file__).parent))
+
+from hook_utils import setup_hook_logging, run_hook_safely, read_json_from_stdin
+
+
+def helper_function(logger):
+    """Helper 函式必須透過參數接收 logger。"""
+    logger.info("處理細節")
+
+
+def main() -> int:
+    """Hook 主邏輯。"""
+    logger = setup_hook_logging("my-hook-name")
+
+    # stdin 解析：必須使用統一入口
+    input_data = read_json_from_stdin(logger)
+    if input_data is None:
+        return 0  # 空輸入或解析失敗，正常退出（已記錄到日誌）
+
+    # ... 業務邏輯 ...
+    helper_function(logger)
+    return 0  # 成功
+
+
+if __name__ == "__main__":
+    sys.exit(run_hook_safely(main, "my-hook-name"))
+```
+
+---
+
 ## JSON 處理
 
 ### stdin 輸入讀取
@@ -511,6 +556,25 @@ Hook JSON output 新增 `terminalSequence` 欄位，讓 hook 在無 controlling 
 | `bell` | true 時發出終端 bell（`\x07`） |
 
 適合長時 hook（pre-push、test runner、agent 完成廣播）通知用戶切回 Claude Code。取代過去自行送 OSC escape 的脆弱做法。
+
+### 受眾評估 checklist（additionalContext / systemMessage 強制項）
+
+任何輸出 `additionalContext` / `systemMessage` 的 hook，設計時必須評估 subagent 受眾適切性。
+
+**Why**：hook 開發的隱含假設是「觸發者 = PM 主線程」，但 PostToolUse / Stop event 對 subagent 同樣觸發，且 CC runtime 無受眾標記機制——所有注入訊息對觸發方的 LLM 一視同仁（PC-V1-004 根因）。
+
+**Consequence**：PM-only 訊息注入 subagent context 造成雙向污染——入口方向：指令性訊息（「建議 git merge」等）誘導唯讀 subagent 越界執行寫入操作；出口方向：subagent final-message 被 Stop hook 訊息擠壓，PM 驗收依據遺失。
+
+**Action**：
+
+| 步驟 | 檢查項 |
+|------|--------|
+| 1 | hook 是否輸出 `additionalContext` / `systemMessage`？否 → 免檢 |
+| 2 | 訊息受眾是誰？對 subagent 同樣有意義（如格式錯誤回饋）→ 可保留；PM-only（commit 提醒、派發建議、checkpoint 提示）→ 進步驟 3 |
+| 3 | PM-only 訊息必加 `is_subagent_environment()`（`.claude/hooks/hook_utils/hook_io.py`）早期跳過 |
+| 4 | 跳過位置遵循既有修復慣例：輸入解析後、業務邏輯前早期 return（先 parse input 取得 `agent_id` 欄位，命中即輸出 DEFAULT_OUTPUT 並 return） |
+
+**識別訊號**：hook 原始碼有 `additionalContext` / `systemMessage` 輸出但 grep 不到 `is_subagent_environment`，即為待評估對象。完整症狀與案例見 `.claude/error-patterns/process-compliance/PC-V1-004-hook-injection-audience-mismatch.md`。
 
 ---
 
@@ -772,7 +836,7 @@ if __name__ == "__main__":
 
 ---
 
-**Last Updated**: 2026-05-21
+**Last Updated**: 2026-06-11
 **Source**: basil-hook-architect.md v2.1.0 精簡外移；2026-05-14 同步 Claude Code v2.1.130-2.1.141 hook 系統能力（`args` exec 形式、`continueOnBlock`、`effort.level` payload、`$CLAUDE_EFFORT` / `$CLAUDE_CODE_SESSION_ID` env、`terminalSequence` 通知、MCP stdio `CLAUDE_PROJECT_DIR` 注入）；2026-05-21 同步 v2.1.142-2.1.145 新增能力（W3-026 + W3-031 ANA 結論落地）：
 
 | 版本範圍 | 新增章節 | 內容 |
@@ -781,3 +845,5 @@ if __name__ == "__main__":
 | v2.1.139 | v2.1.139+ 終端存取限制 | stderr vs raw terminal fd 區別；規則 4 仍有效釋疑 |
 | v2.1.143 | Stop → v2.1.143 Stop 8-block cap | Stop hook 最多 8 blocks；本專案 5 個 Stop hook 安全評估 |
 | v2.1.145 | v2.1.145 Stop/SubagentStop input 新欄位 | background_tasks / session_crons schema；弱依賴策略；參考實作 |
+
+2026-06-11 新增「受眾評估 checklist（additionalContext / systemMessage 強制項）」章節：PC-V1-004 防護 B，輸出注入訊息的 hook 必評估 subagent 受眾適切性，PM-only 訊息加 `is_subagent_environment()` 早期跳過。

@@ -5,6 +5,7 @@ track_acceptance 模組測試
 """
 
 import re
+import tempfile
 from typing import Dict, Any, List
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
@@ -16,6 +17,12 @@ from ticket_system.commands.track_acceptance import (
     execute_check_acceptance,
     execute_append_log,
 )
+
+# W1-018.1: 真實 tmp lock target。command 內為 lock_target = Path(get_ticket_path(...))；
+# 若 get_ticket_path 被 patch 成無 return_value 的 MagicMock，Path(MagicMock) 會經
+# os.fspath 合成出 "MagicMock/get_ticket_path()/<id>" 真實垃圾路徑，再由 file_lock 寫出
+# .lock 檔污染 cwd。patch 一律回傳真實 tmp target，使 .lock 落在 tmp 並由 OS 清理。
+_LOCK_TARGET = Path(tempfile.gettempdir()) / "w1018_test_lock_target.md"
 
 
 class TestCheckAcceptance:
@@ -306,7 +313,7 @@ class TestAppendLog:
         with patch('ticket_system.commands.track_acceptance.load_ticket') as mock_load:
             mock_load.return_value = mock_ticket
 
-            with patch('ticket_system.commands.track_acceptance.get_ticket_path'):
+            with patch('ticket_system.commands.track_acceptance.get_ticket_path', return_value=_LOCK_TARGET):
                 with patch('ticket_system.commands.track_acceptance.save_ticket') as mock_save:
                     result = execute_append_log(args, "0.31.0")
 
@@ -385,7 +392,7 @@ class TestAppendLog:
         with patch('ticket_system.commands.track_acceptance.load_ticket') as mock_load:
             mock_load.return_value = mock_ticket
 
-            with patch('ticket_system.commands.track_acceptance.get_ticket_path'):
+            with patch('ticket_system.commands.track_acceptance.get_ticket_path', return_value=_LOCK_TARGET):
                 with patch('ticket_system.commands.track_acceptance.save_ticket') as mock_save:
                     result = execute_append_log(args, "0.31.0")
 
@@ -413,7 +420,7 @@ class TestAppendLog:
         with patch('ticket_system.commands.track_acceptance.load_ticket') as mock_load:
             mock_load.return_value = mock_ticket
 
-            with patch('ticket_system.commands.track_acceptance.get_ticket_path'):
+            with patch('ticket_system.commands.track_acceptance.get_ticket_path', return_value=_LOCK_TARGET):
                 with patch('ticket_system.commands.track_acceptance.save_ticket') as mock_save:
                     result = execute_append_log(args, "0.31.0")
 
@@ -442,7 +449,7 @@ class TestAppendLog:
         with patch('ticket_system.commands.track_acceptance.load_ticket') as mock_load:
             mock_load.return_value = mock_ticket
 
-            with patch('ticket_system.commands.track_acceptance.get_ticket_path'):
+            with patch('ticket_system.commands.track_acceptance.get_ticket_path', return_value=_LOCK_TARGET):
                 with patch('ticket_system.commands.track_acceptance.save_ticket') as mock_save:
                     result = execute_append_log(args, "0.31.0")
 
@@ -463,7 +470,7 @@ class TestAppendLogH2Warning:
         mock_ticket = {"id": args.ticket_id, "_path": "/p/t.md", "_body": body}
         with patch('ticket_system.commands.track_acceptance.load_ticket') as mock_load:
             mock_load.return_value = mock_ticket
-            with patch('ticket_system.commands.track_acceptance.get_ticket_path'):
+            with patch('ticket_system.commands.track_acceptance.get_ticket_path', return_value=_LOCK_TARGET):
                 with patch('ticket_system.commands.track_acceptance.save_ticket') as mock_save:
                     result = execute_append_log(args, "0.31.0")
         captured = capsys.readouterr()
@@ -556,7 +563,7 @@ class TestAppendLogSectionMatching:
     def _run(self, args, ticket):
         with patch('ticket_system.commands.track_acceptance.load_ticket') as mock_load:
             mock_load.return_value = ticket
-            with patch('ticket_system.commands.track_acceptance.get_ticket_path'):
+            with patch('ticket_system.commands.track_acceptance.get_ticket_path', return_value=_LOCK_TARGET):
                 with patch('ticket_system.commands.track_acceptance.save_ticket'):
                     return execute_append_log(args, "0.31.0")
 
@@ -573,17 +580,32 @@ class TestAppendLogSectionMatching:
         assert self._run(args, ticket) == 0
 
     def test_solutions_does_not_falsely_match_solution(self):
+        # W1-025: Solution 屬 Schema 章節，缺失時自動補建（rc 0）；
+        # 防護重點不變——不得誤匹配進 ## Solutions，新內容應落在獨立的 ## Solution
         args, ticket = self._build_args("## Solutions\n\n內容\n", section="Solution")
-        assert self._run(args, ticket) == 1
+        assert self._run(args, ticket) == 0
+        new_body = ticket["_body"]
+        # 既有 Solutions 區段未被汙染（內容原樣保留）
+        assert "## Solutions\n\n內容" in new_body
+        # 新內容落在自動補建的獨立 ## Solution 章節
+        assert re.search(r"(?m)^## Solution$", new_body) is not None
+        assert "新內容" in new_body
 
     def test_solution_alt_does_not_falsely_match(self):
+        # W1-025: 同上——「## Solution alt」不得被誤匹配，改走自動補建路徑
         args, ticket = self._build_args("## Solution alt\n\n內容\n", section="Solution")
-        assert self._run(args, ticket) == 1
+        assert self._run(args, ticket) == 0
+        new_body = ticket["_body"]
+        assert "## Solution alt\n\n內容" in new_body
+        assert re.search(r"(?m)^## Solution$", new_body) is not None
+        assert "新內容" in new_body
 
     def test_error_message_lists_existing_headers(self, capsys):
+        # W1-025: Schema 章節缺失改自動補建，SECTION_NOT_FOUND 的 H2 標題列舉
+        # 引導改以非 Schema 章節（Execution Log）驗證
         args, ticket = self._build_args(
             "## Problem Analysis\n內容\n## Test Results\n內容\n",
-            section="Solution"
+            section="Execution Log"
         )
         assert self._run(args, ticket) == 1
         out = capsys.readouterr().out

@@ -4,7 +4,7 @@ description: Claude Code Hook System Design and Implementation Expert. Designs a
 tools: Write, Read, Edit, Grep, LS, Bash, Glob, mcp__serena__*
 permissionMode: bypassPermissions
 color: blue
-model: opus
+model: inherit
 effort: low
 ---
 
@@ -117,7 +117,7 @@ basil-hook-architect 在以下情況下**應該被觸發**：
 
 ## hook_utils 統一日誌規範（強制）
 
-> **背景**：W22-001 已將 44 個 hooks 統一遷移至 hook_utils 日誌模組。所有新建或修改的 Hook 必須遵循此規範。
+> **背景**：Hook 系統歷史遷移已將既有 hooks 統一遷移至 hook_utils 日誌模組。所有新建或修改的 Hook 必須遵循此規範。
 
 ### 強制要求
 
@@ -132,41 +132,7 @@ basil-hook-architect 在以下情況下**應該被觸發**：
 
 ### 標準 Hook 結構
 
-```python
-#!/usr/bin/env python3
-"""Hook 描述。"""
-
-import sys
-from pathlib import Path
-
-# 加入 hook_utils 路徑（相同目錄）
-sys.path.insert(0, str(Path(__file__).parent))
-
-from hook_utils import setup_hook_logging, run_hook_safely, read_json_from_stdin
-
-
-def helper_function(logger):
-    """Helper 函式必須透過參數接收 logger。"""
-    logger.info("處理細節")
-
-
-def main() -> int:
-    """Hook 主邏輯。"""
-    logger = setup_hook_logging("my-hook-name")
-
-    # stdin 解析：必須使用統一入口
-    input_data = read_json_from_stdin(logger)
-    if input_data is None:
-        return 0  # 空輸入或解析失敗，正常退出（已記錄到日誌）
-
-    # ... 業務邏輯 ...
-    helper_function(logger)
-    return 0  # 成功
-
-
-if __name__ == "__main__":
-    sys.exit(run_hook_safely(main, "my-hook-name"))
-```
+完整可複製的 Hook 骨架範本（shebang / `sys.path` 注入 / helper 透過參數收 logger / `__main__` 入口）見 `.claude/references/hook-architect-technical-reference.md`「標準 Hook 結構（完整骨架）」章節。
 
 **重要**：`logger` 必須在 `main()` 內部初始化，並透過參數傳遞給所有 helper 函式。禁止在模組級定義 logger（避免 IMP-003 作用域迴歸）。
 
@@ -178,7 +144,7 @@ if __name__ == "__main__":
 | `run_hook_safely(main_func, hook_name)` | 頂層例外處理，crash 時自動記錄 traceback 並回傳非零退出碼 |
 | `read_json_from_stdin(logger)` | 統一 stdin JSON 解析，返回 dict 或 None（空輸入/解析失敗） |
 
-### stdin 解析規範（強制，W5-001）
+### stdin 解析規範（強制）
 
 **所有 Hook 必須使用 `read_json_from_stdin(logger)` 讀取 stdin**。禁止直接 `json.load(sys.stdin)`。
 
@@ -252,6 +218,7 @@ def get_version() -> Optional[str]:  # 不要寫 str | None
 | 3 | 若完成時且涉及代理人 → **必用 SubagentStop**，禁用 PostToolUse(Agent) |
 | 4 | 查 `.claude/references/hook-architect-technical-reference.md` 確認選用 event 在 `run_in_background: true` 模式的真實觸發時機（不憑名稱推論） |
 | 5 | 狀態檔案匹配 → **必用 source of truth 識別碼**（如 SubagentStop input 的 `agent_id`），禁用易碰撞的字串（如 `agent_description`） |
+| 6 | 輸出 `additionalContext` / `systemMessage` → 依 `.claude/references/hook-architect-technical-reference.md`「受眾評估 checklist」評估 subagent 受眾適切性；PM-only 訊息必加 `is_subagent_environment()` 早期跳過（PC-V1-004） |
 
 ### Event 選擇對照表
 
@@ -304,21 +271,7 @@ def get_version() -> Optional[str]:  # 不要寫 str | None
 
 ## 工作流程
 
-```
-rosemary-project-manager (派發任務)
-    |
-    v
-basil-hook-architect
-    |
-    +-- Phase 1: 需求分析 → 理解目的、選擇 Hook 類型、定義輸入輸出
-    +-- Phase 2: 設計規劃 → 選擇語言、設計邏輯、規劃測試
-    +-- Phase 3: 實作開發 → 編寫腳本、hook_utils 整合、錯誤處理
-    +-- Phase 4: 配置整合 → 更新 settings.local.json、設定 Matcher/Timeout
-    +-- Phase 5: 測試驗證 → 語法檢查、功能測試、Debug 模式驗證
-    |
-    v
-rosemary-project-manager (驗收和部署)
-```
+PM 派發後，basil 依五階段推進：需求分析（目的、Hook 類型、輸入輸出）→ 設計規劃（語言、邏輯、測試）→ 實作開發（腳本、hook_utils 整合、錯誤處理）→ 配置整合（settings 註冊、Matcher/Timeout）→ 測試驗證（語法、功能、Debug），完成後交回 PM 驗收。各階段的 hook 專屬規範見本檔對應章節（hook_utils 統一日誌規範、Python 版本限制、Hook event 選擇規則、實作完成驗證 Dogfooding），技術細節見 `.claude/references/hook-architect-technical-reference.md`。
 
 ### 語言選擇指引
 
@@ -417,31 +370,17 @@ rosemary-project-manager (驗收和部署)
 
 ## 搜尋工具
 
-### ripgrep (rg)
-
-代理人可透過 Bash 工具使用 ripgrep 進行高效能文字搜尋。
-
-**文字搜尋預設使用 rg（透過 Bash）**，特別適合：
-- 需要 PCRE2 正則表達式（lookaround、backreference）
-- 需要搜尋壓縮檔（`-z` 參數）
-- 需要 JSON 格式輸出（`--json` 參數）
-- 需要複雜管線操作
-
-**完整指南**：`.claude/skills/search-tools-guide/SKILL.md`
-
-**環境要求**：需要安裝 ripgrep。未安裝時建議：
-- macOS: `brew install ripgrep`
-- Linux: `sudo apt-get install ripgrep`
-- Windows: `choco install ripgrep`
+ripgrep（rg）、LSP/Serena 符號搜尋等工具的選擇與使用見 `.claude/skills/search-tools-guide/SKILL.md`。
 
 ---
 
-**Last Updated**: 2026-02-25
-**Version**: 3.0.0 (精簡重寫：1231→~380 行，外移技術參考)
+**Last Updated**: 2026-06-11
+**Version**: 3.1.0 (強制檢查清單新增步驟 6：additionalContext / systemMessage 受眾評估指引列)
 **Specialization**: Claude Code Hook System Design and Implementation
 **Status**: Active
 
 **Change Log**:
+- v3.1.0 (2026-06-11): Hook event 選擇規則強制檢查清單新增步驟 6，引用 technical-reference「受眾評估 checklist」（PC-V1-004 防護 B：PM-only 訊息加 `is_subagent_environment()` 早期跳過）
 - v3.0.0 (2026-02-25): 精簡重寫
   - 刪除重複段落（工作流程x2、價值主張x2、品質指標x2、輸出模板x2）
   - 外移詳細技術參考到 .claude/references/hook-architect-technical-reference.md

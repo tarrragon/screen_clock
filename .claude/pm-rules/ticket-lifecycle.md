@@ -231,7 +231,7 @@ Acceptance 欄位表達的是 **complete 時的驗收條件**，而非 claim 時
 >
 > **Why**：claim 是狀態切換動作，不應綁全域測試副作用；同 wave 並行 claim 必然撞 Jest 暫存 / git stash 中間狀態。
 >
-> **Consequence**：原預設行為已造成多次 false test failure，PM 必須以 `--skip-verify` 繞過，反而失去 AC 漂移防護。新預設改為「不執行 verification」+「明示 --verify 啟用」，將決策權交回 PM。
+> **Consequence**：原預設行為已造成多次 false test failure。新預設改為「不執行 verification」+「明示 --verify 啟用」，將決策權交回 PM。如需單獨執行 AC 驗證（不 claim），W4-019 拆出 `ticket track verify <id>` 子命令補足查詢缺口。
 >
 > **Action**：日常 claim 直接 `ticket track claim <id>`；除錯/AC 漂移巡檢場景才用 `ticket track claim <id> --verify`。
 >
@@ -317,7 +317,7 @@ $ ticket track claim 0.18.0-W10-042 --verify   # W3-046：須 opt-in
 |------|------|
 | 預設（無 `--verify`） | 跳過 AC 驗證直接 claim，避免 PC-078 並行衝突（W3-046 後新預設） |
 | `--verify` 旗標 | 明示啟用 AC 驗證，保留除錯/AC 漂移巡檢場景（W3-046 新增） |
-| `--skip-verify` 旗標 | No-op，保留向後相容（W3-046 後失效；新預設已不執行驗證） |
+| `ticket track verify <id>` 子命令 | W4-019：單獨執行 AC 驗證，不變更 ticket 狀態（與 claim 解耦，補足查詢缺口） |
 | `--yes` 旗標 | 配合 `--verify` 使用，自動選 y 繼續；S4 仍拒絕（S4 優先於 --yes） |
 | 無可機器驗證 AC 的 Ticket | `--verify` 啟用時 CLI 輸出「無可驗證項」，不阻擋 claim |
 
@@ -421,6 +421,10 @@ ANA Ticket 分為兩類，差異在於「分析結論是否需要後續實作才
 > 「若分析報告今天完成，一週後回頭看，問題是否已被解決？」
 > - 是 → 研究性 ANA，分析本身即為解法
 > - 否，還需要有人去改程式/改 hook → 防護性 ANA，建 children 追蹤落地
+
+> **盤點/規劃型 ANA 屬防護性（W8-025 Option A 釐清）**：盤點型 ANA（產出分類處置計畫，如載體盤點 W8-009/010/015）的交付物雖是「計畫」，但**問題（如載體錯置）需後續清理才算解決** → 屬**防護性**，清理落地用 children，ANA 保持 in_progress 直到清理 children 完成。
+>
+> **陷阱（本 session W8-009 實證）**：勿因「交付物是計畫」誤判為研究性而用 spawned + --yes-spawned 強制完成——「產出計畫」不等於「問題已解決」。判別關鍵是**問題是否已解決**，非「是否產出了文件」。盤點計畫只是解法藍圖，清理執行才解決問題。清理延後時 ANA 跨 round 維持 in_progress（由 `stuck-anas` 追蹤），不強制本輪 complete。詳見 PC-091 v1.2.0。
 
 ### 各類範例
 

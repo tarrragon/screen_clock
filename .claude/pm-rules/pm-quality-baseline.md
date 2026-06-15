@@ -99,22 +99,25 @@
 
 > **來源**：W9-003 分析發現 PM 有 5/13（約 38%）的 feedback memory 僅存 memory 未升級，包含跨專案適用的原則（如「框架/產物分離」「Ticket 引導優先於 Hook」「/clear 前持久化」）。Memory 是**專案層級儲存**（`~/.claude/projects/<project>/memory/`），不會隨 `.claude/` sync 到其他專案；跨專案原則若僅存 memory，會在其他專案消失並可能重複踩同樣的雷。
 
-**強制四問檢查**（寫入 feedback memory 時必須回答）：
+**強制四問檢查**（寫入 feedback memory 時必須回答；目的地拿不準時先查 `.claude/methodologies/knowledge-carrier-allocation-methodology.md` 受眾 x 形態地圖）：
 
 | 檢查問題 | 回答「是」的升級路徑 |
 |---------|-------------------|
 | 此原則對其他專案也適用嗎？ | 至少升級到 `.claude/` 框架層；否則加 `project_` 前綴標示為專案特定 |
-| 此原則是通用品質或流程原則嗎？ | 升級至 `.claude/rules/core/quality-baseline.md` 或新建 `rules/core/*.md` |
-| 此原則是 PM 行為規範嗎？ | 升級至 `.claude/rules/core/pm-role.md` 或 `.claude/pm-rules/` |
+| 此原則是通用品質或流程原則嗎？ | 預設升級至 `.claude/references/`；僅當屬「每回合都需遵守的行為禁令」且通過預算閘門（見下）時進 `rules/core/`（quality-baseline.md 加一行或速查 stub） |
+| 此原則是 PM 行為規範嗎？ | 升級至 `.claude/pm-rules/`（按需層）；pm-role.md（自動載入）僅加路由行 |
+| 此原則是單一代理人的身份 / 偏好嗎？ | 升級至 `.claude/agents/<name>.md`（內容邊界見 knowledge-carrier-allocation「代理人定義內容規範」節：偏好 / 邊界可裝，流程外移 skill） |
 | 此原則是錯誤學習嗎？ | 升級至 `.claude/error-patterns/`（PC/IMP/ARCH 對應分類） |
 | 此原則是流程方法論嗎？ | 升級至 `.claude/methodologies/` |
 | 此原則是 Skill 引導嗎？ | 升級至 `.claude/skills/<skill>/` |
 
+**升級目的地預算閘門**（W7-007）：升級目的地屬自動載入層（`rules/core/`、CLAUDE.md、rules/README.md、pm-role.md）時，必須先通過 `rules/README.md`「自動載入預算原則」自問——「這是否每回合都需要遵守？」答否一律改放按需層（references/ / pm-rules/ / error-patterns/），自動載入層至多加一行路由。**Why**：升級路徑若預設指向自動載入層，每次知識固化即膨脹一次，45k 預算單調耗盡（W7-004 根因「每次事故教訓傾向寫進自動載入層」的制度化版本）。寫入形態依 `document-writing-style.md`「載入層邊界」：自動載入層為禁令 + 路由，論證放按需層。
+
 **四問都回答「否」才允許僅存 memory**（代表確為專案特定 context 索引）。
 
-**升級後處理**：
+**升級後處理**（升級即搬家，非複製——W7-004.6 索引修剪原則成文化）：
 - 原 memory 檔案頂部註明「本原則已升級為框架規則」並列出升級目的地路徑
-- 保留 memory 作為本專案的 context 提醒索引（不必刪除）
+- 自 `MEMORY.md` 索引**移除**該條目（MEMORY.md 每 session 自動載入，升級後保留索引行即雙重儲存；memory 單檔可保留供考古，對照關係記於升級 commit 或 ticket）
 - 升級完成後才能視為「原則已落地」
 
 **禁止行為**：
@@ -159,5 +162,7 @@
 
 ---
 
-**Last Updated**: 2026-04-16
+**Last Updated**: 2026-06-12
+**Version**: 1.2.0 - 規則 7 升級路徑表補「單一代理人身份/偏好 → agents/<name>.md」分支（原六分支對偏好類教訓無目的地，fall through 誤置）+ 表前補知識載體地圖路由（W8 multi-round-review R3）
+**Version**: 1.1.0 - 規則 7 新增「升級目的地預算閘門」（自動載入層需過「每回合都需要」自問，預設按需層）；升級後處理改「升級即搬家」（MEMORY.md 索引移除條目，修正與 W7-004.6 索引修剪實務的矛盾）（W7-007）
 **Version**: 1.0.0 - 從 quality-baseline.md v1.9.0 規則 6-7 外移；auto-load 僅保留通用品質底線（規則 1-5），PM 情境專屬規則移至此處按需讀取（對應 0.18.0-W10-073.4 WRAP 選項 B）

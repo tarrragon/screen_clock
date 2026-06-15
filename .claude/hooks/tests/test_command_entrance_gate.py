@@ -568,14 +568,18 @@ class TestMainFunction:
         assert result == 0
 
     def test_dev_command_blocked(self):
-        """測試開發命令被阻擋"""
+        """測試開發命令被阻擋（Ticket 存在但畸形 / 未認領，ticket_id 非 None）
+
+        W1-036 後：硬阻擋僅適用「Ticket 存在但驗證失敗」情境（ticket_id 非 None）。
+        「無 Ticket」情境改為引導式放行，見 TestW1036GuidedNoTicket。
+        """
         hook_module = load_hook_module()
 
         with patch.object(hook_module, 'read_json_from_stdin',
                          return_value={"prompt": "實作新功能"}):
             with patch.object(hook_module, 'is_development_command', return_value=True):
                 with patch.object(hook_module, 'check_ticket_status',
-                                 return_value=(False, "Ticket 未找到", None, None)):
+                                 return_value=(False, "Ticket 決策樹缺失", "0.19.1-W1-099", None)):
                     with patch('sys.stdout', new_callable=io.StringIO):
                         with patch('sys.stderr', new_callable=io.StringIO):
                             result = hook_module.main()
@@ -624,7 +628,7 @@ class TestBoundaryScenarios:
                          return_value={"prompt": "0.1.0-W39-001 0.1.0-W39-002 實作新功能"}):
             with patch.object(hook_module, 'is_development_command', return_value=True):
                 with patch.object(hook_module, 'check_ticket_status',
-                                 return_value=(False, "錯誤", None, None)):
+                                 return_value=(False, "錯誤", "0.1.0-W39-001", None)):
                     with patch('sys.stdout', new_callable=io.StringIO):
                         with patch('sys.stderr', new_callable=io.StringIO):
                             result = hook_module.main()
@@ -653,4 +657,323 @@ class TestBoundaryScenarios:
                 result = hook_module.main()
 
         # 應允許執行（預設安全行為）
+        assert result == 0
+
+
+# ============================================================================
+# W4-027 組合 F：三層誤判修復測試
+# ============================================================================
+
+class TestW4027L1WordBoundaryContext:
+    """L1 is_development_command：描述性開發詞不誤判為開發命令
+
+    W4-026 根因：prompt「更新 v0.20.0-main.md 反映新增的監測波次」中
+    描述性「新增」以 substring 命中 IMPLEMENT_KEYWORDS 被誤判為開發命令。
+    """
+
+    def test_descriptive_keyword_in_doc_edit_not_dev(self):
+        """描述性開發詞嵌在 doc 編輯 prompt 中不應判為開發命令"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        prompt = "更新 v0.20.0-main.md 反映新增的監測波次"
+        assert hook_module.is_development_command(prompt, logger) is False
+
+    def test_descriptive_keyword_mid_sentence_not_dev(self):
+        """開發詞出現在描述子句（「的」修飾語）不應判為開發命令"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        # 「新增的功能」屬名詞性描述，非命令
+        assert hook_module.is_development_command(
+            "整理文件以說明新增的功能清單", logger
+        ) is False
+
+    def test_imperative_keyword_at_start_is_dev(self):
+        """命令式開發詞（句首）仍應判為開發命令（防護不喪失）"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        assert hook_module.is_development_command("實作新功能", logger) is True
+        assert hook_module.is_development_command("新增使用者登入流程", logger) is True
+
+    def test_imperative_keyword_short_prompt_is_dev(self):
+        """短命令式開發 prompt 仍應判為開發命令"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        assert hook_module.is_development_command("重構 UC-06", logger) is True
+
+
+class TestW4027L2TriggerNarrowing:
+    """L2 get_latest_pending_ticket：觸發限縮
+
+    僅在 prompt 顯式引用 ticket-id 或存在 in_progress ticket 時才回傳 pending，
+    不再用全版本 mtime-latest-pending 盲選。
+    """
+
+    def _ticket(self, tmp_path, name, status, title="無關標題"):
+        f = tmp_path / name
+        f.write_text(
+            f"---\nid: {name[:-3]}\ntitle: {title}\nstatus: {status}\n---\n",
+            encoding="utf-8",
+        )
+        return f
+
+    def test_no_ticket_id_no_in_progress_returns_none(self, tmp_path):
+        """prompt 無 ticket-id 引用、無 in_progress ticket → 不盲選 pending"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        pending = self._ticket(tmp_path, "0.20.0-W1-013.md", "pending")
+
+        with patch.object(hook_module, 'get_project_root', return_value=tmp_path):
+            with patch.object(hook_module, 'find_ticket_files', return_value=[pending]):
+                result = hook_module.get_latest_pending_ticket(
+                    logger, prompt="更新 v0.20.0-main.md 反映新增的監測波次"
+                )
+
+        assert result is None
+
+    def test_explicit_ticket_id_returns_matching(self, tmp_path):
+        """prompt 顯式引用 ticket-id → 回傳該 ticket"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        pending = self._ticket(tmp_path, "0.20.0-W1-013.md", "pending")
+
+        with patch.object(hook_module, 'get_project_root', return_value=tmp_path):
+            with patch.object(hook_module, 'find_ticket_files', return_value=[pending]):
+                result = hook_module.get_latest_pending_ticket(
+                    logger, prompt="認領 0.20.0-W1-013 並開始"
+                )
+
+        assert result is not None
+        assert result[0] == "0.20.0-W1-013"
+
+    def test_in_progress_ticket_returned_without_id(self, tmp_path):
+        """存在 in_progress ticket → 即使 prompt 無 ticket-id 仍回傳（既有 gate 行為）"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        in_prog = self._ticket(tmp_path, "0.20.0-W1-005.md", "in_progress")
+
+        with patch.object(hook_module, 'get_project_root', return_value=tmp_path):
+            with patch.object(hook_module, 'find_ticket_files', return_value=[in_prog]):
+                result = hook_module.get_latest_pending_ticket(
+                    logger, prompt="繼續實作功能"
+                )
+
+        assert result is not None
+        assert result[0] == "0.20.0-W1-005"
+        assert result[1] == "in_progress"
+
+    def test_backward_compat_no_prompt_arg(self, tmp_path):
+        """向後相容：未傳 prompt 參數時 fallback 回舊行為（mtime-latest pending）"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        pending = self._ticket(tmp_path, "0.20.0-W1-013.md", "pending")
+
+        with patch.object(hook_module, 'get_project_root', return_value=tmp_path):
+            with patch.object(hook_module, 'find_ticket_files', return_value=[pending]):
+                result = hook_module.get_latest_pending_ticket(logger)
+
+        assert result is not None
+        assert result[0] == "0.20.0-W1-013"
+
+
+class TestW4027L3PendingRelevanceGate:
+    """L3 check_ticket_status：pending 阻擋前加 relevance 閘門
+
+    mirror in_progress 既有 check_ticket_relevance 路徑：
+    pending ticket 與 prompt 無關時不阻擋（放行而非要求認領無關 ticket）。
+    """
+
+    def test_pending_irrelevant_not_blocked(self):
+        """pending ticket 與 prompt 無關 → 不阻擋"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+
+        with patch.object(hook_module, 'get_latest_pending_ticket',
+                          return_value=("0.20.0-W1-013", "pending",
+                                        "title: 監測波次校準分析")):
+            is_valid, error_msg, ticket_id, _ = hook_module.check_ticket_status(
+                prompt="更新 v0.20.0-main.md 反映新增的監測波次", logger=logger
+            )
+
+        # 無關 pending 不阻擋
+        assert is_valid is True
+
+    def test_pending_relevant_still_blocked(self):
+        """pending ticket 與 prompt 相關但未認領 → 仍阻擋（要求 claim，防護不喪失）"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+
+        with patch.object(hook_module, 'get_latest_pending_ticket',
+                          return_value=("0.20.0-W1-013", "pending",
+                                        "title: 修復 command-entrance-gate-hook")):
+            is_valid, error_msg, ticket_id, _ = hook_module.check_ticket_status(
+                prompt="修復 command-entrance-gate-hook", logger=logger
+            )
+
+        assert is_valid is False
+        assert ticket_id == "0.20.0-W1-013"
+        assert "未認領" in error_msg or "未被認領" in error_msg
+
+
+class TestW4027IntegrationReproCase:
+    """W4-026 完整重現案例：doc-edit prompt + 無關 pending → 不應阻擋"""
+
+    def test_doc_edit_with_unrelated_pending_not_blocked(self):
+        """主重現：「更新 v0.20.0-main.md 反映新增的監測波次」+ 無關 pending → 放行"""
+        hook_module = load_hook_module()
+
+        # 模擬全版本掃描只找到無關的 pending W1-013
+        with patch.object(hook_module, 'read_json_from_stdin',
+                         return_value={"prompt": "更新 v0.20.0-main.md 反映新增的監測波次"}):
+            with patch.object(hook_module, 'get_latest_pending_ticket',
+                             return_value=("0.20.0-W1-013", "pending",
+                                           "title: 監測波次校準分析")):
+                with patch('sys.stdout', new_callable=io.StringIO):
+                    with patch('sys.stderr', new_callable=io.StringIO):
+                        result = hook_module.main()
+
+        assert result == 0  # 不應阻擋
+
+    def test_real_coding_intent_no_ticket_still_blocked(self):
+        """防護不喪失：真實命令式開發意圖（句首開發詞）+ 有相關 pending 仍被擋
+
+        prompt 避開 management 白名單詞（如 hook/commit），確保走開發命令驗證路徑。
+        """
+        hook_module = load_hook_module()
+
+        with patch.object(hook_module, 'read_json_from_stdin',
+                         return_value={"prompt": "實作使用者登入流程"}):
+            with patch.object(hook_module, 'get_latest_pending_ticket',
+                             return_value=("0.20.0-W1-013", "pending",
+                                           "title: 實作使用者登入流程")):
+                with patch('sys.stdout', new_callable=io.StringIO):
+                    with patch('sys.stderr', new_callable=io.StringIO):
+                        result = hook_module.main()
+
+        assert result == 2  # EXIT_BLOCK
+
+
+# ============================================================================
+# W1-036：引導式互動 + 描述性前綴 / merge 白名單誤判修補
+# ============================================================================
+
+class TestW1036DescriptivePrefix:
+    """描述性前綴（已經 / 已 / 現已 等完成態標記）不應判為開發命令
+
+    觸發案例：「這個分支現在已經修復，可以合併」中的「修復」屬狀態陳述，
+    非「去修復」命令意圖，不應觸發 Ticket 閘門。
+    """
+
+    @pytest.mark.parametrize("prompt", [
+        "已經修復",
+        "已修復登入問題",
+        "現在已修復登入問題",
+        "這個分支現在已經修復",
+        "剛剛重構完成",
+        "都已新增完畢",
+    ])
+    def test_descriptive_prefix_not_dev(self, prompt):
+        """緊接完成態前綴的開發詞不應判為開發命令"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        assert hook_module.is_development_command(prompt, logger) is False
+
+    @pytest.mark.parametrize("prompt", [
+        "修復登入問題",
+        "重構 UC-06",
+        "新增使用者登入流程",
+    ])
+    def test_imperative_without_prefix_still_dev(self, prompt):
+        """無完成態前綴的命令式開發詞仍判為開發命令（防護不喪失）"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        assert hook_module.is_development_command(prompt, logger) is True
+
+
+class TestW1036MergeWhitelist:
+    """合併 / merge 等 git 操作納入 management 白名單，不被當開發命令阻擋"""
+
+    @pytest.mark.parametrize("prompt", [
+        "這個分支可以合併回主線",
+        "可以合併了",
+        "merge this branch into main",
+        "幫我 pull 最新的 main",
+        "需要 rebase 到 main",
+    ])
+    def test_git_ops_are_management(self, prompt):
+        """git 合併 / merge / pull / rebase 屬管理操作（永遠放行）"""
+        hook_module = load_hook_module()
+        logger = MagicMock()
+        assert hook_module.is_management_operation(prompt, logger) is True
+
+
+class TestW1036GuidedNoTicket:
+    """無對應 Ticket 時引導式放行（exit 0 + 注入 AskUserQuestion 引導 context），取代硬阻擋"""
+
+    def test_generate_output_guidance_not_blocking(self):
+        """generate_hook_output 引導式情境：should_block=False 且注入 guidance_msg"""
+        hook_module = load_hook_module()
+
+        output = hook_module.generate_hook_output(
+            prompt="實作新功能",
+            is_dev_cmd=True,
+            is_valid=False,
+            error_msg="未找到 Ticket",
+            ticket_id=None,
+            relevance_warning=None,
+            is_guidance=True,
+            guidance_msg=hook_module.GUIDANCE_NO_TICKET,
+        )
+
+        assert output["check_result"]["should_block"] is False
+        assert output["check_result"]["is_guidance"] is True
+        assert output["check_result"]["exit_code"] == "EXIT_SUCCESS"
+        context = output["hookSpecificOutput"].get("additionalContext", "")
+        assert "AskUserQuestion" in context
+
+    def test_main_dev_command_no_ticket_guided_not_blocked(self):
+        """main：開發命令 + 無 Ticket（ticket_id=None）→ exit 0（引導），非 exit 2"""
+        hook_module = load_hook_module()
+
+        captured = io.StringIO()
+        with patch.object(hook_module, 'read_json_from_stdin',
+                         return_value={"prompt": "實作新功能"}):
+            with patch.object(hook_module, 'is_development_command', return_value=True):
+                with patch.object(hook_module, 'check_ticket_status',
+                                 return_value=(False, "未找到 Ticket", None, None)):
+                    with patch('sys.stdout', captured):
+                        with patch('sys.stderr', new_callable=io.StringIO):
+                            result = hook_module.main()
+
+        assert result == 0  # EXIT_SUCCESS（引導式放行）
+        assert "AskUserQuestion" in captured.getvalue()
+
+    def test_main_dev_command_malformed_ticket_still_blocked(self):
+        """main：開發命令 + Ticket 存在但畸形（ticket_id 非 None）→ 仍 exit 2（阻擋不退化）"""
+        hook_module = load_hook_module()
+
+        with patch.object(hook_module, 'read_json_from_stdin',
+                         return_value={"prompt": "實作新功能"}):
+            with patch.object(hook_module, 'is_development_command', return_value=True):
+                with patch.object(hook_module, 'check_ticket_status',
+                                 return_value=(False, "決策樹缺失", "0.19.1-W1-099", None)):
+                    with patch('sys.stdout', new_callable=io.StringIO):
+                        with patch('sys.stderr', new_callable=io.StringIO):
+                            result = hook_module.main()
+
+        assert result == 2  # EXIT_BLOCK
+
+    def test_full_repro_already_fixed_can_merge_not_blocked(self):
+        """完整重現：『這個分支現在已經修復，可以合併』→ 不阻擋（exit 0）
+
+        雙重防護：『已經修復』描述性前綴 + 『合併』management 白名單，
+        任一機制即可放行，不需 mock check_ticket_status。
+        """
+        hook_module = load_hook_module()
+
+        with patch.object(hook_module, 'read_json_from_stdin',
+                         return_value={"prompt": "這個分支現在已經修復，可以合併"}):
+            with patch('sys.stdout', new_callable=io.StringIO):
+                with patch('sys.stderr', new_callable=io.StringIO):
+                    result = hook_module.main()
+
         assert result == 0

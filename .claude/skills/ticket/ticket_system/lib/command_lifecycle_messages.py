@@ -258,6 +258,11 @@ class CreateMessages:
         "[WARNING] 使用預設驗收條件模板。請修改為具體、可量化的驗收標準。\n"
         "           使用 /ticket fields update <ticket-id> acceptance <criteria> 修改"
     )
+    ACCEPTANCE_PIPE_SPLIT_WARNING = (
+        "[WARNING] 單一 --acceptance 值含分隔符，已被拆成 {count} 條：\n"
+        "{preview}\n"
+        "           若分隔符屬內文（非刻意分隔多條），請改用反斜線跳脫（\\ 接分隔符）以保留原文。"
+    )
     BLOCKED_BY_CHECK = "   [ ] 是否有需要設定的 blockedBy？"
     DECISION_TREE_CHECK = "   [ ] 是否已填寫 decision_tree_path 欄位？"
     DECISION_TREE_DESC = "       （派發驗證必需）"
@@ -386,6 +391,21 @@ class CreateMessages:
     DUPLICATE_STATUS_LABEL_IN_PROGRESS = "進行中"
     DUPLICATE_STATUS_LABEL_COMPLETED = "已完成"
 
+    # Tier 2 阻擋層訊息（1.0.0-W1-040.1）
+    DUPLICATE_BLOCK_HEADER = (
+        "[ERROR] 偵測到同窗口高相似度 Ticket，已阻擋建立（冪等防護）："
+    )
+    DUPLICATE_BLOCK_ITEM = (
+        "   - {ticket_id}: {title} [{status_label}] (相似度 {similarity:.3f})"
+    )
+    DUPLICATE_BLOCK_SUGGESTION = (
+        "   若確定要建立，請加上 --allow-duplicate 旁路本防護；"
+        "否則建議沿用或 migrate 既有 Ticket"
+    )
+    DUPLICATE_BLOCK_BYPASSED = (
+        "[INFO] --allow-duplicate 已啟用，略過同窗口高相似度阻擋"
+    )
+
     # 問題 4 新增常數（0.1.2-W4-001.1）
     EXEMPTED_PARTIAL_PARAMS_ERROR = (
         "[ERROR] 豁免條件下三個參數必須全部提供或全部省略"
@@ -448,6 +468,9 @@ class FieldsMessages:
     # Fields 的實際值顯示
     FIELD_VALUE_SEPARATOR = ": "
     NO_FIELDS_FOUND = "未找到任何欄位"
+
+    # set-where 路徑型輸入同步 where.files（W1-078 修復）
+    WHERE_FILES_SYNCED = "   where.files 已同步（{count} 項）:"
 
 
 def format_msg(template: str, **kwargs) -> str:

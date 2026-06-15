@@ -157,7 +157,11 @@ class TrackAcceptanceMessages:
     # execute_append_log 中有效的區段清單
     # W10-107: 對齊 .claude/pm-rules/ticket-body-schema.md，補入 ANA 必填的
     # 「重現實驗結果」章節（PC-063），讓 ANA 執行者不再被迫寫到 Solution。
+    # W3-099 修正：W10-107 對齊時遺漏 'Task Summary' 與 'Completion Info' 兩個
+    # IMP/ANA/DOC 三類型必填章節，導致 complete 階段必須 Edit 直填 ticket md。
+    # 本次補完成 10 章節 SSOT 對齊（按 schema 章節順序排列）。
     VALID_SECTIONS = [
+        "Task Summary",
         "Problem Analysis",
         "Context Bundle",
         "重現實驗結果",
@@ -166,10 +170,16 @@ class TrackAcceptanceMessages:
         "Execution Log",
         "NeedsContext",
         "Exit Status",
+        "Completion Info",
     ]
 
     # execute_append_log 中的有效值提示前綴
     VALID_VALUES_PREFIX = "   有效值:"
+
+    # execute_append_log 中缺失 Schema 章節自動建立的提示
+    # W1-025: 白名單合法但 body 缺失的 Schema 章節（如 IMP 模板未含 Context Bundle）
+    # 於 canonical 順序位置自動補建，消除「章節不存在 → 被迫繞道 Edit」的摩擦
+    SECTION_AUTO_CREATED_FORMAT = "[OK] 章節 ## {section} 原不存在，已於 schema 順序位置自動建立"
 
     # execute_append_log 中的時間戳標籤
     TIMESTAMP_PREFIX = "   時間戳:"
@@ -364,7 +374,7 @@ class TrackMessages:
     HELP_SET_WHO = "設定 Ticket 的 who 欄位"
     HELP_SET_WHAT = "設定 Ticket 的 what 欄位"
     HELP_SET_WHEN = "設定 Ticket 的 when 欄位"
-    HELP_SET_WHERE = "設定 Ticket 的 where 欄位"
+    HELP_SET_WHERE = "設定 Ticket 的 where 欄位（路徑型輸入同步更新 where.files；逗號分隔多路徑）"
     HELP_SET_WHY = "設定 Ticket 的 why 欄位"
     HELP_SET_HOW = "設定 Ticket 的 how 欄位"
     HELP_SET_PRIORITY = "設定 Ticket 的 priority 欄位"
@@ -585,6 +595,9 @@ class BulkCreateMessages:
     # _print_batch_result 中的警告項目標籤
     WARNED_ITEMS_TITLE = "警告項目："
 
+    # _create_batch_tickets 中的 checklist 缺欄位警告格式（1.0.0-W1-027）
+    CHECKLIST_WARNING_FORMAT = "缺必填欄位: {fields}"
+
 
 # ============================================================================
 # GenerateMessages - generate.py 相關訊息
@@ -618,6 +631,10 @@ class GenerateMessages:
 
     # _save_tickets 中的錯誤訊息（使用 BACKUP_FAILED，但這裡保留以供參考）
     # 注：實際使用來自 WarningMessages.BACKUP_FAILED
+
+    # _print_generation_summary 中的 checklist 缺欄位警告（1.0.0-W1-027，warning 級不阻擋）
+    CHECKLIST_WARNING_TITLE = "[WARNING] 以下 Ticket 缺必填欄位（warning 級，未阻擋建立）："
+    CHECKLIST_WARNING_ITEM = "   {id}: 缺 {fields}"
 
     # register 中的命令 help 文字
     HELP_GENERATE = "從 Plan 檔案生成 Atomic Tickets"
@@ -777,7 +794,7 @@ class ClaimWrapMessages:
         "    故建議 Read .claude/skills/compositional-writing/SKILL.md。\n"
         "    （同 session 已 Read 過、或本次 Edit 屬純格式調整時可省略以下成本對照）\n"
         "    成本對照：Read 約 2-3K token 換取首次撰寫品質；\n"
-        "    跳過則事後 Layer 2 委員補修約 5-10K token（估算依 W17-122 ginger ROI 實測）。"
+        "    跳過則事後 Layer 2 委員補修約 5-10K token（估算值）。"
     )
 
     # ANA 類型專屬第四問（PC-063 防護 4/4）

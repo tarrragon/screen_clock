@@ -56,9 +56,9 @@ HOOK_METADATA (JSON):
 {
   "event_type": "UserPromptSubmit",
   "timeout": 5000,
-  "description": "命令入口閘門 - 驗證開發命令的 Ticket 前置條件",
+  "description": "命令入口閘門 - 驗證開發命令的 Ticket 前置條件（v3.6.0 引導式：無 Ticket 放行 + 注入 AskUserQuestion 引導）",
   "dependencies": [],
-  "version": "3.4.0"
+  "version": "3.6.0"
 }
 """
 
@@ -174,6 +174,10 @@ MANAGEMENT_PATTERNS = [
     "提交",    # 中文 commit（git 提交）
     "git",     # Git 操作前綴（push, pull, status 等）
     "push",    # git push
+    "合併",    # git merge（合併分支，非開發命令；W1-036 補白名單）
+    "merge",   # git merge（英文）
+    "pull",    # git pull
+    "rebase",  # git rebase
     # 查詢和摘要操作
     "查詢",    # 查詢操作（非開發）
     "摘要",    # 摘要操作（非開發）
@@ -247,6 +251,23 @@ LONG_TEXT_THRESHOLD = 50
 EXIT_SUCCESS = 0
 EXIT_ERROR = 1
 EXIT_BLOCK = 2
+
+# 引導式互動訊息（W1-036）：開發命令無對應 Ticket 時，改為放行 + 注入此 context，
+# 指示主線程用 AskUserQuestion 詢問下一步，取代硬阻擋（exit 2）。
+# Why: UserPromptSubmit hook 無法直接呼叫 AskUserQuestion tool（hook 只能 exit / 注入 context），
+#      故以「放行 + 注入引導指令」間接達成「引導式閘門」效果。
+GUIDANCE_NO_TICKET = (
+    "[command-entrance-gate] 偵測到開發/調整類命令，但目前沒有對應的 in_progress "
+    "或顯式引用的 Ticket。\n"
+    "\n"
+    "請勿直接執行開發動作。改用 AskUserQuestion 工具詢問用戶下一步"
+    "（先 ToolSearch(\"select:AskUserQuestion\") 載入 schema），提供以下選項：\n"
+    "- 建立新 Ticket（引導進入 /ticket create 流程）\n"
+    "- 認領現有 Ticket（先 `ticket track list --status pending` 查詢再 `ticket track claim <id>`）\n"
+    "- 此為描述 / 討論而非開發命令，直接繼續\n"
+    "\n"
+    "（引導式閘門 v3.6.0：無 Ticket 時放行並引導，取代硬阻擋）"
+)
 
 # validate_input 已遷移至 hook_utils.validate_hook_input
 
@@ -377,15 +398,79 @@ def is_development_command(prompt: str, logger) -> bool:
 
     # 轉換為小寫以進行不區分大小寫的匹配
     prompt_lower = prompt.lower()
+    prompt_stripped = prompt.strip()
+    prompt_stripped_lower = prompt_stripped.lower()
 
     # 檢查是否包含開發命令關鍵字
+    # W4-027 L1：加 word-boundary / 語境判斷，避免描述性開發詞誤判。
+    # 例：「更新 v0.20.0-main.md 反映新增的監測波次」中的「新增」屬名詞性
+    # 描述（「新增的監測波次」），非命令意圖，不應觸發 Ticket 閘門。
     for keyword in DEVELOPMENT_KEYWORDS:
-        if keyword.lower() in prompt_lower:
+        kw_lower = keyword.lower()
+        idx = prompt_lower.find(kw_lower)
+        if idx < 0:
+            continue
+        if _is_command_keyword_occurrence(
+            prompt_stripped_lower, kw_lower, idx, prompt_lower
+        ):
             logger.info(f"識別開發命令關鍵字: {keyword}")
             return True
+        logger.debug(f"開發詞 '{keyword}' 屬描述性語境，不判為命令")
 
     logger.debug(f"未識別為開發命令: {prompt[:50]}...")
     return False
+
+
+# 描述性語境標記：開發詞緊接以下字元視為名詞性修飾（非命令意圖）
+# 例：「新增的功能」「重構過的模組」中的開發詞不是命令動詞
+_DESCRIPTIVE_SUFFIXES = ("的", "過", "了的")
+
+# 描述性前綴標記：開發詞緊接於以下過去式 / 完成態標記之後視為狀態陳述（非命令意圖）
+# 例：「已經修復」「現在已修復」「剛剛重構」中的開發詞描述「已完成的狀態」，不是「去做」的命令
+# W1-036：補 _DESCRIPTIVE_SUFFIXES 漏掉的「描述性前綴」維度，與後綴規則對稱。
+_DESCRIPTIVE_PREFIXES = ("已經", "已", "現已", "剛剛", "剛", "都已")
+
+
+def _is_command_keyword_occurrence(
+    prompt_stripped_lower: str, kw_lower: str, idx_in_full: int, prompt_lower: str
+) -> bool:
+    """判斷開發關鍵字的某次出現是否屬命令意圖（而非描述性語境）
+
+    判定規則（保守，傾向保留防護）：
+    1. 句首出現（去除前後空白後 prompt 以該關鍵字開頭）→ 視為命令。
+    1.5. 關鍵字緊接描述性前綴（「已經」「已」等完成態標記）→ 視為狀態陳述，非命令。
+    2. 關鍵字緊接描述性後綴（「的」「過」等修飾標記）→ 視為描述，非命令。
+    3. 其餘出現位置 → 視為命令（防護不喪失）。
+
+    Args:
+        prompt_stripped_lower: 去除前後空白並轉小寫的 prompt
+        kw_lower: 小寫關鍵字
+        idx_in_full: 關鍵字在完整 prompt_lower 中的索引
+        prompt_lower: 完整 prompt 轉小寫
+
+    Returns:
+        bool - 該次出現是否屬命令意圖
+    """
+    # 規則 1：句首即命令式開發詞 → 命令
+    if prompt_stripped_lower.startswith(kw_lower):
+        return True
+
+    # 規則 1.5：緊接描述性前綴（已經 / 已 / 現已 等完成態標記）→ 狀態陳述，非命令
+    # 例：「已經修復」「現在已修復」描述已完成狀態，非「去修復」的命令意圖。
+    before = prompt_lower[:idx_in_full]
+    for prefix in _DESCRIPTIVE_PREFIXES:
+        if before.endswith(prefix):
+            return False
+
+    # 規則 2：緊接描述性後綴 → 描述性語境，非命令
+    after_idx = idx_in_full + len(kw_lower)
+    rest = prompt_lower[after_idx:]
+    for suffix in _DESCRIPTIVE_SUFFIXES:
+        if rest.startswith(suffix):
+            return False
+
+    # 規則 3：其餘位置保守視為命令
+    return True
 
 # ============================================================================
 # Ticket 檢查
@@ -590,12 +675,45 @@ def check_ticket_relevance(prompt: str, ticket_id: str, ticket_content: str, log
     logger.warning(f"Ticket {ticket_id} 與 prompt 無關聯")
     return False, warning
 
-def get_latest_pending_ticket(logger) -> Optional[Tuple[str, str, str]]:
+# Ticket ID 格式：如 0.19.0-W4-027、0.20.0-W1-013
+_TICKET_ID_PATTERN = re.compile(r"\b\d+\.\d+\.\d+-W\d+-\d+\b")
+
+
+def extract_ticket_id_from_prompt(prompt: Optional[str]) -> Optional[str]:
+    """從 prompt 擷取顯式引用的 Ticket ID（若有）
+
+    Args:
+        prompt: 用戶提示文本
+
+    Returns:
+        str - 第一個符合格式的 Ticket ID；無則 None
     """
-    取得最新的待處理 Ticket
+    if not prompt:
+        return None
+    match = _TICKET_ID_PATTERN.search(prompt)
+    return match.group(0) if match else None
+
+
+def get_latest_pending_ticket(
+    logger, prompt: Optional[str] = None
+) -> Optional[Tuple[str, str, str]]:
+    """
+    取得用於閘門的待處理 Ticket
+
+    W4-027 L2：觸發限縮。不再盲選「全版本 mtime 最新 pending」，
+    避免無關 ticket（如剛遷移者）誤觸閘門。新觸發規則：
+
+    1. prompt 顯式引用某 Ticket ID → 回傳該 Ticket（精準匹配）。
+    2. 存在 in_progress Ticket → 回傳（既有 gate 行為，沿用 mtime 最新者）。
+    3. 否則（無 ticket-id 引用且無 in_progress）→ 回傳 None，
+       不以 mtime-latest pending 盲選。
+
+    向後相容：未傳 prompt（None）時 fallback 回舊行為，回傳 mtime 最新的
+    pending/in_progress，維持既有呼叫端與測試相容。
 
     Args:
         logger: 日誌物件
+        prompt: 用戶提示文本（用於觸發限縮判斷）
 
     Returns:
         tuple - (ticket_id, status, content) 或 None
@@ -606,13 +724,34 @@ def get_latest_pending_ticket(logger) -> Optional[Tuple[str, str, str]]:
     # 按修改時間排序（最新優先）
     sorted_tickets = sorted(tickets, key=lambda p: p.stat().st_mtime, reverse=True)
 
+    # 向後相容：未提供 prompt 時沿用舊行為（mtime 最新 pending/in_progress）
+    if prompt is None:
+        for ticket_file in sorted_tickets:
+            ticket_id, status, content = extract_ticket_status(ticket_file, logger)
+            if ticket_id and status in ["pending", "in_progress"]:
+                logger.info(f"找到待處理 Ticket（相容模式）: {ticket_id} (status={status})")
+                return ticket_id, status, content
+        logger.debug("未找到待處理 Ticket（相容模式）")
+        return None
+
+    # 規則 1：prompt 顯式引用 Ticket ID → 精準匹配
+    referenced_id = extract_ticket_id_from_prompt(prompt)
+    if referenced_id:
+        for ticket_file in sorted_tickets:
+            ticket_id, status, content = extract_ticket_status(ticket_file, logger)
+            if ticket_id == referenced_id and status in ["pending", "in_progress"]:
+                logger.info(f"prompt 顯式引用 Ticket: {ticket_id} (status={status})")
+                return ticket_id, status, content
+
+    # 規則 2：存在 in_progress Ticket → 回傳（既有 gate 行為）
     for ticket_file in sorted_tickets:
         ticket_id, status, content = extract_ticket_status(ticket_file, logger)
-        if ticket_id and status in ["pending", "in_progress"]:
-            logger.info(f"找到待處理 Ticket: {ticket_id} (status={status})")
+        if ticket_id and status == "in_progress":
+            logger.info(f"找到 in_progress Ticket 作閘門: {ticket_id}")
             return ticket_id, status, content
 
-    logger.debug("未找到待處理 Ticket")
+    # 規則 3：無 ticket-id 引用且無 in_progress → 不盲選 pending
+    logger.debug("無顯式 Ticket ID 引用且無 in_progress Ticket，跳過 pending 盲選")
     return None
 
 def check_ticket_status(prompt: Optional[str] = None, logger=None) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
@@ -635,7 +774,8 @@ def check_ticket_status(prompt: Optional[str] = None, logger=None) -> Tuple[bool
             - ticket_id: Ticket ID（如果找到）
             - relevance_warning: 關聯性檢查警告訊息（soft check，不阻塊執行）
     """
-    ticket_info = get_latest_pending_ticket(logger)
+    # W4-027 L2：傳入 prompt 使閘門觸發限縮（顯式 ID 或 in_progress 才 gate）
+    ticket_info = get_latest_pending_ticket(logger, prompt=prompt)
 
     # 驗證 1：Ticket 是否存在且已認領
     if ticket_info is None:
@@ -647,6 +787,17 @@ def check_ticket_status(prompt: Optional[str] = None, logger=None) -> Tuple[bool
     ticket_id, status, content = ticket_info
 
     if status == "pending":
+        # W4-027 L3：pending 阻擋前加 relevance 閘門（mirror in_progress 路徑）。
+        # 若 pending Ticket 與 prompt 無關，放行而非要求認領無關 Ticket；
+        # 與 prompt 相關時才阻擋並要求 claim（防護不喪失）。
+        if prompt:
+            is_relevant, _ = check_ticket_relevance(prompt, ticket_id, content, logger)
+            if not is_relevant:
+                logger.info(
+                    f"pending Ticket {ticket_id} 與 prompt 無關聯，放行（不要求認領無關 Ticket）"
+                )
+                return True, None, None, None
+
         msg = format_message(GateMessages.TICKET_NOT_CLAIMED_ERROR, ticket_id=ticket_id)
 
         logger.warning(f"Ticket {ticket_id} 未被認領 - 阻止執行")
@@ -688,7 +839,9 @@ def generate_hook_output(
     is_valid: bool,
     error_msg: Optional[str],
     ticket_id: Optional[str],
-    relevance_warning: Optional[str] = None
+    relevance_warning: Optional[str] = None,
+    is_guidance: bool = False,
+    guidance_msg: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     生成 Hook 輸出
@@ -700,12 +853,14 @@ def generate_hook_output(
         error_msg: 如果驗證失敗，提供的錯誤訊息
         ticket_id: Ticket ID
         relevance_warning: 關聯性檢查警告（soft check，不阻塊）
+        is_guidance: 是否為引導式情境（無 Ticket → 放行 + 注入引導 context，不阻擋；W1-036）
+        guidance_msg: 引導訊息（is_guidance=True 時注入 additionalContext，取代 error_msg）
 
     Returns:
         dict - Hook 輸出 JSON
     """
-    # 決定是否阻止
-    should_block = is_dev_cmd and not is_valid
+    # 決定是否阻止：引導式情境放行（不阻擋），僅注入引導 context
+    should_block = is_dev_cmd and not is_valid and not is_guidance
 
     output = {
         "hookSpecificOutput": {
@@ -714,8 +869,11 @@ def generate_hook_output(
     }
 
     # 添加額外上下文
+    # 引導式情境注入 guidance_msg（取代硬阻擋的 error_msg）；其餘沿用 error_msg
     context_parts = []
-    if error_msg:
+    if is_guidance and guidance_msg:
+        context_parts.append(guidance_msg)
+    elif error_msg:
         context_parts.append(error_msg)
     if relevance_warning:
         context_parts.append(relevance_warning)
@@ -729,6 +887,7 @@ def generate_hook_output(
         "ticket_validation_passed": is_valid,
         "ticket_id": ticket_id,
         "should_block": should_block,
+        "is_guidance": is_guidance,
         "has_relevance_warning": relevance_warning is not None,
         "exit_code": "EXIT_BLOCK" if should_block else "EXIT_SUCCESS",
         "timestamp": datetime.now().isoformat()
@@ -806,14 +965,23 @@ def main() -> int:
             is_valid, error_msg, ticket_id, relevance_warning = check_ticket_status(prompt, logger)
             logger.info(f"Ticket 驗證結果: is_valid={is_valid}, ticket_id={ticket_id}, has_warning={relevance_warning is not None}")
 
+        # 步驟 5.5: 判別引導式情境（W1-036）
+        # 無對應 Ticket（驗證失敗且 ticket_id 為 None）→ 引導式放行；
+        # Ticket 存在但畸形 / 未認領（ticket_id 非 None）→ 維持硬阻擋。
+        is_guidance = is_dev_cmd and not is_valid and ticket_id is None
+        guidance_msg = GUIDANCE_NO_TICKET if is_guidance else None
+        if is_guidance:
+            logger.info("無對應 Ticket，改為引導式放行（注入 AskUserQuestion 引導 context）")
+
         # 步驟 6: 生成 Hook 輸出
         hook_output = generate_hook_output(
-            prompt, is_dev_cmd, is_valid, error_msg, ticket_id, relevance_warning
+            prompt, is_dev_cmd, is_valid, error_msg, ticket_id, relevance_warning,
+            is_guidance=is_guidance, guidance_msg=guidance_msg
         )
         print(json.dumps(hook_output, ensure_ascii=False, indent=2))
 
         # 步驟 7: 儲存日誌
-        should_block = is_dev_cmd and not is_valid
+        should_block = is_dev_cmd and not is_valid and not is_guidance
         status = "BLOCKED" if should_block else "ALLOWED"
         warning_status = "WITH_WARNING" if relevance_warning is not None else "OK"
         log_entry = f"""[{datetime.now().isoformat()}]
@@ -827,8 +995,10 @@ def main() -> int:
 """
         save_check_log("command-entrance-gate", log_entry, logger)
 
-        # 步驟 8: 決定 exit code（阻塞式）
-        if is_dev_cmd and not is_valid:
+        # 步驟 8: 決定 exit code
+        # 阻擋僅限「Ticket 存在但畸形 / 未認領」（is_guidance=False）；
+        # 無 Ticket 的引導式情境（is_guidance=True）放行（exit 0），引導 context 已注入 stdout。
+        if should_block:
             logger.warning(GateMessages.COMMAND_GATE_BLOCKED)
             # 將錯誤訊息寫到 stderr，讓 Claude Code 能正確顯示阻擋原因
             if error_msg:

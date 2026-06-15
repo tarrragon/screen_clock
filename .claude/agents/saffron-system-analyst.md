@@ -144,7 +144,45 @@ SA 前置審查在以下情況下**應該被觸發**：
 - 若專案為多平台（Chrome Extension / APP / CLI），各平台是否同步變更？
 - 是否需要向後相容的 fallback？
 
-### 6. Proposal 評估支援
+### 6. ANA 全量 grep/regex 範圍判定自檢（強制）
+
+當 ANA Solution 涉及「全量 grep/regex 範圍判定」時（即含數量斷言、零依賴斷言、路徑範圍斷言、字元集覆蓋斷言任一），saffron 必須在 Solution 結論前補充完整性聲明。
+
+**觸發句型自檢表**（出現以下任一即必須補聲明）：
+
+| 句型 | 是否需補聲明 |
+|------|------------|
+| 「X 在 codebase 中共有 N 處」 | 是 |
+| 「無任何 X 依賴」「X 依賴 = 0」 | 是 |
+| 「X 僅出現於 [路徑]」 | 是 |
+| 「所有 X 已覆蓋 Unicode 區段 U+XXXX-YYYY」 | 是 |
+
+**必填聲明格式**（置於 Solution 結論前）：
+
+```markdown
+**範圍驗證方法**：[列舉法 / 全字元集掃描法 / rg regex 法 / 組合]
+**驗證指令**：（附上實際執行的指令或腳本）
+**已知盲區**：（說明此方法無法偵測什麼）
+**盲區影響評估**：（說明為何盲區不影響本結論，或盲區已另行驗證）
+```
+
+**禁止行為**：
+
+| 禁止 | 原因 |
+|------|------|
+| 以手工列舉部分 Unicode 區段代替全字元集掃描 | 遺漏的區段導致後續 IMP acceptance 建立在錯誤覆蓋假設（W1-005 根因） |
+| 以單一關鍵字 rg 驗證「依賴 = 0」斷言 | 單一關鍵字不等於全量掃描，不同字串字面或模式會被遺漏 |
+| AC 設計不回鏈 ANA 驗證指令 | IMP 驗收應能重現 ANA 聲明的範圍，而非僅驗 build/lint |
+
+**Why**：單一視角 ANA 若未明示驗證方法完整性，後人（含 PM 和後續 IMP 執行者）無法判斷「覆蓋 N 處」這個結論是否可信，AC 設計會繼承不完整的假設。
+
+**Consequence**：W1-005 ANA AC-4 遺漏 48+ 處斷言依賴，引發 W1-005.2 隱性回歸（12 檔）+ 範圍二度誤判，最終需兩個 patch ticket 修復（W1-007 ANA 教訓 1）。
+
+**Action**：每次撰寫 ANA Solution 前，執行以上觸發句型自檢；發現觸發句型時，先完善驗證指令再撰寫結論。
+
+> 完整規範（三層要求 + Python 全字元集掃描範本）：`.claude/pm-rules/tdd-flow.md`「ANA 全量 grep/regex 範圍驗證完整性規範」章節
+
+### 7. Proposal 評估支援
 
 **目標**：協助 PM 評估 Proposal 階段的提案品質（配合 `.claude/pm-rules/proposal-evaluation-gate.md` 強制機制）
 
@@ -157,85 +195,6 @@ SA 前置審查在以下情況下**應該被觸發**：
 - 跨版本 / 跨專案 PROP 的本端 Reality Test 是否充分
 - Framework 類 PROP 是否明示 candidate 數 >= 3
 - confirmed 狀態是否綁定實作 ticket_refs
-
----
-
-## 審查報告格式
-
-### SA 審查報告模板
-
-```markdown
-# SA 前置審查報告
-
-## 審查摘要
-- **審查日期**: [日期]
-- **審查功能**: [功能名稱]
-- **審查結果**: [通過/需要修正/不建議實作]
-
-## 系統一致性檢查
-
-### 命名規範
-- [ ] 遵循現有命名規範
-- [ ] 備註: [說明]
-
-### 架構模式
-- [ ] 遵循現有架構模式
-- [ ] 備註: [說明]
-
-### 依賴方向
-- [ ] 依賴方向正確
-- [ ] 備註: [說明]
-
-## 重複實作檢查
-
-### 搜尋結果
-- **搜尋關鍵字**: [關鍵字列表]
-- **找到的相關檔案**: [檔案列表]
-
-### 分析結果
-- [ ] 無重複實作
-- [ ] 可重用現有實作: [說明]
-- [ ] 需要擴展現有實作: [說明]
-
-## 需求文件檢查
-
-### 文件完整性
-- [ ] 需求已記錄在 app-requirements-spec.md
-- [ ] 用例已記錄在 app-use-cases.md
-- [ ] 備註: [需要補充的內容]
-
-## 系統衝突檢查（強制章節）
-
-### 跨模組依賴衝突
-- [ ] 無衝突
-- [ ] 有衝突（列出）：[衝突項目]
-- [ ] 嚴重度：critical / warning / info
-
-### 既有 UC 變動影響
-- [ ] 無 UC 變動
-- [ ] 有變動（列出受影響 UC 清單）：[UC-01, UC-02 ...]
-- [ ] 既有測試案例是否需更新：是 / 否
-- [ ] 嚴重度：critical / warning / info
-
-### 跨版本相容性
-- [ ] 無相容性影響
-- [ ] 有影響（列出）：[影響項目]
-- [ ] Migration 路徑：[已設計 / 待設計 / 不適用]
-- [ ] 嚴重度：critical / warning / info
-
-### 衝突檢查結論
-- [ ] 無 critical 衝突，可進入 TDD Phase 1
-- [ ] 存在 critical 衝突，須先解決：[清單]
-
-## 建議
-
-### 審查建議
-[詳細建議內容]
-
-### 下一步
-- [ ] 可以進入 TDD Phase 1（前提：衝突檢查結論為「無 critical」）
-- [ ] 需要先完成: [前置作業]
-```
 
 ---
 
@@ -254,6 +213,14 @@ SA 前置審查在以下情況下**應該被觸發**：
 5. **禁止修改已審查通過的需求**：如果需求已通過 SA 審查並進入 TDD 階段，SA 不得主動修改相關的需求文件或設計決策，只能在被派發回來進行重新審查時才能修改。
 
 6. **禁止在未建立 Ticket 的情況下提出建議**：如果發現重大問題需要修正，必須通過建立 Ticket 的方式提出，而不是直接建議修改。
+
+7. **禁止對非自己派發範圍的 ticket 執行修改操作**：包括 `ticket track close` / `set-status` / 編輯他人 ticket md 等。即使在審查過程中發現重複 ticket、孤兒 ticket 或範圍衝突，SA 只能在審查報告的「系統衝突檢查」章節明示衝突關係，由 rosemary-project-manager 決策。**禁止自行 close 兄弟 ticket，即使標 `closed_by` 也屬越界**。
+
+   **Why**: subagent 在派發中發現的衝突應透過審查報告 / Exit Status / NeedsContext 上報 PM。SA 自行修改他人 ticket 違反「ticket 由派發者管理生命週期」原則，且會造成並行 claim race condition 下的雙重寫入（PM 與 SA 同 session 並行寫入同一 ticket md）。
+
+   **Consequence**: 越界 close 會讓 PM 已寫入的 ANA 結論成為孤兒資料、ticket history 缺一致來源、後人審計無法判斷 close 決策是 PM 決定還是 subagent 自主行為。
+
+   **Action**: 發現重複 / 孤兒 / 範圍衝突時，在審查報告「系統衝突檢查」章節列出衝突關係，並於 Exit Status `reason` 欄位提示 PM 評估；禁止直接呼叫任何 ticket CLI 修改命令。
 
 ### 違規處理
 
@@ -345,8 +312,9 @@ SA 前置審查在以下情況下**應該被觸發**：
 
 ---
 
-**Last Updated**: 2026-03-02
-**Version**: 1.0.1
+**Last Updated**: 2026-06-04
+**Version**: 1.2.0 — 核心職責新增第 6 項「ANA 全量 grep/regex 範圍判定自檢」：觸發句型自檢表 + 必填聲明格式 + 禁止行為 + 三明示（Why/Consequence/Action），引用 W1-005 AC-4 二度誤判觸發案例（0.19.1-W1-039）
+**Version**: 1.1.0 — 禁止行為新增第 7 項「禁止對非自己派發範圍的 ticket 執行修改操作」（含 Why/Consequence/Action 三明示）。Source: SA 越界 close 兄弟 ticket 事件（並行 claim race condition 暴露）。
 **Specialization**: TDD Pre-Review and System Consistency
 
 
@@ -354,21 +322,4 @@ SA 前置審查在以下情況下**應該被觸發**：
 
 ## 搜尋工具
 
-### ripgrep (rg)
-
-代理人可透過 Bash 工具使用 ripgrep 進行高效能文字搜尋。
-
-**文字搜尋預設使用 rg（透過 Bash）**，特別適合：
-- 需要 PCRE2 正則表達式（lookaround、backreference）
-- 需要搜尋壓縮檔（`-z` 參數）
-- 需要 JSON 格式輸出（`--json` 參數）
-- 需要複雜管線操作
-
-**文字搜尋優先使用 rg（透過 Bash）**，內建 Grep 工具作為備選。
-
-**完整指南**：`.claude/skills/search-tools-guide/SKILL.md`
-
-**環境要求**：需要安裝 ripgrep。未安裝時建議：
-- macOS: `brew install ripgrep`
-- Linux: `sudo apt-get install ripgrep`
-- Windows: `choco install ripgrep`
+搜尋工具選擇與 ripgrep 使用指南見 `.claude/skills/search-tools-guide/SKILL.md`。

@@ -107,7 +107,20 @@ DEFAULT_VERSION_RELEASE_CONFIG = {
             "fail_on_error": True,
             "warn_on_mismatch": True
         }
-    }
+    },
+    # release_workflow：發布工作流模式
+    #   "trunk"          — all-on-main，跳過 feature-branch merge 與分支清理（預設）
+    #   "feature-branch" — 維持原行為，merge feature/v{major_minor} 並刪除分支
+    "release_workflow": "trunk",
+    # tag_format：tag 命名範本，{version} 會被實際版本替換
+    #   預設 plain "v{version}"（與本專案既有 v0.18.0/v0.17.4 慣例一致）
+    #   保留 "-final" 後綴需顯式設定 "v{version}-final"
+    "tag_format": "v{version}",
+    # worklog_path_pattern：worklog 目錄相對 repo root 的路徑範本
+    #   支援 {version}（完整版本）、{major_minor}（X.Y）、{major}（X）佔位符
+    #   巢狀範例："docs/work-logs/v{major}/v{major_minor}/v{version}"
+    #   扁平範例（舊結構）："docs/work-logs/v{version}"
+    "worklog_path_pattern": "docs/work-logs/v{major}/v{major_minor}/v{version}",
 }
 
 
@@ -355,6 +368,39 @@ def extract_major_minor(version: str) -> str:
     return ".".join(version.split(".")[:2])
 
 
+def resolve_worklog_dir(root: Path, version: str, pattern: str) -> Path:
+    """
+    依 worklog_path_pattern 範本解析 worklog 版本子目錄。
+
+    支援佔位符：
+    - {version}      完整版本（X.Y.Z）
+    - {major_minor}  主次版本（X.Y）
+    - {major}        主版本（X）
+
+    Args:
+        root: 專案根目錄
+        version: 完整版本號（例如 "0.19.0"）
+        pattern: 路徑範本（相對 root，例如 "docs/work-logs/v{major}/v{major_minor}/v{version}"）
+
+    Returns:
+        解析後的版本子目錄絕對路徑
+
+    Examples:
+        巢狀：docs/work-logs/v{major}/v{major_minor}/v{version}
+          -> <root>/docs/work-logs/v0/v0.19/v0.19.0
+        扁平：docs/work-logs/v{version}
+          -> <root>/docs/work-logs/v0.19.0
+    """
+    major_minor = extract_major_minor(version)
+    major = version.split(".")[0]
+    relative = pattern.format(
+        version=version,
+        major_minor=major_minor,
+        major=major,
+    )
+    return root / relative
+
+
 def check_worklog_completed(version: str) -> Tuple[bool, List[str]]:
     """檢查工作日誌是否完成"""
     root = get_project_root()
@@ -363,10 +409,17 @@ def check_worklog_completed(version: str) -> Tuple[bool, List[str]]:
     errors = []
     major_minor = extract_major_minor(version)
 
+    # 依 config worklog_path_pattern 解析版本子目錄（支援巢狀路徑）
+    config = load_version_release_config(root)
+    pattern = config.get(
+        "worklog_path_pattern",
+        DEFAULT_VERSION_RELEASE_CONFIG["worklog_path_pattern"],
+    )
+    version_subdir = resolve_worklog_dir(root, version, pattern)
+
     # 查詢相關的工作日誌
-    # 優先檢查版本子目錄（新結構：docs/work-logs/v0.1.1/v0.1.1-main.md）
+    # 優先檢查版本子目錄（依 config 範本解析）
     worklog_files = []
-    version_subdir = worklog_dir / f"v{version}"
     if version_subdir.exists():
         for f in version_subdir.glob(f"v{version}*.md"):
             worklog_files.append(f)
@@ -653,10 +706,19 @@ def load_version_release_config(root: Path) -> dict:
     Returns:
         配置字典，結構與 .version-release.yaml 一致
         保證回傳值不為 None
-    """
-    config_path = root / VERSION_RELEASE_CONFIG_FILE
 
-    if not config_path.exists():
+    配置檔位置查找順序（root 優先，.claude/ 為 fallback）：
+    - <root>/.version-release.yaml
+    - <root>/.claude/.version-release.yaml（branch-verify 豁免路徑，
+      使 all-on-main 工作流可直接 commit 到 main 而不被保護分支 hook 阻擋）
+    """
+    candidate_paths = [
+        root / VERSION_RELEASE_CONFIG_FILE,
+        root / ".claude" / VERSION_RELEASE_CONFIG_FILE,
+    ]
+    config_path = next((p for p in candidate_paths if p.exists()), None)
+
+    if config_path is None:
         return DEFAULT_VERSION_RELEASE_CONFIG
 
     try:
@@ -667,7 +729,15 @@ def load_version_release_config(root: Path) -> dict:
             return DEFAULT_VERSION_RELEASE_CONFIG
 
         # 補充缺漏欄位（深層 merge）
-        for key in ["versions", "sync_rules", "detection", "preflight_checks"]:
+        for key in [
+            "versions",
+            "sync_rules",
+            "detection",
+            "preflight_checks",
+            "release_workflow",
+            "tag_format",
+            "worklog_path_pattern",
+        ]:
             if key not in config:
                 config[key] = DEFAULT_VERSION_RELEASE_CONFIG.get(key, {})
 
@@ -1240,11 +1310,34 @@ def update_changelog(version: str, dry_run: bool = False) -> bool:
 
 """
 
-        # 幂等性檢查：若版本已存在則跳過
-        if f"## [{version}]" in changelog_content:
+        # finalize 優先：偵測既有 In-Development 區段（header 改發布日期 + 保留人寫內容）
+        # 開發期 header 慣例為 "## [v{version}] - In Development" 或 "## [{version}] - In Development"
+        finalize_pattern = re.compile(
+            r"^## \[v?" + re.escape(version) + r"\] - In Development\s*$",
+            re.MULTILINE,
+        )
+        finalize_match = finalize_pattern.search(changelog_content)
+        if finalize_match:
+            finalized_header = f"## [{version}] - {today}"
+            updated_content = (
+                changelog_content[: finalize_match.start()]
+                + finalized_header
+                + changelog_content[finalize_match.end():]
+            )
+
+            if not dry_run:
+                with open(changelog_path, "w", encoding="utf-8") as f:
+                    f.write(updated_content)
+
+            print_success(f"CHANGELOG.md 已 finalize In-Development 區段為 {version}")
+            return True
+
+        # 幂等性檢查：若版本已 finalize（header 帶日期）則跳過，不重複插入
+        if f"## [{version}]" in changelog_content or f"## [v{version}]" in changelog_content:
             print_warning(f"CHANGELOG.md 已包含 v{version} 條目，跳過插入")
             return True
 
+        # 無 In-Development 區段且版本未存在：維持原有插入模板行為（向後相容）
         # 插入到 "## [" 之前（在 "格式基於" 之後）
         insert_pos = changelog_content.find("## [")
         if insert_pos > 0:
@@ -1497,6 +1590,86 @@ def insert_version_to_todolist(
     else:
         with open(todolist_path, "w", encoding="utf-8") as f:
             f.write(new_content)
+
+    return True
+
+
+def mark_version_completed(
+    todolist_path: Path,
+    version: str,
+    dry_run: bool = False,
+) -> bool:
+    """將 todolist.yaml 中對應版本的 status 標記為 completed（字串操作，保留格式）。
+
+    release 成功後呼叫，將發布版本由 active 轉為 completed，避免後續 start
+    下一版被前版本驗證（find_last_completed_version）阻擋。
+
+    Args:
+        todolist_path: todolist.yaml 路徑
+        version: 要標記為 completed 的版本號
+        dry_run: 預覽模式
+
+    Returns:
+        True 如果成功（含已是 completed 的冪等情況），False 如果找不到版本
+    """
+    if not todolist_path.exists():
+        print_error(f"找不到 {todolist_path}")
+        return False
+
+    with open(todolist_path, encoding="utf-8") as f:
+        content = f.read()
+
+    # 定位版本條目：- version: "X" 後續行的 status: 欄位
+    major_minor = extract_major_minor(version)
+    candidates = [version, major_minor]
+    entry_start = -1
+    for ver_str in candidates:
+        marker = f'version: "{ver_str}"'
+        pos = content.find(f"- {marker}")
+        if pos != -1:
+            entry_start = pos
+            break
+
+    if entry_start == -1:
+        print_error(f"在 todolist.yaml 中找不到版本 {version}")
+        return False
+
+    # 找到該條目範圍內第一個 status: 行（下一個 "- version:" 之前）
+    next_entry = content.find("- version:", entry_start + 1)
+    search_end = next_entry if next_entry != -1 else len(content)
+    status_match = re.search(
+        r"^(\s*status:\s*)(\S+)",
+        content[entry_start:search_end],
+        re.MULTILINE,
+    )
+    if not status_match:
+        print_error(f"版本 {version} 條目缺少 status 欄位")
+        return False
+
+    current_status = status_match.group(2)
+    if current_status == "completed":
+        print_info(f"版本 {version} 已為 completed，跳過")
+        return True
+
+    abs_start = entry_start + status_match.start()
+    abs_end = entry_start + status_match.end()
+    new_content = content[:abs_start] + status_match.group(1) + "completed" + content[abs_end:]
+
+    # 更新 last_updated
+    today = datetime.now().strftime("%Y-%m-%d")
+    new_content = re.sub(
+        r'(last_updated: ")[^"]*(")',
+        rf"\g<1>{today}\2",
+        new_content,
+        count=1,
+    )
+
+    if dry_run:
+        print_info(f"[DRY RUN] 將標記 todolist.yaml 版本 {version}: {current_status} → completed")
+    else:
+        with open(todolist_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        print_success(f"todolist.yaml 版本 {version} 已標記 completed")
 
     return True
 
@@ -1970,7 +2143,19 @@ def git_merge_and_push(version: str, dry_run: bool = False) -> bool:
     root = get_project_root()
     major_minor = extract_major_minor(version)
     feature_branch = f"feature/v{major_minor}"
-    tag_name = f"v{version}-final"
+
+    # 讀取 config：tag 命名 + 發布工作流模式
+    config = load_version_release_config(root)
+    tag_format = config.get(
+        "tag_format", DEFAULT_VERSION_RELEASE_CONFIG["tag_format"]
+    )
+    tag_name = tag_format.format(version=version, major_minor=major_minor)
+
+    release_workflow = config.get(
+        "release_workflow", DEFAULT_VERSION_RELEASE_CONFIG["release_workflow"]
+    )
+    # trunk = all-on-main，跳過 feature-branch merge 與分支清理
+    use_feature_branch = release_workflow == "feature-branch"
 
     try:
         # 3.1 提交變更
@@ -2007,30 +2192,33 @@ def git_merge_and_push(version: str, dry_run: bool = False) -> bool:
         else:
             print_info("   [預覽] git pull origin main", 2)
 
-        # 3.4 合併 feature 分支
-        print_info("[SHUFFLE] 合併 feature 分支")
-        if not dry_run:
-            result = subprocess.run(
-                [
-                    "git",
-                    "merge",
-                    feature_branch,
-                    "--no-ff",
-                    "-m",
-                    f"Merge {feature_branch} into main",
-                ],
-                cwd=root,
-                capture_output=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                print_success(f"已合併 {feature_branch} 到 main")
-            else:
-                print_error(f"合併 {feature_branch} 失敗")
-                if "fatal: refusing to merge unrelated histories" not in result.stderr:
-                    return False
+        # 3.4 合併 feature 分支（僅 feature-branch 工作流；trunk 模式跳過）
+        if not use_feature_branch:
+            print_info("[SKIP] trunk 工作流：跳過 feature 分支合併（all-on-main）")
         else:
-            print_info(f"   [預覽] git merge {feature_branch} --no-ff", 2)
+            print_info("[SHUFFLE] 合併 feature 分支")
+            if not dry_run:
+                result = subprocess.run(
+                    [
+                        "git",
+                        "merge",
+                        feature_branch,
+                        "--no-ff",
+                        "-m",
+                        f"Merge {feature_branch} into main",
+                    ],
+                    cwd=root,
+                    capture_output=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    print_success(f"已合併 {feature_branch} 到 main")
+                else:
+                    print_error(f"合併 {feature_branch} 失敗")
+                    if "fatal: refusing to merge unrelated histories" not in result.stderr:
+                        return False
+            else:
+                print_info(f"   [預覽] git merge {feature_branch} --no-ff", 2)
 
         # 3.5 建立 Tag
         print_info(f"[TAG]️ 建立 Tag: {tag_name}")
@@ -2088,35 +2276,38 @@ def git_merge_and_push(version: str, dry_run: bool = False) -> bool:
             print_info("   [預覽] git push origin main", 2)
             print_info(f"   [預覽] git push origin {tag_name}", 2)
 
-        # 3.7 刪除 feature 分支
-        print_info("[DEL]️ 清理 feature 分支")
-        if not dry_run:
-            # 本地刪除
-            result = subprocess.run(
-                ["git", "branch", "-d", feature_branch],
-                cwd=root,
-                capture_output=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                print_success(f"本地分支已刪除: {feature_branch}")
-            else:
-                print_error(f"刪除本地分支失敗")
-
-            # 遠端刪除
-            result = subprocess.run(
-                ["git", "push", "origin", "--delete", feature_branch],
-                cwd=root,
-                capture_output=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                print_success(f"遠端分支已刪除: origin/{feature_branch}")
-            else:
-                print_warning(f"刪除遠端分支失敗（可能不存在）")
+        # 3.7 刪除 feature 分支（僅 feature-branch 工作流；trunk 模式跳過）
+        if not use_feature_branch:
+            print_info("[SKIP] trunk 工作流：無 feature 分支需清理")
         else:
-            print_info(f"   [預覽] git branch -d {feature_branch}", 2)
-            print_info(f"   [預覽] git push origin --delete {feature_branch}", 2)
+            print_info("[DEL]️ 清理 feature 分支")
+            if not dry_run:
+                # 本地刪除
+                result = subprocess.run(
+                    ["git", "branch", "-d", feature_branch],
+                    cwd=root,
+                    capture_output=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    print_success(f"本地分支已刪除: {feature_branch}")
+                else:
+                    print_error(f"刪除本地分支失敗")
+
+                # 遠端刪除
+                result = subprocess.run(
+                    ["git", "push", "origin", "--delete", feature_branch],
+                    cwd=root,
+                    capture_output=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    print_success(f"遠端分支已刪除: origin/{feature_branch}")
+                else:
+                    print_warning(f"刪除遠端分支失敗（可能不存在）")
+            else:
+                print_info(f"   [預覽] git branch -d {feature_branch}", 2)
+                print_info(f"   [預覽] git push origin --delete {feature_branch}", 2)
 
         return True
 
@@ -2316,6 +2507,15 @@ def main():
             if not ok:
                 print_error("\nGit 操作失敗，發布已中止")
                 return 1
+
+            # 標記 todolist 版本狀態 active → completed（避免後續 start 被前版本驗證阻擋）
+            print_section("Step: Mark Version Completed")
+            todolist_path = get_project_root() / "docs" / "todolist.yaml"
+            completed_ok = mark_version_completed(todolist_path, version, dry_run)
+            if not completed_ok:
+                print_warning(
+                    f"todolist.yaml 版本 {version} 標記 completed 失敗（不中止發布，請手動確認）"
+                )
 
             # 打印摘要
             print_summary(version, ok, dry_run)

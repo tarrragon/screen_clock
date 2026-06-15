@@ -11,7 +11,7 @@ Different document types have different readers, lifespans, and structural deman
 | Worklog                       | Future self / handoff receiver  | Per version (archived) | High (appended daily)             | Record decisions and milestones, not execution details   |
 | README                        | Newcomer / marketplace visitor  | Permanent              | Low (stable)                      | Orient readers in one screen, route to deeper docs       |
 | Spec (requirement / use case) | Implementers, reviewers, QA     | Permanent (versioned)  | Medium (evolves with scope)       | Define acceptable behaviour in testable terms            |
-| Methodology                   | Framework users (cross-project) | Permanent              | Low (distilled)                   | Give experts a 30-second recall checklist                |
+| Methodology                   | Framework users (cross-project) | Permanent              | Low (distilled)                   | Give framework users and AI an explicit, directly-applicable judgment standard                |
 | Error-pattern                 | Debuggers, reviewers            | Permanent              | Low (append-only)                 | Capture root cause + prevention so it doesn't recur      |
 | Ticket                        | Executor, dispatcher            | Per task (archived)    | Medium (mutated during execution) | Carry a single atomic intent from creation to completion |
 
@@ -82,6 +82,12 @@ Given many atomic documents, how does a reader find the right one?
 
 > A reference without intent ("see X.md") is a broken signpost. Always say what the reader gains by clicking.
 
+### Reference anchors: semantic titles, not positional numbers
+
+引用另一個章節 / 階段 / 條列項時、錨點用語意標題、不用位置編號（「見核心問題」、不是「見 Stage 3」；「如『底線告知協議』所述」、不是「如第 4 點」）。編號是結構排列的 derivation — 插入或搬移一個單位、後續編號全部位移、引用句字面完好、語意卻 silent 指向錯的內容（misdirected 比 broken link 難偵測：連結斷掉會報錯、編號錯位會成功解析到錯的東西）。對應要求：每個結構單位的標題要承載核心意義（「Stage 3：核心問題」、編號只是排序前綴）、引用一律取語意半邊。例外是發布方凍結的編號（RFC 段號、法條）— 那是 fact、可引用。重排結構的 commit 要全 repo 掃編號式引用。完整判準與失效案例見 [reference-by-semantic-title-not-number](principles/reference-by-semantic-title-not-number.md)。
+
+標題要能當穩定錨、名稱本身得先是純 fact：集合命名（問題清單 / 階段序列 / 原則組）只承載角色與層級、把成員數量留給清單呈現 —「核心七問」加一問就在每個複製過名稱的地方失真、「核心問題」承受任意成員增減。判準與邊界（外部凍結品牌 / 概念閾值可留數字）見 [name-collections-by-role-not-count](principles/name-collections-by-role-not-count.md)。
+
 ### Indexing by document type
 
 - **Worklog**: The worklog itself is an index of tickets. Each ticket row points into a detail file.
@@ -93,11 +99,12 @@ Given many atomic documents, how does a reader find the right one?
 
 ### Anti-patterns
 
-| Anti-pattern                                              | What happens                                  |
-| --------------------------------------------------------- | --------------------------------------------- |
-| README that says "this folder contains various utilities" | Provides no routing; reader opens every file  |
-| Spec referencing a ticket ID                              | Spec stability breaks when ticket is archived |
-| Methodology A references methodology B which references A | Circular chase; no real content at the end    |
+| Anti-pattern                                                          | What happens                                                                |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| README that says "this folder contains various utilities"             | Provides no routing; reader opens every file                                |
+| Spec referencing a ticket ID                                          | Spec stability breaks when ticket is archived                               |
+| Methodology A references methodology B which references A             | Circular chase; no real content at the end                                  |
+| "See Stage 3" / "as listed in item 2" pointing into a living document | Structure reorder shifts numbers; reference silently lands on wrong content |
 
 ---
 
@@ -256,7 +263,7 @@ Angles must not overlap: preconditions are entry guards, not flows; acceptance c
 | 檢查清單  | How do I verify I did it right?           | Self-check     |
 | Reference | Where is the full implementation guide?   | Defer to SKILL |
 
-30-second rule: if a reader cannot read the whole methodology in 30 seconds, either split it or move detail into a SKILL.
+Length discipline: keep only judgment criteria and core rules in the methodology; move operational flows, code examples, and error-handling to a SKILL. Length is whatever makes the criteria explicit and directly applicable — it is not bounded by reading time.
 
 ### Error-pattern template
 
@@ -352,9 +359,9 @@ Forbidden phrasings:
 
 Replace with description of what was done and what was observed.
 
-### 30-second elevator test
+### Length discipline: criteria stay, flows leave
 
-A methodology must be readable in 30 seconds. Everything beyond that belongs in a SKILL or reference.
+A methodology carries the framework's judgment criteria and core rules, written explicitly enough for a reader — including an AI applying them during development — to use directly. Operational detail, not the criteria themselves, belongs in a SKILL or reference.
 
 If rewriting an old verbose methodology, the test is:
 
@@ -362,9 +369,9 @@ If rewriting an old verbose methodology, the test is:
 | ---------------------------------------------------------------- | ------------------------ |
 | Does the file contain a complete operational workflow?           | Move it to a SKILL       |
 | Does it contain runnable code examples or error-handling detail? | Move to a SKILL          |
-| Does compression lose critical information?                      | Create a SKILL alongside |
+| Are the judgment criteria compressed into hint-like bullets a reader cannot apply directly? | Restore them explicitly in the methodology |
 
-Methodology remains as the 30-second recall card; SKILL holds the full walk-through.
+The methodology keeps its judgment criteria explicit and applicable; the SKILL holds the full walk-through. Never compress the criteria themselves to save length.
 
 ### Experience-sharing variant (six guidelines)
 
@@ -421,6 +428,6 @@ Skip rules: quick worklog notes can skip rounds 4-7'; stable specs / methodology
 | Write or append a worklog entry | Principle 1 + Worklog extensions                                       |
 | Start a README from scratch     | Principle 2 (indexing) + Principle 5 (README template)                 |
 | Draft a use-case spec           | Principle 3 (spec vs process) + Principle 5 (spec template)            |
-| Rewrite a bloated methodology   | Methodology extensions (30-second test) + Principle 1 (atomize)        |
+| Rewrite a bloated methodology   | Methodology extensions (length discipline) + Principle 1 (atomize)        |
 | Record a new error-pattern      | Principle 5 (error-pattern template) + Principle 4 (ID as grep anchor) |
 | Fill a ticket's fields          | Principle 5 (ticket template), then consult designing-fields.md        |

@@ -113,10 +113,10 @@ def self_test():
 - `.claude/scripts/charset-pollution-detector.py` — W17-144.1 落地，含 _ANCHORS_SEED 警告 + TAIWAN_STANDARD_WHITELIST + self-test 第五層
 - `docs/work-logs/v0/v0.18/v0.18.0/tickets/0.18.0-W17-144.1.1.md` — ANA 完整 WRAP 分析
 - `.claude/error-patterns/process-compliance/PC-074-charset-guard-hook-shared-char-false-positive.md` — 字元集共用字陷阱（姊妹模式）
-- `.claude/error-patterns/process-compliance/PC-088-llm-tool-selection-bias.md` — LLM 工具選擇偏誤（姊妹模式）
+- `.claude/error-patterns/process-compliance/PC-088-llm-tool-selection-heuristic-bias.md` — LLM 工具選擇偏誤（姊妹模式）
 
 ---
 
 **Last Updated**: 2026-05-05
-**Version**: 1.0.0 — 初始建立（W17-144.1 / W17-144.1.1 落地）
+**Version**: 1.0.0 — 初始建立：外部工具權威性預設質疑（交叉驗證後再採信）（W17-144.1）
 **Source**: 用戶 WRAP 質疑「OpenCC 並不是完全正確的權威資料」+ 實證 OpenCC 對台灣標準字 30% 誤判 + zhtw-mcp 對相同字組 100% 正確

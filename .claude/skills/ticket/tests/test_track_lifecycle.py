@@ -33,6 +33,8 @@ class TestClaim:
         args = Mock()
         args.ticket_id = "0.31.0-W4-001"
         args.version = "0.31.0"
+        # W4-019: Mock 預設屬性會被 getattr 視為 truthy；明示 verify=False 才走預設路徑
+        args.verify = False
 
         with patch('ticket_system.commands.lifecycle.load_and_validate_ticket') as mock_load:
             mock_ticket = {
@@ -62,6 +64,7 @@ class TestClaim:
         args = Mock()
         args.ticket_id = "0.31.0-W4-001"
         args.version = "0.31.0"
+        args.verify = False  # W4-019: 明示走預設路徑（非 --verify）
 
         with patch('ticket_system.commands.lifecycle.load_ticket') as mock_load:
             mock_ticket = {
@@ -86,6 +89,7 @@ class TestClaim:
         args = Mock()
         args.ticket_id = "0.31.0-W4-999"
         args.version = "0.31.0"
+        args.verify = False  # W4-019: 明示走預設路徑（非 --verify）
 
         with patch('ticket_system.commands.lifecycle.load_ticket') as mock_load:
             mock_load.return_value = None
@@ -103,6 +107,7 @@ class TestClaim:
         args = Mock()
         args.ticket_id = "0.31.0-W4-001"
         args.version = "0.31.0"
+        args.verify = False  # W4-019: 明示走預設路徑（非 --verify）
 
         with patch('ticket_system.commands.lifecycle.load_ticket') as mock_load:
             mock_ticket = {
@@ -238,11 +243,13 @@ class TestComplete:
 class TestRelease:
     """釋放 Ticket 相關的測試"""
 
-    def test_release_in_progress_ticket_success(self):
+    def test_release_in_progress_no_blocker_returns_pending(self):
         """
-        Given: 存在一個進行中的 Ticket
+        W3-082: blockedBy 為空的進行中 Ticket。
+
+        Given: 進行中且 blockedBy 為空的 Ticket（trigger / 主動讓出的 ready ticket）
         When: 執行 release 操作
-        Then: Ticket 狀態應更改為 blocked，並返回 0
+        Then: Ticket 狀態應退回 pending（非 blocked），並返回 0
         """
         args = Mock()
         args.ticket_id = "0.31.0-W4-001"
@@ -253,6 +260,37 @@ class TestRelease:
                 "id": "0.31.0-W4-001",
                 "status": "in_progress",
                 "title": "Test Ticket",
+                "blockedBy": [],
+                "_path": "/test/path",
+            }
+            mock_load.return_value = mock_ticket
+
+            with patch('ticket_system.commands.lifecycle.save_ticket') as mock_save:
+                result = execute_release(args, "0.31.0")
+
+                assert result == 0
+                mock_save.assert_called_once()
+                saved_ticket = mock_save.call_args[0][0]
+                assert saved_ticket["status"] == "pending"
+
+    def test_release_in_progress_with_blocker_returns_blocked(self):
+        """
+        W3-082: blockedBy 非空的進行中 Ticket。
+
+        Given: 進行中且 blockedBy 非空的 Ticket（確實被其他 ticket 擋著）
+        When: 執行 release 操作
+        Then: Ticket 狀態應設為 blocked，並返回 0
+        """
+        args = Mock()
+        args.ticket_id = "0.31.0-W4-001"
+        args.version = "0.31.0"
+
+        with patch('ticket_system.lib.ticket_ops.load_ticket') as mock_load:
+            mock_ticket = {
+                "id": "0.31.0-W4-001",
+                "status": "in_progress",
+                "title": "Test Ticket",
+                "blockedBy": ["0.31.0-W4-000"],
                 "_path": "/test/path",
             }
             mock_load.return_value = mock_ticket

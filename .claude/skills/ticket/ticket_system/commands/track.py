@@ -42,6 +42,7 @@ from ticket_system.lib.ticket_loader import (
     require_version,
 )
 from ticket_system.lib.ticket_validator import extract_version_from_ticket_id
+from ticket_system.lib.ambiguous_prefix import register_ambiguous_prefix
 from ticket_system.lib.messages import (
     ArgparseFormatErrorParser,
     ErrorMessages,
@@ -151,6 +152,11 @@ from .track_dispatch_readiness import (
     execute_dispatch_readiness,
     register_dispatch_readiness,
 )
+# 嵌套深度查詢（W1-056.8 落地，協議 v2 D3 層級自覺）
+from .track_depth import (
+    execute_depth,
+    register_depth,
+)
 # parallel-check 子任務衝突偵測（W17-203.1 落地）
 from .track_parallel_check import (
     execute_parallel_check,
@@ -199,6 +205,14 @@ def _execute_claim(args: argparse.Namespace, version: str) -> int:  # type: igno
 
 def _execute_complete(args: argparse.Namespace, version: str) -> int:
     """標記完成 - 包裝生命週期模組"""
+    # W1-048: --as 身份申報對照（純前置檢查，deny 不寫入任何狀態）
+    # W1-083: 傳入 command 名稱，使 telemetry 可做 per-command 歸因
+    from ticket_system.lib.identity_guard import check_identity
+    deny = check_identity(
+        version, args.ticket_id, getattr(args, "as_agent", None), command="complete"
+    )
+    if deny is not None:
+        return deny
     return execute_complete(args, version)
 
 
@@ -210,6 +224,13 @@ def _execute_close(args: argparse.Namespace, version: str) -> int:
 def _execute_release(args: argparse.Namespace, version: str) -> int:
     """釋放 Ticket（包裝生命週期模組）"""
     return execute_release(args, version)
+
+
+def _execute_verify(args: argparse.Namespace, version: str) -> int:
+    """單獨執行 AC 驗證（W4-019：與 claim 解耦）。"""
+    from .lifecycle import TicketLifecycle
+    lifecycle = TicketLifecycle(version)
+    return lifecycle.verify_only(args.ticket_id)
 
 
 def _create_version_agnostic_handlers() -> dict:
@@ -250,6 +271,8 @@ def _create_command_handlers() -> dict:
     return {
         "summary": execute_summary,
         "query": execute_query,
+        # W1-056.8 嵌套深度查詢（協議 v2 D3）
+        "depth": execute_depth,
         "claim": _execute_claim,
         "complete": _execute_complete,
         "close": _execute_close,
@@ -257,6 +280,8 @@ def _create_command_handlers() -> dict:
         "list": execute_list,
         "search": execute_search,
         "release": _execute_release,
+        # W4-019: 拆 verify 子命令（單獨執行 AC 驗證，與 claim 解耦）
+        "verify": _execute_verify,
         "chain": execute_chain,
         "deps": execute_deps,
         "full": execute_full,
@@ -380,14 +405,11 @@ def _register_lifecycle_commands(
             "PC-078 並行衝突）。僅供除錯場景使用"
         ),
     )
-    p_claim.add_argument(
-        "--skip-verify",
-        dest="skip_verify",
-        action="store_true",
-        help=(
-            "W3-046: 已預設不執行 AC 驗證，此旗標保留為 no-op（向後相容）"
-        ),
-    )
+    # W4-019: --skip-verify 旗標已移除（W3-092 + W4-015 兩輪觀察期累計
+    # 24hr / 75 commits / 5 ticket cycles 驗證：外部依賴 = 0、runtime
+    # deprecation 觸發 = 0）。如需單獨執行 AC 驗證（不 claim），改用
+    # `ticket track verify <id>`；如需跳過驗證直接 claim，不傳 --verify
+    # 即為預設行為（W3-046 後 claim 預設不驗證）。
     p_claim.add_argument(
         "--yes",
         "-y",
@@ -442,6 +464,13 @@ def _register_lifecycle_commands(
         action="store_true",
         help="跳過 complete 後自動 git add metadata 檔案（W11-035 方案 D opt-out）",
     )
+    p_complete.add_argument(
+        "--as",
+        dest="as_agent",
+        default=None,
+        metavar="AGENT_NAME",
+        help="申報執行身份，與 who.current 對照不符即 deny（W1-048；未提供僅警告）",
+    )
 
     # close 操作（W15-027 / PC-090：--reason 枚舉必填）
     from ticket_system.constants import CLOSE_REASONS, CLOSE_REASON_RETROSPECTIVE_UNKNOWN
@@ -470,6 +499,17 @@ def _register_lifecycle_commands(
     p_release = subparsers.add_parser("release", help=TrackMessages.HELP_RELEASE)
     p_release.add_argument("ticket_id", help=TrackMessages.ARG_TICKET_ID)
     p_release.add_argument("--version", help=TrackMessages.ARG_VERSION)
+
+    # verify 操作（W4-019）：單獨執行 AC 驗證，與 claim 解耦
+    p_verify = subparsers.add_parser(
+        "verify",
+        help=(
+            "單獨執行 AC 驗證（不變更 Ticket 狀態，與 claim 解耦）。"
+            "W4-019：補足 W3-046 後 claim 預設不驗證所造成的查詢缺口"
+        ),
+    )
+    p_verify.add_argument("ticket_id", help=TrackMessages.ARG_TICKET_ID)
+    p_verify.add_argument("--version", help=TrackMessages.ARG_VERSION)
 
 
 def _register_query_commands(
@@ -767,6 +807,13 @@ def _register_acceptance_commands(
         help=TrackMessages.ARG_CHECK_ACCEPTANCE_ALL
     )
     p_check_acceptance.add_argument("--version", help=TrackMessages.ARG_VERSION)
+    p_check_acceptance.add_argument(
+        "--as",
+        dest="as_agent",
+        default=None,
+        metavar="AGENT_NAME",
+        help="申報執行身份，與 who.current 對照不符即 deny（W1-048；未提供僅警告）",
+    )
 
     # set-acceptance 操作
     p_set_acceptance = subparsers.add_parser(
@@ -782,6 +829,16 @@ def _register_acceptance_commands(
         "--uncheck", nargs="+", metavar="INDEX",
         help="取消勾選指定 1-based index（可多個）"
     )
+    # --all 攔截：撞 --all-check/--all-uncheck（1.0.0-W1-028）。作用域 scoped 至
+    # set-acceptance subparser，不影響 list/stale-list/td-status/stuck-anas 的合法
+    # --all（約束 1）。
+    register_ambiguous_prefix(
+        p_set_acceptance,
+        "--all",
+        "--all 不是有效旗標，請使用完整旗標名："
+        "--all-check（勾選全部驗收條件）"
+        "或 --all-uncheck（取消勾選全部驗收條件）",
+    )
     p_set_acceptance.add_argument(
         "--all-check", dest="all_check", action="store_true",
         help="勾選全部驗收條件"
@@ -796,6 +853,13 @@ def _register_acceptance_commands(
         action="store_true",
         default=False,
         help="W3-044 逃生閥：旁路 status precondition 檢查（記入 hook-logs）",
+    )
+    p_set_acceptance.add_argument(
+        "--as",
+        dest="as_agent",
+        default=None,
+        metavar="AGENT_NAME",
+        help="申報執行身份，與 who.current 對照不符即 deny（W1-048；未提供僅警告）",
     )
 
     # validate 操作
@@ -906,6 +970,7 @@ def _register_all_subcommands(
     register_hook_health(track_subparsers)
     register_dispatch_validate(track_subparsers)
     register_dispatch_readiness(track_subparsers)
+    register_depth(track_subparsers)
 
 
 def _register_global_state_commands(

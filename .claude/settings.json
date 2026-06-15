@@ -1,4 +1,5 @@
 {
+  "fallbackModel": ["claude-sonnet-4-5[1m]"],
   "permissions": {
     "allow": [
       "Edit",
@@ -49,6 +50,14 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/homoglyph-guard-hook.py"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/uv-tool-ownership-guard-hook.py"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/uncommitted-ticket-md-reminder-hook.py"
           }
         ]
       },
@@ -143,6 +152,10 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/wrap-skill-yaml-consistency-hook.py"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/skills/error-pattern/hooks/error-pattern-flat-gate-hook.py"
           }
         ]
       },
@@ -180,6 +193,10 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/wrap-skill-yaml-consistency-hook.py"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/skills/error-pattern/hooks/error-pattern-flat-gate-hook.py"
           }
         ]
       },
@@ -288,6 +305,10 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-registration-check-hook.py"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/agent-definition-standard-check-hook.py"
           },
           {
             "type": "command",
@@ -426,6 +447,11 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/skills/ticket/hooks/ticket-skill-sync-check-hook.py",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/parallel-claim-audit-hook.py",
             "timeout": 5000
           }
         ]
@@ -686,6 +712,14 @@
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/skills/ticket/hooks/stop-worklog-handoff-sync-check-hook.py",
             "timeout": 10000
+          },
+          {
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/malformed-tool-call-detector-hook.py",
+            "type": "command"
+          },
+          {
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/context-depth-warning-hook.py",
+            "type": "command"
           }
         ]
       }

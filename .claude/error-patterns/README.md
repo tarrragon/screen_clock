@@ -159,6 +159,7 @@ Claude Code 內建了官方的 memory 系統（`~/.claude/projects/{project}/mem
 | DOC-006 | 規則文件局部更新後，同檔案總覽圖與入口文件未同步 | 中 | 0.1.1 |
 | DOC-007 | append-log section 參數值大小寫不一致 | 低 | v0.1.0 |
 | DOC-008 | 同一文件內定義替換遺漏（局部替換未使用全局 replace） | 中 | v0.1.0 |
+| DOC-V1-001 | 位置編號引用隨目標文件演進靜默失效（misdirected 比 broken 難偵測） | 中 | v1.0.0 |
 
 ### 架構 (ARCH)
 
@@ -185,6 +186,7 @@ Claude Code 內建了官方的 memory 系統（`~/.claude/projects/{project}/mem
 | ARCH-019 | Hook 事件時機不匹配 | 中 | v0.18.0 |
 | ARCH-020 | validator 與 hook 重複驗證邏輯 | 中 | v0.18.0 |
 | ARCH-021 | 模組組裝遺漏導致功能鏈路靜默斷裂（原 ARCH-010 重編號） | 高 | v0.15.4 |
+| ARCH-V1-001 | 同一不變量單點執法、多入口繞過（前門裝鎖、側門敞開） | 中 | v1.0.0 |
 
 ### 程式碼品質 (CQ)
 
@@ -255,6 +257,9 @@ Claude Code 內建了官方的 memory 系統（`~/.claude/projects/{project}/mem
 | IMP-052 | 批量遷移缺少 None guard | 中 | v0.17.3 |
 | IMP-053 | 一刀切修改忽略程式碼執行路徑差異 | 中 | v0.17.3 |
 | IMP-070 | Hook stdin 欄位命名規範混淆（input snake_case vs output camelCase） | 高 | v0.18.0 |
+| IMP-078 | CE-Node 環境前提誤判 — Jest 測試綠燈但 CE Runtime 崩潰 | 高 | v0.19.0 |
+| IMP-079 | 批次替換工具誤傷偵測目標字面 — regex/meta-test 內嵌待測字元被盲目轉換後語意塌縮 | 中 | v0.19.1 |
+| IMP-V1-001 | 估算係數未經實測校準即上線 — 守門機制低估真值提供假安心 | 中 | v1.0.0 |
 
 ### 流程合規 (PC)
 
@@ -353,6 +358,18 @@ Claude Code 內建了官方的 memory 系統（`~/.claude/projects/{project}/mem
 | PC-105 | PM 對 SKILL CLI 語法的 autopilot 假設（同 session 多次撞 hook 警告後仍嘗試相似變體） | 中 | v0.18.0 |
 | PC-154 | 派發 worktree agent 前未驗證兩項前置條件（worktree base 完整性 + ticket 已 claim） | 中 | v0.19.0 |
 | PC-162 | Ticket 描述含過時環境狀態 + schema 註解 PC 引用語意錯誤 | 中 | v0.19.0 |
+| PC-171 | AUQ 派發類選項未先驗 blockedBy readiness（假選項；上游 PC-165 在本專案重編號） | 中 | v0.19.1 |
+| PC-172 | Wrapper command 參數推斷未經 runtime 驗證（只讀底層 binary --help，忽略 wrapper 自動注入參數） | 中 | v0.19.1 |
+| PC-176 | 跨環境設定不一致時歸因「環境差異」而非驗證被 git 同步的共用設定本身（便利假設掩蓋一份錯設定的單點根因） | 中 | v0.19.1 |
+| PC-180 | 雙專案共用 sync 時混淆「共享 repo 納入範圍」與「本地保留範圍」致框架調整誤失（preserve 清單為根本解） | 中 | v1.0.0 |
+| PC-V1-001 | sync-push 無 --help，未知參數當 commit 訊息觸發真實不可逆推送 | 高 | v1.0.0 |
+| PC-V1-002 | Ticket ID 引用觸發 agent 自律收尾越權（引用 ≠ 指派缺口） | 高 | v1.0.0 |
+| PC-V1-003 | 聯想式檔案參照寫入後個案修補，跳過模式分析 | 中 | v1.0.0 |
+| PC-V1-004 | Hook 注入訊息受眾錯配（PM-only 訊息注入 Subagent Context） | 高 | v1.0.0 |
+| PC-V1-005 | Acceptance 量化目標設定未考慮 substance 密度上限 | 中 | v1.0.0 |
+| PC-V1-006 | 規則變更未盤點既有規則矛盾即上線（有執法者的一方勝出） | 中 | v1.0.0 |
+| PC-V1-007 | 確定性 ≠ 準確性 — 量測工具確定化未驗證複現原始分析意圖 | 高 | v1.0.0 |
+| PC-V1-008 | lockfile 版本漂移修正被 auto-preserve worktree commit 孤立並險遭當噪音丟棄 | 中 | v1.0.0 |
 
 ---
 

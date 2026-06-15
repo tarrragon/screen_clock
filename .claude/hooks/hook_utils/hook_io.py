@@ -557,24 +557,183 @@ def generate_hook_output(
     return output
 
 
+_VALID_AUDIENCES = ("all", "pm_only")
+"""emit_hook_output 的合法受眾枚舉：all（雙方可見）/ pm_only（僅 PM 主線程）"""
+
+
+PM_ONLY_PREFIX = "[PM-ONLY] "
+"""PM 專屬 hook 注入訊息的受眾標記前綴（PC-V1-004 防護 C 規則層契約）。
+
+單一來源（ARCH-020）：所有 PM-only 注入訊息的前綴一律引用本常數，
+禁止各 hook 自行複製字串字面，避免拼字漂移使 AGENT_PRELOAD 的
+忽略規則失去比對錨點。
+
+用途分兩層：
+1. emit_hook_output(audience="pm_only")：主線程觸發時自動加前綴（本模組單點實作）
+2. Stop 類 hook（systemMessage / decision-reason 等 emit_hook_output 無法
+   覆蓋的輸出 shape）：import 本常數自行前置。Stop event 無 agent_id，
+   程式層無法過濾，前綴是該盲區唯一的受眾標記手段，
+   由 AGENT_PRELOAD 規則層教 subagent 忽略。
+"""
+
+
 def emit_hook_output(
     hook_event_name: str,
     additional_context: Optional[str] = None,
     permission_decision: Optional[str] = None,
     permission_decision_reason: Optional[str] = None,
+    *,
+    audience: str = "all",
+    input_data: "dict | None" = None,
 ) -> None:
-    """一步完成 Hook JSON stdout 輸出 — 防止遺漏 json.dumps 格式
+    """一步完成 Hook JSON stdout 輸出 — 統一格式 + 受眾過濾單點（ARCH-V1-001）
 
     組合 generate_hook_output + json.dumps + print，確保輸出格式正確。
+
+    受眾過濾（PC-V1-004 防護 C）：audience="pm_only" 且觸發方為 subagent
+    （input_data 含 agent_id）時，丟棄 additional_context，輸出退化為
+    無訊息的基本結構（沿用 W1-071 既有跳過慣例）。過濾邏輯只存在於
+    本函式，各 hook 禁止自行複製判斷（ARCH-020）。
+
+    受眾標記前綴（PC-V1-004 防護 C 規則層）：audience="pm_only" 且觸發方為
+    主線程時，additional_context 自動加上 PM_ONLY_PREFIX，供 AGENT_PRELOAD
+    忽略規則比對。
+
+    已知盲區：Stop event 無 agent_id（CC runtime 硬約束），
+    is_subagent_environment 對其永遠返回 False；該盲區由
+    [PM-ONLY] 前綴 + AGENT_PRELOAD 忽略規則補位。
 
     Args:
         hook_event_name: Hook 事件名稱
         additional_context: 可選的額外上下文訊息
         permission_decision: 可選的權限決策
         permission_decision_reason: 可選的權限決策理由
+        audience: 訊息受眾，"all"（預設，向後相容既有呼叫）或 "pm_only"
+        input_data: Hook stdin JSON；audience="pm_only" 時應傳入，
+                    供 is_subagent_environment 判定觸發方（None 視為 PM）
+
+    Raises:
+        ValueError: audience 不在合法枚舉內（開發期錯誤，測試階段即暴露，
+                    避免拼字錯誤造成 PM-only 訊息靜默洩漏給 subagent）
     """
+    if audience not in _VALID_AUDIENCES:
+        raise ValueError(
+            "audience 必須為 {} 之一，收到: {!r}".format(
+                "/".join(_VALID_AUDIENCES), audience
+            )
+        )
+
+    if audience == "pm_only" and is_subagent_environment(input_data):
+        # subagent 觸發：丟棄 PM-only 訊息；permission 欄位屬功能性決策不過濾
+        additional_context = None
+    elif audience == "pm_only" and additional_context:
+        # 主線程觸發：加受眾標記前綴（PC-V1-004 防護 C）。程式層過濾涵蓋不到的
+        # 環境（如 Stop event 無 agent_id）由 AGENT_PRELOAD 忽略規則依此前綴補位。
+        additional_context = PM_ONLY_PREFIX + additional_context
+
     output = generate_hook_output(
         hook_event_name, additional_context,
         permission_decision, permission_decision_reason,
     )
     print(json.dumps(output, ensure_ascii=False))
+
+
+# ============================================================================
+# SubagentStop additionalContext 輸出（含版本相容 graceful fallback）
+# ============================================================================
+
+# CC 2.1.163 #4 解除 SubagentStop event schema 對
+# hookSpecificOutput.additionalContext 的限制（W17-159 / W17-160 當時被迫
+# 改用 top-level systemMessage）。低於此版本的 runtime 仍會拒絕
+# additionalContext，故以版本偵測決定輸出 shape，舊版 graceful fallback
+# 回 systemMessage。
+SUBAGENT_STOP_ADDITIONAL_CONTEXT_MIN_VERSION = (2, 1, 163)
+
+# 偵測結果快取（單次 hook 進程內只解析一次，避免重複 subprocess）。
+_cc_version_cache: "Optional[Tuple[int, ...]]" = None
+_cc_version_resolved = False
+
+
+def _parse_version_tuple(raw: str) -> "Optional[Tuple[int, ...]]":
+    """從 `claude --version` 輸出解析 (major, minor, patch) 整數 tuple。
+
+    範例輸入: "2.1.163 (Claude Code)" -> (2, 1, 163)
+    無法解析時回 None。
+    """
+    import re
+
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", raw or "")
+    if not match:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def get_claude_code_version(
+    logger: "Optional[logging.Logger]" = None,
+) -> "Optional[Tuple[int, ...]]":
+    """偵測當前 Claude Code runtime 版本，回 (major, minor, patch) tuple。
+
+    透過 `claude --version` 取得；偵測失敗（binary 不在 PATH、subprocess
+    逾時、輸出格式異常）時回 None，由呼叫端決定 fallback 行為。
+    結果於進程內快取。
+    """
+    global _cc_version_cache, _cc_version_resolved
+    if _cc_version_resolved:
+        return _cc_version_cache
+
+    _cc_version_resolved = True
+    try:
+        result = subprocess.run(
+            ["claude", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        _cc_version_cache = _parse_version_tuple(result.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        if logger:
+            logger.debug("無法偵測 Claude Code 版本（fallback）: %s", exc)
+        _cc_version_cache = None
+    return _cc_version_cache
+
+
+def supports_subagent_stop_additional_context(
+    logger: "Optional[logging.Logger]" = None,
+) -> bool:
+    """判定當前 runtime 是否支援 SubagentStop additionalContext。
+
+    版本 >= 2.1.163 回 True；低於則回 False。
+    版本偵測失敗時採「樂觀預設」回 True——CC 2.1.163 為向後新基線，
+    偵測失敗多發生於 sandbox/測試環境，採新 schema 可避免長期沿用
+    過時 workaround；舊版實際拒絕時僅退化為一次 hook error（非致命）。
+    """
+    version = get_claude_code_version(logger)
+    if version is None:
+        return True
+    return version >= SUBAGENT_STOP_ADDITIONAL_CONTEXT_MIN_VERSION
+
+
+def build_subagent_stop_output(
+    context: str,
+    logger: "Optional[logging.Logger]" = None,
+) -> dict:
+    """為 SubagentStop event 建構輸出 JSON，含版本相容 graceful fallback。
+
+    - CC >= 2.1.163: hookSpecificOutput.additionalContext（正確機制）
+    - CC < 2.1.163 : top-level systemMessage（降級 workaround）
+
+    Args:
+        context: 要注入 PM 主線程的訊息文字。
+        logger: 可選 logger，用於記錄版本偵測 fallback。
+
+    Returns:
+        dict: 對應 runtime 版本的輸出結構。
+    """
+    if supports_subagent_stop_additional_context(logger):
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "SubagentStop",
+                "additionalContext": context,
+            }
+        }
+    return {"systemMessage": context}

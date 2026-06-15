@@ -54,7 +54,7 @@ from typing import Dict, Any, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from hook_utils import setup_hook_logging, run_hook_safely, read_json_from_stdin
+from hook_utils import setup_hook_logging, run_hook_safely, read_json_from_stdin, emit_hook_output
 
 # ============================================================================
 # 常數定義
@@ -146,7 +146,7 @@ SYSTEM_GAP_FEEDBACK_TEMPLATE = """
 
 可能原因：
   CLI 缺少對應子欄位的寫入路徑（非單純文檔缺失），使用者
-  意圖背後反映系統功能缺口。參考案例：W3-072（set-where --layer）。
+  意圖背後反映系統功能缺口（如 set-where --layer 類缺口）。
 
 建議動作：
   1. 不要僅補 SKILL.md，先評估是否為系統功能缺口
@@ -158,7 +158,6 @@ SYSTEM_GAP_FEEDBACK_TEMPLATE = """
   4. Fallback：直接 Edit ticket frontmatter 對應子欄位
 
 詳見：.claude/skills/ticket/SKILL.md
-參考：W3-072 / W3-073
 
 ============================================================
 """
@@ -418,13 +417,13 @@ def main() -> int:
             known_subfields=system_gap["known_subfields"],
             command_summary=command_summary,
         )
-        output = {
-            "hookSpecificOutput": {
-                "hookEventName": "PostToolUse",
-                "additionalContext": feedback_message,
-            }
-        }
-        print(json.dumps(output, ensure_ascii=False, indent=2))
+        # 系統功能缺失回饋為 PM-only：統一出口過濾 subagent 觸發（PC-V1-004 防護 C）
+        emit_hook_output(
+            "PostToolUse",
+            additional_context=feedback_message,
+            audience="pm_only",
+            input_data=input_data,
+        )
         return EXIT_SUCCESS
 
     # 偵測 SKILL 引導缺陷錯誤
@@ -448,14 +447,13 @@ def main() -> int:
         command_base=command_base,
     )
 
-    output = {
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": feedback_message
-        }
-    }
-
-    print(json.dumps(output, ensure_ascii=False, indent=2))
+    # SKILL 引導缺陷回饋為 PM-only：統一出口過濾 subagent 觸發（PC-V1-004 防護 C）
+    emit_hook_output(
+        "PostToolUse",
+        additional_context=feedback_message,
+        audience="pm_only",
+        input_data=input_data,
+    )
     return EXIT_SUCCESS
 
 
