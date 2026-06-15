@@ -10,6 +10,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_clock/app_constants.dart';
@@ -35,6 +36,12 @@ class _FakeInputBindingController extends InputBindingController {
   int refreshCalls = 0;
   int requestCalls = 0;
 
+  /// 進行中的捕捉回呼，測試以 [emitCaptured] / [emitCancelled] 觸發。
+  ValueChanged<int>? _capturedCallback;
+  VoidCallback? _cancelledCallback;
+  int beginCaptureCalls = 0;
+  int cancelCaptureCalls = 0;
+
   @override
   ValueListenable<bool> get permissionGranted => permission;
 
@@ -46,6 +53,42 @@ class _FakeInputBindingController extends InputBindingController {
   @override
   Future<void> requestPermission() async {
     requestCalls++;
+  }
+
+  @override
+  Future<void> startButtonCapture({
+    required ValueChanged<int> onCaptured,
+    VoidCallback? onCancelled,
+    Duration timeout = AppDurations.buttonCaptureTimeout,
+  }) async {
+    beginCaptureCalls++;
+    _capturedCallback = onCaptured;
+    _cancelledCallback = onCancelled;
+  }
+
+  @override
+  Future<void> cancelButtonCapture() async {
+    cancelCaptureCalls++;
+    final VoidCallback? onCancelled = _cancelledCallback;
+    _capturedCallback = null;
+    _cancelledCallback = null;
+    onCancelled?.call();
+  }
+
+  /// 模擬原生回報捕捉到側鍵。
+  void emitCaptured(int buttonNumber) {
+    final ValueChanged<int>? callback = _capturedCallback;
+    _capturedCallback = null;
+    _cancelledCallback = null;
+    callback?.call(buttonNumber);
+  }
+
+  /// 模擬逾時/取消（無結果結束捕捉）。
+  void emitCancelled() {
+    final VoidCallback? callback = _cancelledCallback;
+    _capturedCallback = null;
+    _cancelledCallback = null;
+    callback?.call();
   }
 }
 
@@ -189,6 +232,190 @@ void main() {
       expect(remaining, isNot(contains(4)));
       expect(remaining, contains(5));
       expect(settingsService.saveCalls, greaterThanOrEqualTo(1));
+    });
+  });
+
+  group('FR-06/FR-08 新增綁定流程與偵測捕捉（W4-004）', () {
+    Future<void> startAddFlow(WidgetTester tester) async {
+      final Finder addButton = find.text(AppText.bindingAddButton);
+      await tester.ensureVisible(addButton);
+      await tester.tap(addButton);
+      await tester.pump();
+    }
+
+    testWidgets('面板顯示新增綁定按鈕', (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+
+      expect(find.text(AppText.bindingAddButton), findsOneWidget);
+    });
+
+    testWidgets('點新增進入捕捉：呼叫 startButtonCapture 並顯示捕捉提示',
+        (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+
+      await startAddFlow(tester);
+
+      expect(inputController.beginCaptureCalls, greaterThanOrEqualTo(1));
+      expect(find.text(AppText.bindingCapturePrompt), findsOneWidget);
+    });
+
+    testWidgets('捕捉到側鍵後顯示動作型別選擇', (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      expect(find.text(AppText.bindingActionDragScroll), findsWidgets);
+      expect(find.text(AppText.bindingActionHotkey), findsWidgets);
+    });
+
+    testWidgets('逾時/取消捕捉退出 capturing 視覺、不殘留提示',
+        (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+
+      expect(find.text(AppText.bindingCapturePrompt), findsOneWidget);
+
+      inputController.emitCancelled();
+      await tester.pump();
+
+      expect(find.text(AppText.bindingCapturePrompt), findsNothing);
+    });
+
+    testWidgets('取消按鈕呼叫 cancelButtonCapture', (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+
+      final Finder cancelButton =
+          find.byKey(const ValueKey<String>('add-flow-cancel'));
+      await tester.ensureVisible(cancelButton);
+      await tester.tap(cancelButton);
+      await tester.pump();
+
+      expect(inputController.cancelCaptureCalls, greaterThanOrEqualTo(1));
+      expect(find.text(AppText.bindingCapturePrompt), findsNothing);
+    });
+
+    testWidgets('DragScroll：確認後寫入綁定且呼叫 persist',
+        (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      // 預設動作型別為 DragScroll，直接確認。
+      final Finder confirm =
+          find.byKey(const ValueKey<String>('add-flow-confirm'));
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await tester.pump();
+
+      final List<MouseBinding> bindings = settingsController.value.bindings;
+      expect(bindings, hasLength(1));
+      expect(bindings.single.buttonNumber, 6);
+      expect(bindings.single.action, isA<DragScrollAction>());
+      expect(settingsService.saveCalls, greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('DragScroll：可切換方向為反向並寫入', (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      final Finder invertedToggle =
+          find.byKey(const ValueKey<String>('add-flow-direction-inverted'));
+      await tester.ensureVisible(invertedToggle);
+      await tester.tap(invertedToggle);
+      await tester.pump();
+
+      final Finder confirm =
+          find.byKey(const ValueKey<String>('add-flow-confirm'));
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await tester.pump();
+
+      final MouseAction action =
+          settingsController.value.bindings.single.action;
+      expect(action, isA<DragScrollAction>());
+      expect((action as DragScrollAction).direction,
+          ScrollDirection.inverted);
+    });
+
+    testWidgets('Hotkey：選型別後擷取鍵盤組合並寫入 keyCode+modifiers',
+        (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      // 切換到 Hotkey 型別。
+      final Finder hotkeyType =
+          find.byKey(const ValueKey<String>('add-flow-type-hotkey'));
+      await tester.ensureVisible(hotkeyType);
+      await tester.tap(hotkeyType);
+      await tester.pump();
+
+      // 模擬鍵盤按下 Cmd + 4（送 keyDown 事件）。
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.meta);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.digit4);
+      await tester.pump();
+
+      final Finder confirm =
+          find.byKey(const ValueKey<String>('add-flow-confirm'));
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await tester.pump();
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.digit4);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.meta);
+
+      final MouseAction action =
+          settingsController.value.bindings.single.action;
+      expect(action, isA<HotkeyAction>());
+      final HotkeyAction hotkey = action as HotkeyAction;
+      expect(hotkey.keyCode, isNot(0));
+      expect(hotkey.modifiers, isNotEmpty);
+    });
+
+    testWidgets('重複 buttonNumber：新綁定覆蓋同編號舊綁定',
+        (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(<MouseBinding>[
+        const MouseBinding(buttonNumber: 6, action: DragScrollAction()),
+      ])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      final Finder hotkeyType =
+          find.byKey(const ValueKey<String>('add-flow-type-hotkey'));
+      await tester.ensureVisible(hotkeyType);
+      await tester.tap(hotkeyType);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyA);
+      await tester.pump();
+
+      final Finder confirm =
+          find.byKey(const ValueKey<String>('add-flow-confirm'));
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await tester.pump();
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyA);
+
+      final List<MouseBinding> bindings = settingsController.value.bindings;
+      final Iterable<MouseBinding> button6 =
+          bindings.where((MouseBinding b) => b.buttonNumber == 6);
+      expect(button6, hasLength(1));
+      expect(button6.single.action, isA<HotkeyAction>());
     });
   });
 }
