@@ -105,13 +105,29 @@ versions:
   - version: "1.2.1"
     codename: "fullscreen-occlusion-fix"
     description: "假全螢幕（影片/簡報/遊戲，不建獨立 Space）遮蔽偵測：fullScreenAuxiliary 對其無效，需新增原生覆蓋偵測機制讓時鐘讓位；含 runtime 層生效驗證方法設計"
-    status: "active"
+    status: "completed"
     worklog: "docs/work-logs/v1/v1.2/v1.2.1/"
     notes: |
       源於用戶回報：全螢幕播放影片/簡報/遊戲時遮罩時鐘仍覆蓋其上。
       根因：v1.2.0 的 visibleOnFullScreen=false（fullScreenAuxiliary）只管 native fullscreen 獨立 Space，
       假全螢幕為鋪滿螢幕的普通視窗，該設定不適用。README.md:112 描述亦誤（誤稱假全螢幕佔據獨立 Space）。
       W1 ANA 探索偵測方案並設計可實機驗證的驗收方法，避免再次 false positive（quality-baseline 規則 1 邊界）。
+      關閉決策（2026-06-15）：用戶澄清真正需求為完整、可靠的全螢幕時鐘隱藏；既有以 CGWindowList
+      覆蓋判定的「假全螢幕讓位」屬啟發式 best-effort，非用戶目標，且完整通用解無法保證（做不到）。
+      經用戶同意關閉本版、不再追 runtime 驗收。已 merge 的偵測程式碼保留為 best-effort 行為；
+      未來若決定移除另開 ticket。
+
+  - version: "1.3.0"
+    codename: "mouse-button-binding"
+    description: "滑鼠按鍵綁定 domain：按住側鍵拖曳模擬滾動 + 側鍵綁定鍵盤快捷鍵；原生 CGEventTap 全域攔截、移除 App Sandbox、輔助使用權限、設定面板偵測捕捉"
+    status: "active"
+    worklog: null
+    notes: |
+      源於 PROP-002：開發者滑鼠滾輪損壞，欲在既有常駐 app 內以「按住側鍵拖動」取代滾輪。
+      範圍：可擴充綁定 domain（一筆 = 實體鍵 → 動作），本版兩種動作（拖曳滾動 + 快捷鍵），
+      一律吃掉原上一頁/下一頁，偵測捕捉指定按鍵，參數可調，方向預設往下拖=往下捲。
+      風險：需移除 sandbox（無法上架 MAS）+ 輔助使用授權；W1 先以最小 spike 驗證 CGEventTap
+      攔截側鍵、合成滾輪、消費事件四項假設後再展開 TDD。macOS only。
 
 # ============================================================
 # 開發核心原則
@@ -151,7 +167,11 @@ references:
   requirements:
     - path: "docs/proposals/PROP-001-screen-clock-overlay.md"
       description: "桌面螢幕透明時鐘遮罩提案"
+    - path: "docs/proposals/PROP-002-mouse-button-binding.md"
+      description: "滑鼠按鍵綁定（拖曳滾動與快捷鍵）提案"
     - path: "docs/spec/platform/transparent-overlay-window.md"
       description: "SPEC-001 透明全螢幕遮罩視窗"
     - path: "docs/spec/display/center-clock.md"
       description: "SPEC-002 螢幕中央時鐘顯示"
+    - path: "docs/spec/input/mouse-button-binding.md"
+      description: "SPEC-007 滑鼠按鍵綁定 domain"

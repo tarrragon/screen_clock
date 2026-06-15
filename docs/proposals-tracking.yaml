@@ -27,3 +27,36 @@ proposals:
       - item: "Cmd+Q 退出時 timer 正確 dispose"
         status: pending
         verified_by: null
+
+  PROP-002:
+    title: "滑鼠按鍵綁定（拖曳滾動與快捷鍵）"
+    status: draft
+    proposed: "2026-06-15"
+    confirmed: null
+    target_version: "v1.3.0"
+    source: development
+    spec_refs:
+      - spec/input/mouse-button-binding.md
+    usecase_refs:
+      - UC-04
+      - UC-05
+    ticket_refs: []
+    checklist:
+      - item: "滑鼠按鍵綁定 domain（綁定模型 + 序列化 + 持久化 schema v3）"
+        status: pending
+        verified_by: null
+      - item: "原生 CGEventTap 全域攔截 + 移除 App Sandbox + 輔助使用權限"
+        status: pending
+        verified_by: null
+      - item: "動作①拖曳滾動（垂直位移合成滾輪、吃掉原動作、方向/靈敏度可調）"
+        status: pending
+        verified_by: null
+      - item: "動作②綁定快捷鍵（合成鍵盤組合鍵）"
+        status: pending
+        verified_by: null
+      - item: "設定面板整合（綁定清單 + 偵測捕捉 + 參數調整）"
+        status: pending
+        verified_by: null
+      - item: "未授權安全停用 + 既有功能非 sandbox 回歸"
+        status: pending
+        verified_by: null
