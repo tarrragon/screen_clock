@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_clock/app_constants.dart';
+import 'package:screen_clock/input/mouse_action.dart';
+import 'package:screen_clock/input/mouse_binding.dart';
 import 'package:screen_clock/models/settings_model.dart';
 
 void main() {
@@ -93,5 +95,82 @@ void main() {
     expect(a, b);
     expect(a.hashCode, b.hashCode);
     expect(a == c, isFalse);
+  });
+
+  group('SettingsModel bindings (schema v3, SPEC-007 FR-02)', () {
+    test('schemaVersion is 3', () {
+      expect(SettingsModel.schemaVersion, 3);
+    });
+
+    test('defaults to an empty bindings list', () {
+      expect(SettingsModel.defaults().bindings, isEmpty);
+    });
+
+    test('round-trips bindings (drag scroll + hotkey)', () {
+      final SettingsModel original = SettingsModel.defaults().copyWith(
+        bindings: <MouseBinding>[
+          const MouseBinding(
+            buttonNumber: 3,
+            action: DragScrollAction(direction: ScrollDirection.inverted),
+          ),
+          MouseBinding(
+            buttonNumber: 4,
+            action: HotkeyAction(keyCode: 21, modifiers: <int>[55, 56]),
+          ),
+        ],
+      );
+      final SettingsModel decoded = SettingsModel.fromJson(original.toJson());
+      expect(decoded, original);
+      expect(decoded.bindings.length, 2);
+    });
+
+    test('v2 data without bindings is parsed as empty list (backward compat)',
+        () {
+      final Map<String, Object> v2Json = SettingsModel.defaults().toJson()
+        ..remove(AppSettingsKeys.bindingsKey)
+        ..['schemaVersion'] = 2;
+      expect(v2Json.containsKey(AppSettingsKeys.bindingsKey), isFalse);
+      final SettingsModel decoded = SettingsModel.fromJson(v2Json);
+      expect(decoded.bindings, isEmpty);
+    });
+
+    test('skips a single corrupt binding without dropping the others', () {
+      final Map<String, Object> json = SettingsModel.defaults().toJson();
+      json[AppSettingsKeys.bindingsKey] = <Object>[
+        const MouseBinding(buttonNumber: 3, action: DragScrollAction())
+            .toJson(),
+        <String, dynamic>{
+          AppInputBinding.buttonNumberKey: 4,
+          AppInputBinding.actionKey: <String, dynamic>{
+            AppInputBinding.actionTypeKey: 'corruptType',
+          },
+        },
+      ];
+      final SettingsModel decoded = SettingsModel.fromJson(json);
+      expect(decoded.bindings.length, 1);
+      expect(decoded.bindings.single.buttonNumber, 3);
+    });
+
+    test('dedupes same buttonNumber on construction', () {
+      final SettingsModel model = SettingsModel.defaults().copyWith(
+        bindings: <MouseBinding>[
+          const MouseBinding(buttonNumber: 3, action: DragScrollAction()),
+          MouseBinding(buttonNumber: 3, action: HotkeyAction(keyCode: 9)),
+        ],
+      );
+      expect(model.bindings.length, 1);
+      expect(model.bindings.single.action, isA<HotkeyAction>());
+    });
+
+    test('copyWith with bindings does not mutate the original', () {
+      final SettingsModel original = SettingsModel.defaults();
+      final SettingsModel updated = original.copyWith(
+        bindings: <MouseBinding>[
+          const MouseBinding(buttonNumber: 3, action: DragScrollAction()),
+        ],
+      );
+      expect(updated.bindings.length, 1);
+      expect(original.bindings, isEmpty);
+    });
   });
 }

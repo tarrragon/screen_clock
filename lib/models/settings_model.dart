@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_constants.dart';
+import '../input/mouse_binding.dart';
 
 /// 使用者設定資料模型（SPEC-004 FR-01）。
 ///
@@ -18,6 +20,7 @@ class SettingsModel {
     required this.autoLaunch,
     this.birthDate,
     this.lifeTimerMode = false,
+    this.bindings = const <MouseBinding>[],
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
@@ -32,6 +35,7 @@ class SettingsModel {
       autoLaunch: false,
       birthDate: null,
       lifeTimerMode: false,
+      bindings: <MouseBinding>[],
     );
   }
 
@@ -51,12 +55,13 @@ class SettingsModel {
       autoLaunch: _asBool(json['autoLaunch']) ?? d.autoLaunch,
       birthDate: _asDateTime(json['birthDate']) ?? d.birthDate,
       lifeTimerMode: _asBool(json['lifeTimerMode']) ?? d.lifeTimerMode,
+      bindings: _bindingsFromJson(json[AppSettingsKeys.bindingsKey]),
     );
   }
 
-  /// schemaVersion 2：新增 birthDate / lifeTimerMode（生命計時模式）。
-  /// 舊版（v1）資料缺這兩欄，fromJson 以 default 補齊，向後相容。
-  static const int schemaVersion = 2;
+  /// schemaVersion 3：新增 bindings（滑鼠按鍵綁定清單）。
+  /// 舊版（v2）資料缺 bindings 欄，fromJson 解析為空清單，向後相容。
+  static const int schemaVersion = 3;
 
   final double fontSize;
   final Color fillColor;
@@ -71,6 +76,9 @@ class SettingsModel {
 
   /// 是否啟用生命計時模式（顯示即時年齡取代時間）。
   final bool lifeTimerMode;
+
+  /// 滑鼠按鍵綁定清單（SPEC-007 FR-02）；同 buttonNumber 已去重。
+  final List<MouseBinding> bindings;
 
   Map<String, Object> toJson() {
     final Map<String, Object> json = <String, Object>{
@@ -89,6 +97,9 @@ class SettingsModel {
     if (birth != null) {
       json['birthDate'] = birth.millisecondsSinceEpoch;
     }
+    json[AppSettingsKeys.bindingsKey] = <Map<String, Object>>[
+      for (final MouseBinding binding in bindings) binding.toJson(),
+    ];
     return json;
   }
 
@@ -102,6 +113,7 @@ class SettingsModel {
     bool? autoLaunch,
     DateTime? birthDate,
     bool? lifeTimerMode,
+    List<MouseBinding>? bindings,
   }) {
     return SettingsModel(
       fontSize: fontSize ?? this.fontSize,
@@ -113,6 +125,9 @@ class SettingsModel {
       autoLaunch: autoLaunch ?? this.autoLaunch,
       birthDate: birthDate ?? this.birthDate,
       lifeTimerMode: lifeTimerMode ?? this.lifeTimerMode,
+      bindings: bindings != null
+          ? dedupeBindingsByButton(bindings)
+          : this.bindings,
     );
   }
 
@@ -128,7 +143,8 @@ class SettingsModel {
         other.targetScreenIndex == targetScreenIndex &&
         other.autoLaunch == autoLaunch &&
         other.birthDate == birthDate &&
-        other.lifeTimerMode == lifeTimerMode;
+        other.lifeTimerMode == lifeTimerMode &&
+        listEquals(other.bindings, bindings);
   }
 
   @override
@@ -142,7 +158,23 @@ class SettingsModel {
         autoLaunch,
         birthDate,
         lifeTimerMode,
+        Object.hashAll(bindings),
       );
+}
+
+/// 容錯解析 bindings 欄（SPEC-007 FR-02）。
+///
+/// 非清單 → 空清單；單筆型別錯誤 / 未知 action type → 略過該筆，不拋例外；
+/// 同 buttonNumber 依 [dedupeBindingsByButton] 規則收斂。
+List<MouseBinding> _bindingsFromJson(Object? value) {
+  if (value is! List) return const <MouseBinding>[];
+  final List<MouseBinding> parsed = <MouseBinding>[];
+  for (final Object? element in value) {
+    if (element is! Map<String, dynamic>) continue;
+    final MouseBinding? binding = MouseBinding.fromJson(element);
+    if (binding != null) parsed.add(binding);
+  }
+  return dedupeBindingsByButton(parsed);
 }
 
 double? _asDouble(Object? value) {

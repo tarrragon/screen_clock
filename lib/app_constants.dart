@@ -143,3 +143,50 @@ class AppFullscreenDetect {
   /// 原生 → Dart 參數鍵：是否被覆蓋。
   static const String coveredArgKey = 'covered';
 }
+
+/// 滑鼠按鍵綁定 domain 的序列化常數（SPEC-007 FR-01/FR-02）。
+///
+/// 集中所有綁定 / 動作 JSON 鍵與 action type 字串字面，避免硬編碼。
+/// 持久化字面一旦變更會破壞向後相容，須與既有儲存資料保持一致；
+/// 變更前確認 [SettingsModel.fromJson] 容錯路徑仍能解析舊資料。
+class AppInputBinding {
+  AppInputBinding._();
+
+  /// MouseBinding JSON 鍵：實體滑鼠按鍵編號。
+  static const String buttonNumberKey = 'buttonNumber';
+
+  /// MouseBinding JSON 鍵：綁定動作。
+  static const String actionKey = 'action';
+
+  /// MouseAction JSON 鍵：動作型別標籤（對應 [MouseActionType.name]）。
+  static const String actionTypeKey = 'type';
+
+  /// DragScrollAction type 字面（須等於 MouseActionType.dragScroll.name）。
+  static const String dragScrollType = 'dragScroll';
+
+  /// HotkeyAction type 字面（須等於 MouseActionType.hotkey.name）。
+  static const String hotkeyType = 'hotkey';
+
+  /// DragScrollAction JSON 鍵：捲動方向（對應 [ScrollDirection.name]）。
+  static const String directionKey = 'direction';
+
+  /// DragScrollAction JSON 鍵：位移到滾輪量的倍率。
+  static const String sensitivityKey = 'sensitivity';
+
+  /// HotkeyAction JSON 鍵：實體鍵碼。
+  static const String keyCodeKey = 'keyCode';
+
+  /// HotkeyAction JSON 鍵：修飾鍵集合（List of int）。
+  static const String modifiersKey = 'modifiers';
+
+  /// DragScrollAction 預設靈敏度（位移到滾輪量的中等倍率）。
+  static const double defaultDragScrollSensitivity = 1;
+}
+
+/// SettingsModel 中 bindings 欄的 JSON 鍵（SPEC-007 FR-02）。
+class AppSettingsKeys {
+  AppSettingsKeys._();
+
+  /// 綁定清單欄（schema v3 新增）。
+  static const String bindingsKey = 'bindings';
+}
