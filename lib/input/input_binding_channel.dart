@@ -22,18 +22,37 @@ class InputBindingChannel {
   /// 授權狀態變化回呼。參數為「是否已取得輔助使用授權」。
   ValueChanged<bool>? _onPermissionChanged;
 
-  /// 開始監聽原生授權狀態變化通知。
+  /// 側鍵捕捉回呼（SPEC-007 FR-06）。參數為原生回報的滑鼠按鍵編號。
+  ValueChanged<int>? _onButtonCaptured;
+
+  /// 開始監聽原生通知（授權狀態變化、側鍵捕捉回報）。
   ///
   /// [onPermissionChanged] 在每次原生回報授權狀態變化時呼叫（true=已授權）。
-  void start({required ValueChanged<bool> onPermissionChanged}) {
+  /// [onButtonCaptured] 為選用；提供時，原生捕捉到的側鍵編號會路由到此回呼。
+  void start({
+    required ValueChanged<bool> onPermissionChanged,
+    ValueChanged<int>? onButtonCaptured,
+  }) {
     _onPermissionChanged = onPermissionChanged;
+    _onButtonCaptured = onButtonCaptured;
     _channel.setMethodCallHandler(_handleNativeCall);
   }
 
   /// 停止監聽並清除 handler。
   void stop() {
     _onPermissionChanged = null;
+    _onButtonCaptured = null;
     _channel.setMethodCallHandler(null);
+  }
+
+  /// 進入側鍵捕捉模式：原生開始監聽下一個側鍵並經 onButtonCaptured 回報。
+  Future<void> beginCaptureButton() async {
+    await _invoke(AppInputBinding.beginCaptureButtonMethod);
+  }
+
+  /// 離開側鍵捕捉模式。
+  Future<void> endCaptureButton() async {
+    await _invoke(AppInputBinding.endCaptureButtonMethod);
   }
 
   /// 查詢目前是否已取得輔助使用授權（AXIsProcessTrusted）。
@@ -79,14 +98,30 @@ class InputBindingChannel {
     }
   }
 
-  /// 處理原生端 method call；僅認得授權狀態變化方法。
+  /// 處理原生端 method call；認得授權狀態變化與側鍵捕捉回報方法。
   Future<void> _handleNativeCall(MethodCall call) async {
-    if (call.method != AppInputBinding.onPermissionChangedMethod) {
-      debugPrint('[input-binding] 未知原生方法: ${call.method}');
-      return;
+    switch (call.method) {
+      case AppInputBinding.onPermissionChangedMethod:
+        _onPermissionChanged?.call(_parseGranted(call.arguments));
+        return;
+      case AppInputBinding.onButtonCapturedMethod:
+        _handleButtonCaptured(call.arguments);
+        return;
+      default:
+        debugPrint('[input-binding] 未知原生方法: ${call.method}');
     }
-    final bool granted = _parseGranted(call.arguments);
-    _onPermissionChanged?.call(granted);
+  }
+
+  /// 解析捕捉到的側鍵編號並路由到回呼；型別不符時忽略，不拋出。
+  void _handleButtonCaptured(Object? arguments) {
+    if (arguments is Map) {
+      final Object? value = arguments[AppInputBinding.capturedButtonNumberArgKey];
+      if (value is int) {
+        _onButtonCaptured?.call(value);
+        return;
+      }
+    }
+    debugPrint('[input-binding] 捕捉參數格式異常: $arguments');
   }
 
   /// 從原生參數解析 granted 旗標；型別不符時保守視為未授權。

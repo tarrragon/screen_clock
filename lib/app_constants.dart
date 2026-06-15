@@ -82,6 +82,11 @@ class AppDurations {
   /// 16ms 逐幀更新讓跑數最平順；年齡小數末位 ≈ 0.3 秒跳動，此頻率足以
   /// 平滑呈現且不漏更新。
   static const Duration lifeTimerTick = Duration(milliseconds: 16);
+
+  /// SPEC-007 FR-06：按鍵捕捉 session 逾時。
+  /// 使用者於面板進入捕捉後若未按任何側鍵，逾時自動退出捕捉，
+  /// 避免綁定 channel 長期停留在捕捉狀態。
+  static const Duration buttonCaptureTimeout = Duration(seconds: 5);
 }
 
 /// 生命計時（即時年齡）相關常數。
@@ -204,11 +209,25 @@ class AppInputBinding {
   /// 原生 → Dart：授權狀態變化通知，參數 [grantedArgKey]（bool）。
   static const String onPermissionChangedMethod = 'onPermissionChanged';
 
+  /// Dart → 原生：進入滑鼠側鍵捕捉模式（SPEC-007 FR-06 偵測捕捉）。
+  /// 原生開始監聽下一個側鍵並經 [onButtonCapturedMethod] 回報。
+  /// Swift 端字面對齊留 W4-002；本票僅定義 Dart 常數。
+  static const String beginCaptureButtonMethod = 'beginCaptureButton';
+
+  /// Dart → 原生：離開側鍵捕捉模式。
+  static const String endCaptureButtonMethod = 'endCaptureButton';
+
+  /// 原生 → Dart：回報捕捉到的側鍵編號，參數 [capturedButtonNumberArgKey]（int）。
+  static const String onButtonCapturedMethod = 'onButtonCaptured';
+
   /// updateBindings 參數鍵：綁定清單。
   static const String bindingsArgKey = 'bindings';
 
   /// onPermissionChanged 參數鍵：是否已授權。
   static const String grantedArgKey = 'granted';
+
+  /// onButtonCaptured 參數鍵：捕捉到的滑鼠按鍵編號（與 SPEC channel 草案表一致）。
+  static const String capturedButtonNumberArgKey = 'buttonNumber';
 }
 
 /// SettingsModel 中 bindings 欄的 JSON 鍵（SPEC-007 FR-02）。

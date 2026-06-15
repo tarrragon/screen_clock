@@ -128,4 +128,111 @@ void main() {
       expect(first[AppInputBinding.buttonNumberKey], 5);
     });
   });
+
+  /// 模擬原生端 onButtonCaptured 推送到 Dart handler。
+  Future<void> sendButtonCaptured(int buttonNumber) async {
+    final ByteData message = const StandardMethodCodec().encodeMethodCall(
+      MethodCall(
+        AppInputBinding.onButtonCapturedMethod,
+        <String, Object?>{
+          AppInputBinding.capturedButtonNumberArgKey: buttonNumber,
+        },
+      ),
+    );
+    await messenger.handlePlatformMessage(channel.name, message, (_) {});
+  }
+
+  group('permissionGranted', () {
+    test('start 時以查詢結果初始化授權狀態', () async {
+      mockNative(granted: true);
+
+      await controller.start(sampleBindings);
+
+      expect(controller.permissionGranted.value, isTrue);
+    });
+
+    test('原生回報授權變化時更新 ValueListenable', () async {
+      mockNative(granted: false);
+      await controller.start(sampleBindings);
+      expect(controller.permissionGranted.value, isFalse);
+
+      final ByteData message = const StandardMethodCodec().encodeMethodCall(
+        const MethodCall(
+          AppInputBinding.onPermissionChangedMethod,
+          <String, Object?>{AppInputBinding.grantedArgKey: true},
+        ),
+      );
+      await messenger.handlePlatformMessage(channel.name, message, (_) {});
+
+      expect(controller.permissionGranted.value, isTrue);
+    });
+  });
+
+  group('startButtonCapture', () {
+    test('發出 beginCaptureButton', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      await controller.startButtonCapture(onCaptured: (_) {});
+
+      expect(callsOf(AppInputBinding.beginCaptureButtonMethod), hasLength(1));
+    });
+
+    test('收到捕捉回報時呼叫 onCaptured 並自動結束捕捉', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      final List<int> captured = <int>[];
+      await controller.startButtonCapture(onCaptured: captured.add);
+
+      await sendButtonCaptured(4);
+
+      expect(captured, <int>[4]);
+      expect(callsOf(AppInputBinding.endCaptureButtonMethod), hasLength(1));
+    });
+
+    test('捕捉結束後再次回報不再呼叫 onCaptured', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      final List<int> captured = <int>[];
+      await controller.startButtonCapture(onCaptured: captured.add);
+      await sendButtonCaptured(4);
+      await sendButtonCaptured(5);
+
+      expect(captured, <int>[4]);
+    });
+
+    test('逾時自動結束捕捉', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      final List<int> captured = <int>[];
+      await controller.startButtonCapture(
+        onCaptured: captured.add,
+        timeout: const Duration(milliseconds: 10),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(captured, isEmpty);
+      expect(callsOf(AppInputBinding.endCaptureButtonMethod), hasLength(1));
+    });
+  });
+
+  group('cancelButtonCapture', () {
+    test('發出 endCaptureButton 並停止後續回報', () async {
+      mockNative(granted: true);
+      await controller.start(sampleBindings);
+
+      final List<int> captured = <int>[];
+      await controller.startButtonCapture(onCaptured: captured.add);
+      await controller.cancelButtonCapture();
+
+      expect(callsOf(AppInputBinding.endCaptureButtonMethod), hasLength(1));
+
+      await sendButtonCaptured(4);
+      expect(captured, isEmpty);
+    });
+  });
 }

@@ -193,4 +193,76 @@ void main() {
       expect(received, isEmpty);
     });
   });
+
+  group('beginCaptureButton / endCaptureButton', () {
+    test('beginCaptureButton 發出對應原生方法', () async {
+      mockNative((_) => null);
+
+      await bridge.beginCaptureButton();
+
+      expect(nativeCalls.single.method,
+          AppInputBinding.beginCaptureButtonMethod);
+    });
+
+    test('endCaptureButton 發出對應原生方法', () async {
+      mockNative((_) => null);
+
+      await bridge.endCaptureButton();
+
+      expect(nativeCalls.single.method,
+          AppInputBinding.endCaptureButtonMethod);
+    });
+
+    test('beginCaptureButton 遇 PlatformException 不拋出', () async {
+      mockNative((_) => throw PlatformException(code: 'boom'));
+
+      await expectLater(bridge.beginCaptureButton(), completes);
+    });
+  });
+
+  group('onButtonCaptured', () {
+    test('原生回報捕捉到的按鍵觸發 callback', () async {
+      final List<int> received = <int>[];
+      bridge.start(
+        onPermissionChanged: (_) {},
+        onButtonCaptured: received.add,
+      );
+
+      await sendNativeCall(
+        AppInputBinding.onButtonCapturedMethod,
+        <String, Object?>{AppInputBinding.capturedButtonNumberArgKey: 4},
+      );
+
+      expect(received, <int>[4]);
+    });
+
+    test('參數型別不符時忽略不拋出且不觸發 callback', () async {
+      final List<int> received = <int>[];
+      bridge.start(
+        onPermissionChanged: (_) {},
+        onButtonCaptured: received.add,
+      );
+
+      await sendNativeCall(
+        AppInputBinding.onButtonCapturedMethod,
+        <String, Object?>{
+          AppInputBinding.capturedButtonNumberArgKey: 'not-an-int',
+        },
+      );
+
+      expect(received, isEmpty);
+    });
+
+    test('未提供 onButtonCaptured 時收到回報不拋出', () async {
+      bridge.start(onPermissionChanged: (_) {});
+
+      await expectLater(
+        sendNativeCall(
+          AppInputBinding.onButtonCapturedMethod,
+          <String, Object?>{AppInputBinding.capturedButtonNumberArgKey: 4},
+        ),
+        completes,
+      );
+    });
+  });
 }
