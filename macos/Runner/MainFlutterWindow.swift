@@ -265,7 +265,7 @@ final class FullscreenCoverageDetector {
 ///
 /// 分派規則（依 buttonNumber 比對綁定）：
 /// - DragScroll 綁定 → down 進入拖曳並消費；move 依方向 / 靈敏度合成滾輪；up 離開並消費。
-/// - Hotkey 綁定 → 本階段先消費 + log（HotkeyAction 執行留 W3）。
+/// - Hotkey 綁定 → 合成對應鍵盤組合鍵（含修飾鍵 flags）注入前景 app 並消費（FR-05）。
 /// - 未綁定 → 放行。
 ///
 /// 授權狀態變化以 onPermissionChanged 回報 Dart。channel 與方法名須與
@@ -451,7 +451,7 @@ final class InputBindingBridge {
     }
   }
 
-  /// 側鍵按下：命中綁定則分派（DragScroll 進入拖曳 / Hotkey 消費 log），消費事件。
+  /// 側鍵按下：命中綁定則分派（DragScroll 進入拖曳 / Hotkey 合成鍵盤事件），消費事件。
   private func handleButtonDown(
     button: Int64,
     event: CGEvent
@@ -466,12 +466,169 @@ final class InputBindingBridge {
       return nil
     }
     if type == "hotkey" {
-      // HotkeyAction 執行留 W3；本階段先消費並記錄，避免側鍵觸發瀏覽器上下頁。
-      NSLog("[input-binding] hotkey 綁定觸發（執行留 W3），消費事件")
+      synthesizeHotkey(action: action)
+      // 無論是否成功合成，皆消費原側鍵事件（FR-03），避免觸發瀏覽器上下頁。
       return nil
     }
     return Unmanaged.passUnretained(event)
   }
+
+  /// 依 HotkeyAction 合成 keyDown+keyUp（含修飾鍵 flags）注入前景 app（SPEC-007 FR-05）。
+  ///
+  /// keyCode（= Flutter usbHidUsage）映射為 macOS CGKeyCode；modifiers（usbHidUsage
+  /// 0xE0–0xE7）OR 合併為 CGEventFlags。一次按下只送一次（非連發）。
+  /// 主鍵 usbHidUsage 無對應 CGKeyCode 時 NSLog 警告並安全略過（不合成、不崩潰），
+  /// 由呼叫端仍消費原側鍵事件。
+  ///
+  /// 合成事件 post 到 .cgSessionEventTap 注入當前 session 前景 app；本 app 的
+  /// CGEventTap mask 僅含滑鼠事件（不含 keyboard），故合成的鍵盤事件不會被本 tap
+  /// 重攔，無迴圈風險。hotkey 是單次按下事件（非拖曳熱路徑），合成成本可接受（NFR-01）。
+  private func synthesizeHotkey(action: [String: Any]) {
+    guard let usbHidUsage = action["keyCode"] as? Int else {
+      NSLog("[input-binding] hotkey 缺少 keyCode，略過合成")
+      return
+    }
+    guard let keyCode = Self.cgKeyCode(forUsbHidUsage: usbHidUsage) else {
+      NSLog(
+        "[input-binding] hotkey keyCode usbHidUsage=0x\(String(usbHidUsage, radix: 16)) "
+          + "無 CGKeyCode 對應，略過合成（仍消費側鍵）"
+      )
+      return
+    }
+    let modifierUsages = (action["modifiers"] as? [Int]) ?? []
+    let flags = Self.cgEventFlags(forModifierUsages: modifierUsages)
+
+    guard
+      let keyDown = CGEvent(
+        keyboardEventSource: scrollSource,
+        virtualKey: keyCode,
+        keyDown: true
+      ),
+      let keyUp = CGEvent(
+        keyboardEventSource: scrollSource,
+        virtualKey: keyCode,
+        keyDown: false
+      )
+    else {
+      NSLog("[input-binding] hotkey CGEvent 建立失敗，略過合成")
+      return
+    }
+    keyDown.flags = flags
+    keyUp.flags = flags
+    keyDown.post(tap: .cgSessionEventTap)
+    keyUp.post(tap: .cgSessionEventTap)
+  }
+
+  /// modifiers（usbHidUsage 0xE0–0xE7）OR 合併為 CGEventFlags。
+  ///
+  /// LeftCtrl 0xE0 / RightCtrl 0xE4 → control；LeftShift 0xE1 / RightShift 0xE5 → shift；
+  /// LeftAlt 0xE2 / RightAlt 0xE6 → alternate；LeftGUI 0xE3 / RightGUI 0xE7 → command。
+  /// 未知修飾鍵 usbHidUsage 安全忽略（不影響其餘修飾鍵）。
+  private static func cgEventFlags(forModifierUsages usages: [Int]) -> CGEventFlags {
+    var flags: CGEventFlags = []
+    for usage in usages {
+      switch usage {
+      case 0xE0, 0xE4: flags.insert(.maskControl)
+      case 0xE1, 0xE5: flags.insert(.maskShift)
+      case 0xE2, 0xE6: flags.insert(.maskAlternate)
+      case 0xE3, 0xE7: flags.insert(.maskCommand)
+      default:
+        NSLog("[input-binding] 未知修飾鍵 usbHidUsage=0x\(String(usage, radix: 16))，忽略")
+      }
+    }
+    return flags
+  }
+
+  /// usbHidUsage（HID usage page 0x07）→ macOS CGKeyCode（Carbon virtual keycode）映射。
+  ///
+  /// 涵蓋字母 a–z、數字 1–0、Enter/Esc/Tab/Space/Backspace/Delete、方向鍵、
+  /// F1–F12、常用符號（- = [ ] \ ; ' ` , . /）。未列入者回傳 nil，由呼叫端 log 並略過。
+  private static func cgKeyCode(forUsbHidUsage usage: Int) -> CGKeyCode? {
+    return hidUsageToCGKeyCode[usage]
+  }
+
+  /// usbHidUsage → CGKeyCode 對照表（HID page 0x07 → Carbon kVK_*）。
+  ///
+  /// CGKeyCode 為硬體位置碼，本表以 ANSI/標準鍵盤的 USB HID usage 對應；
+  /// 修飾鍵（0xE0–0xE7）不在此表（改由 cgEventFlags 處理）。
+  private static let hidUsageToCGKeyCode: [Int: CGKeyCode] = [
+    // 字母 a–z（HID 0x04–0x1D → kVK_ANSI_A 等）
+    0x04: 0x00,  // a
+    0x05: 0x0B,  // b
+    0x06: 0x08,  // c
+    0x07: 0x02,  // d
+    0x08: 0x0E,  // e
+    0x09: 0x03,  // f
+    0x0A: 0x05,  // g
+    0x0B: 0x04,  // h
+    0x0C: 0x22,  // i
+    0x0D: 0x26,  // j
+    0x0E: 0x28,  // k
+    0x0F: 0x25,  // l
+    0x10: 0x2E,  // m
+    0x11: 0x2D,  // n
+    0x12: 0x1F,  // o
+    0x13: 0x23,  // p
+    0x14: 0x0C,  // q
+    0x15: 0x0F,  // r
+    0x16: 0x01,  // s
+    0x17: 0x11,  // t
+    0x18: 0x20,  // u
+    0x19: 0x09,  // v
+    0x1A: 0x0D,  // w
+    0x1B: 0x07,  // x
+    0x1C: 0x10,  // y
+    0x1D: 0x06,  // z
+    // 數字列 1–9、0（HID 0x1E–0x27 → kVK_ANSI_1 等）
+    0x1E: 0x12,  // 1
+    0x1F: 0x13,  // 2
+    0x20: 0x14,  // 3
+    0x21: 0x15,  // 4
+    0x22: 0x17,  // 5
+    0x23: 0x16,  // 6
+    0x24: 0x1A,  // 7
+    0x25: 0x1C,  // 8
+    0x26: 0x19,  // 9
+    0x27: 0x1D,  // 0
+    // 控制鍵
+    0x28: 0x24,  // Return/Enter (kVK_Return)
+    0x29: 0x35,  // Escape (kVK_Escape)
+    0x2A: 0x33,  // Delete/Backspace (kVK_Delete)
+    0x2B: 0x30,  // Tab (kVK_Tab)
+    0x2C: 0x31,  // Space (kVK_Space)
+    // 符號
+    0x2D: 0x1B,  // - (kVK_ANSI_Minus)
+    0x2E: 0x18,  // = (kVK_ANSI_Equal)
+    0x2F: 0x21,  // [ (kVK_ANSI_LeftBracket)
+    0x30: 0x1E,  // ] (kVK_ANSI_RightBracket)
+    0x31: 0x2A,  // \ (kVK_ANSI_Backslash)
+    0x33: 0x29,  // ; (kVK_ANSI_Semicolon)
+    0x34: 0x27,  // ' (kVK_ANSI_Quote)
+    0x35: 0x32,  // ` (kVK_ANSI_Grave)
+    0x36: 0x2B,  // , (kVK_ANSI_Comma)
+    0x37: 0x2F,  // . (kVK_ANSI_Period)
+    0x38: 0x2C,  // / (kVK_ANSI_Slash)
+    // 功能鍵 F1–F12
+    0x3A: 0x7A,  // F1
+    0x3B: 0x78,  // F2
+    0x3C: 0x63,  // F3
+    0x3D: 0x76,  // F4
+    0x3E: 0x60,  // F5
+    0x3F: 0x61,  // F6
+    0x40: 0x62,  // F7
+    0x41: 0x64,  // F8
+    0x42: 0x65,  // F9
+    0x43: 0x6D,  // F10
+    0x44: 0x67,  // F11
+    0x45: 0x6F,  // F12
+    // Forward Delete
+    0x4C: 0x75,  // Delete Forward (kVK_ForwardDelete)
+    // 方向鍵
+    0x4F: 0x7C,  // Right (kVK_RightArrow)
+    0x50: 0x7B,  // Left (kVK_LeftArrow)
+    0x51: 0x7D,  // Down (kVK_DownArrow)
+    0x52: 0x7E,  // Up (kVK_UpArrow)
+  ]
 
   /// 捕捉模式：取下一個側鍵編號，經 onButtonCaptured 回報 Dart 並消費該事件。
   ///
