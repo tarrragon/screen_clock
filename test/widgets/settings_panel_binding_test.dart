@@ -417,5 +417,63 @@ void main() {
       expect(button6, hasLength(1));
       expect(button6.single.action, isA<HotkeyAction>());
     });
+
+    bool confirmEnabled(WidgetTester tester) {
+      final FilledButton confirm = tester.widget<FilledButton>(
+        find.byKey(const ValueKey<String>('add-flow-confirm')),
+      );
+      return confirm.onPressed != null;
+    }
+
+    testWidgets('Hotkey 型別且未擷取按鍵時 confirm 禁用',
+        (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      final Finder hotkeyType =
+          find.byKey(const ValueKey<String>('add-flow-type-hotkey'));
+      await tester.ensureVisible(hotkeyType);
+      await tester.tap(hotkeyType);
+      await tester.pump();
+
+      expect(confirmEnabled(tester), isFalse);
+    });
+
+    testWidgets('Hotkey 擷取按鍵後 confirm 啟用', (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      final Finder hotkeyType =
+          find.byKey(const ValueKey<String>('add-flow-type-hotkey'));
+      await tester.ensureVisible(hotkeyType);
+      await tester.tap(hotkeyType);
+      await tester.pump();
+
+      expect(confirmEnabled(tester), isFalse);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyA);
+      await tester.pump();
+
+      expect(confirmEnabled(tester), isTrue);
+
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyA);
+    });
+
+    testWidgets('DragScroll 型別 confirm 一律啟用', (WidgetTester tester) async {
+      inputController = _FakeInputBindingController(granted: true);
+      await tester.pumpWidget(panelUnder(modelWith(const <MouseBinding>[])));
+      await startAddFlow(tester);
+      inputController.emitCaptured(6);
+      await tester.pump();
+
+      // 預設動作型別即 DragScroll，無需擷取按鍵。
+      expect(confirmEnabled(tester), isTrue);
+    });
   });
 }
