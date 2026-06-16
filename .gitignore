@@ -52,6 +52,7 @@ __pycache__/
 coverage/
 htmlcov/
 .claude/hook-logs/
+.claude/hooks/hook-logs/
 .claude/worktrees/
 .claude/tool-results/
 .claude/handoff/
