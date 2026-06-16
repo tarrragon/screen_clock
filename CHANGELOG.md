@@ -4,6 +4,28 @@ All notable changes to **screen_clock** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-16
+
+滑鼠按鍵綁定：以滑鼠側鍵取代損壞的滾輪，並可將側鍵映射為鍵盤快捷鍵。
+
+### Added
+
+- **滑鼠按鍵綁定 domain**：可擴充的「實體滑鼠按鍵 → 動作」綁定，本版支援兩種動作：
+  - **拖曳滾動**：按住綁定的側鍵並垂直拖動，將位移合成為滾輪事件注入游標下方視窗（往下拖 = 往下捲，方向與靈敏度可調）。開箱預設綁定側鍵 button 4。
+  - **快捷鍵**：按一下綁定的側鍵，合成對應的鍵盤組合鍵（如 Cmd+C / Cmd+Shift+4）送往前景 app。
+  - 被綁定側鍵原本的上一頁 / 下一頁動作一律被吃掉。
+- **設定面板綁定管理**：顯示輔助使用授權狀態與引導；列出 / 新增 / 刪除綁定。新增採偵測捕捉——按下滑鼠側鍵或鍵盤組合鍵自動填入，動作參數（方向 / 靈敏度 / 快捷鍵組合）可調；綁定變更即時持久化。
+- **SettingsModel schema 升至 3**：新增 `bindings` 綁定清單，向後相容 v2（缺欄補空清單）；既有使用者升級時一次性 seed 預設綁定（已自訂者不覆蓋）。
+
+### Changed
+
+- **移除 App Sandbox**：全域事件攔截與合成需「輔助使用（Accessibility）」權限，與 App Sandbox 互斥，故關閉 sandbox。代價：無法上架 Mac App Store（本 app 為個人常駐工具，自簽散佈可接受）。
+- 首次使用滑鼠綁定需於系統設定 → 隱私權與安全性 → 輔助使用 授權本 app；未授權時功能安全停用，不影響透明遮罩 / 時鐘 / 開機啟動等既有功能。
+
+### Technical
+
+- 原生 `CGEventTap` 全域攔截側鍵與滑鼠移動事件、依綁定清單分派，`CGEvent` 合成滾輪 / 鍵盤事件；經 `FlutterMethodChannel` 與 Dart `lib/input/` 綁定層橋接。偵測捕捉模式由原生回報下一個側鍵編號。
+
 ## [1.2.0] - 2026-05-29
 
 選單列 agent app 與多桌面行為強化。
