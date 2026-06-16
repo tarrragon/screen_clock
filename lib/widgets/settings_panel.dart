@@ -670,6 +670,10 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
     return KeyEventResult.handled;
   }
 
+  /// 是否允許確認綁定：Hotkey 動作必須先擷取到按鍵；DragScroll 一律允許。
+  bool get _canConfirm =>
+      _actionType != _AddActionType.hotkey || _hotkeyCode != null;
+
   MouseBinding _buildBinding() {
     final MouseAction action = switch (_actionType) {
       _AddActionType.dragScroll =>
@@ -739,7 +743,11 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
           const SizedBox(width: 8),
           FilledButton(
             key: const ValueKey<String>('add-flow-confirm'),
-            onPressed: () => widget.onConfirm(_buildBinding()),
+            // Hotkey 動作未擷取按鍵（keyCode 為 null）時禁用，避免建立 keyCode=0
+            // 的無效綁定；DragScroll 或已擷取按鍵時啟用。
+            onPressed: _canConfirm
+                ? () => widget.onConfirm(_buildBinding())
+                : null,
             child: const Text(AppText.bindingFlowConfirm),
           ),
         ],
