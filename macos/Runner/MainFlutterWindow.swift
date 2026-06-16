@@ -527,7 +527,10 @@ final class InputBindingBridge {
   private static func cgEventFlags(forModifierUsages usages: [Int]) -> CGEventFlags {
     var flags: CGEventFlags = []
     for usage in usages {
-      switch usage {
+      // Flutter physicalKey.usbHidUsage = (page 0x07 << 16) | usage_id；
+      // 修飾鍵比對需先剝除 page 前綴取 usage_id（0xE0–0xE7）。
+      let id = usage & 0xFFFF
+      switch id {
       case 0xE0, 0xE4: flags.insert(.maskControl)
       case 0xE1, 0xE5: flags.insert(.maskShift)
       case 0xE2, 0xE6: flags.insert(.maskAlternate)
@@ -544,7 +547,10 @@ final class InputBindingBridge {
   /// 涵蓋字母 a–z、數字 1–0、Enter/Esc/Tab/Space/Backspace/Delete、方向鍵、
   /// F1–F12、常用符號（- = [ ] \ ; ' ` , . /）。未列入者回傳 nil，由呼叫端 log 並略過。
   private static func cgKeyCode(forUsbHidUsage usage: Int) -> CGKeyCode? {
-    return hidUsageToCGKeyCode[usage]
+    // Flutter physicalKey.usbHidUsage = (page 0x07 << 16) | usage_id；
+    // 本表以裸 usage_id 為 key，查表前須剝除 page 前綴。非鍵盤 page（!=0x07）回 nil。
+    guard (usage >> 16) == 0x07 else { return nil }
+    return hidUsageToCGKeyCode[usage & 0xFFFF]
   }
 
   /// usbHidUsage → CGKeyCode 對照表（HID page 0x07 → Carbon kVK_*）。
