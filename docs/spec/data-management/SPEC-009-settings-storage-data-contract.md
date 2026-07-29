@@ -5,7 +5,7 @@ status: draft
 source_proposal: null
 created: "2026-07-29"
 updated: "2026-07-29"
-version: "1.0"
+version: "1.1"
 owner: sassafras-data-administrator
 
 # Domain 歸屬
@@ -56,7 +56,7 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 | `birthDate` | DateTime? | epoch 毫秒（整數） | 可為 null（未設定） | 生命計時模式基準日；**唯一可為 null 的欄位** |
 | `lifeTimerMode` | bool | — | true / false，預設 false | 生命計時模式開關 |
 | `bindings` | List\<MouseBinding\> | 物件清單 | 同 `buttonNumber` 已去重 | 滑鼠按鍵綁定清單（SPEC-007 FR-02） |
-| `bindingsSeeded` | bool | — | true / false | 一次性預設綁定 seed 遷移旗標；缺鍵視為 false（未遷移） |
+| `bindingsSeeded` | bool | — | true / false | **欄位級 migration 旗標**（非使用者設定）；一次性預設綁定 seed 遷移旗標；缺鍵視為 false（未遷移）。與 `schemaVersion` 正交，見下方「欄位級 migration 旗標」說明 |
 
 **Schema 版本演進**（逐版本以 git 比對 `toJson()` 欄位集取得）：
 
@@ -68,7 +68,22 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 | 3（同版擴充） | `10284df` feat(1.3.0-W3-002) | `bindingsSeeded` | 缺鍵 → false，觸發一次性 seed 遷移（見 A.6 / B.3）。**未提升 schemaVersion**，v3 內部存在「有無 `bindingsSeeded`」兩種資料形態 |
 | 4 | 規劃中（1.4.0-W1-001） | 滑鼠定位器三項設定：啟用開關（bool，預設 true）、特效時長（double 秒，預設 1.5，範圍 0.5–3.0）、主色調（Color，預設系統藍） | v3 及更早資料缺欄 → 補上述預設值，不拋例外 |
 
-> v4 列來源為 **SPEC-008 FR-06 規格**，非 code。實際 JSON 鍵名與 Dart 欄位名於 1.4.0-W1-001 實作前不預先斷言，本表僅記錄規格已定的語意、型別與預設值。
+> v4 列來源為 **SPEC-008 FR-06 規格**，非 code（`lib/models/settings_model.dart` 的 `schemaVersion` 常數於本文件撰寫時仍為 3）。實際 JSON 鍵名與 Dart 欄位名於 1.4.0-W1-001 實作前不預先斷言，本表僅記錄規格已定的語意、型別與預設值。
+
+**欄位級 migration 旗標**（`bindingsSeeded` 及未來同類欄位）：
+
+| 面向 | `schemaVersion` | 欄位級 migration 旗標 |
+|------|-----------------|----------------------|
+| 回答的問題 | 這筆資料由哪一版 code 寫出 | 這筆資料是否已執行過某一次特定 migration |
+| 解析端是否讀取 | 否（`fromJson()` 完全不讀，見 A.3 註記） | 是（旗標值直接決定 migration 是否觸發） |
+| 缺鍵 fallback | 不適用 | 字面 `false`（**不是** `defaults()` 值） |
+| 生命週期 | 隨每次 schema 演進遞增 | 單向一次性，true 後不再回 false（INV-07） |
+
+兩者語意正交：旗標不表達版本、版本不表達遷移狀態，不得互相取代或合併。
+
+`bindingsSeeded` 的 fallback 為字面 `false` 而非 `defaults()` 的 `true`（`settings_model.dart` 的 `fromJson`），是刻意設計：若取 `defaults()` 值，舊資料會被誤判為已遷移，`_migrateBindingSeed()` 將永不觸發。此為全表唯一不遵循「缺欄取 `defaults()`」通則的欄位。
+
+其直接後果：**同為 `schemaVersion: 3` 存在兩種資料形態**（`10284df` 之前寫出者無 `bindingsSeeded`，之後寫出者有）。此為既定事實而非缺陷，任何針對 v3 的相容性測試須同時涵蓋 v3-early 與 v3-late 兩形態。
 
 > **與 SPEC-004 分工**：SPEC-004 `## 資料模型` 與 FR-01 聚焦「設定面板功能需要哪些欄位」；本節聚焦欄位的格式、值域與版本邊界約束。
 >
@@ -97,7 +112,39 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 | INV-08 | 讀取任一舊版資料不得使 app 崩潰；最壞情況降級為 `defaults()` | SPEC-004 FR-03 |
 | INV-09 | `SettingsModel` 為不可變物件；變更一律經 `copyWith` 產生新實例 | SPEC-004 FR-01 |
 
-> **`schemaVersion` 的實際角色（重要）**：`fromJson()` 完全不讀取 `schemaVersion`，版本相容全靠「欄位缺失 → 取預設值」達成。因此 `schemaVersion` 目前是**單向的審計標記**而非解析分支依據。此設計的後果：無法對「同名欄位語意變更」做版本分支處理，故 INV-03（只加欄、不改型別）是相容性的必要前提，不可放寬。
+> **`schemaVersion` 的實際角色（重要）**：`fromJson()` 完全不讀取 `schemaVersion`，版本相容全靠「欄位缺失 → 取預設值」達成。因此 `schemaVersion` 是**單向的稽核標記**：只在 `toJson()` 寫出，從不參與解析，不作為任何分支依據。實測佐證（1.4.0-W1-011 實驗 E1）：`schemaVersion` 為缺失、`99`、`'garbage'`、`-1` 四種輸入所產生的 `SettingsModel` 完全相等。版本號可為任意值甚至不存在，解析行為不變。
+>
+> 此設計的後果：無法對「同名欄位語意變更」做版本分支處理，故 INV-03（只加欄、不改型別）是相容性的必要前提，不可放寬。
+
+#### migration 治理規則
+
+本契約採「加欄 + 預設值 fallback」策略（B.3），不設版本分派層。為避免該策略在演進中被靜默侵蝕，以下規則對所有修改 `SettingsModel` 的變更生效：
+
+| 規則 | 內容 |
+|------|------|
+| G-01 | 欄位級 migration 旗標得在**不提升 `schemaVersion`** 的情況下新增（`bindingsSeeded` 為既有先例） |
+| G-02 | 但該次新增**必須登錄於 A.1 Schema 版本演進表**，以「N（同版擴充）」列標示引入 commit、新增欄位與缺鍵行為。未登錄的同版擴充視為違反本契約 |
+| G-03 | 新增一般設定欄位（非旗標）必須提升 `schemaVersion` 並於演進表新增一列 |
+| G-04 | 旗標累積達 **3 個**時，觸發「升級為版本分支解析」的評估（見下表 T-04） |
+
+G-04 的理由：每個旗標為資料形態引入一次二分，N 個旗標即 2^N 種形態組合。旗標數 1 至 2 時，形態數（2 至 4）仍可由 fixture 矩陣窮舉；達 3 個時形態數為 8，窮舉成本超過改以 `schemaVersion` 分派的成本。
+
+**現行旗標計數：1**（`bindingsSeeded`）。新增旗標時須同步更新此計數。
+
+#### 升級為版本分支解析（方案 B）的觸發條件
+
+「版本分支解析」指 `fromJson()` 讀取 `schemaVersion` 並依版本分派至對應解析路徑或 migration 函式鏈。出現下列**任一**可驗證條件時，必須先完成該升級，才能進行對應變更；不得以現行加欄策略硬做：
+
+| 編號 | 觸發條件 | 依據（1.4.0-W1-011 實測後果） |
+|------|---------|------------------------------|
+| T-01 | 需變更既有欄位的**型別** | E2：不拋例外。可轉型時靜默寬鬆轉型（`targetScreenIndex: 2.9 → 2` 無條件截斷、`'3.5' → 3.5`、`'true' → true`）；不可轉型時靜默取預設。使用者資料被改值或重置且無訊號 |
+| T-02 | 需變更既有欄位的**語意或單位** | E3：現行機制完全無法偵測。型別不變時舊值被新語意原樣接收，零例外零警示。`birthDate` 若由 epoch 毫秒改為 epoch 秒，`946684800` 會被解讀為 1970-01-12。錯誤會在下次 `save()` 被持久化，原始資料永久遺失 |
+| T-03 | 需**移除**既有欄位 | E4：方向 A（新版讀舊資料）安全，多餘欄位靜默忽略；方向 B（舊版讀新資料）造成 write-back 截斷，見 A.5 |
+| T-04 | 欄位級 migration 旗標累積達 **3 個** | 形態組合數達 8，超過版本分派成本（G-04） |
+
+四項條件皆為可判定事件（變更意圖明確、旗標數可清點），非時間性或主觀判斷。判定為觸發時，應建立獨立 ticket 執行升級，該 ticket 完成前對應變更維持阻塞。
+
+**未觸發時維持現狀的理由**：實測顯示現行策略的缺口是「INV-03 違規無偵測訊號」而非「無法解析舊資料」。純加欄變更（如 schema 4）在 INV-03 前提下由 E4a 證實安全。因此防線設於 golden fixture 迴歸測試（涵蓋 v1 / v2 / v3-early / v3-late 四形態，1.4.0-W1-015），而非預先重構解析層。
 
 ### A.4 交易邊界
 
@@ -122,13 +169,24 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 
 > **契約後果**：呼叫端無法區分「首次啟動」與「資料損毀」——兩者都回 `defaults()`。若未來需要區分（例如提示使用者設定遺失），須在此契約新增回傳型別而非僅改實作。
 
+#### 已接受風險：降級寫回截斷（direction B）
+
+| 項目 | 內容 |
+|------|------|
+| 風險 | 使用者以新版 app 寫出資料後，回退至舊版 app 執行。舊版 `fromJson()` 只認得自己那代的鍵，新欄位靜默丟棄；舊版一旦 `save()`，`toJson()` 全量重寫，新欄位資料**永久遺失** |
+| 實測佐證 | 1.4.0-W1-011 實驗 E4b：v1 版解析新版 payload 後，`schemaVersion`、`lifeTimerMode`、`bindings`、`bindingsSeeded` 全數靜默丟棄 |
+| 判定 | **已接受風險**，不建修復 ticket |
+| 不可修復的理由 | 防護必須由**讀取端**執行，而讀取端是已發布的舊版 binary。舊版 binary 不受任何新版程式碼或本契約約束——今日新增的欄位保留邏輯，只能保護今日之後發布的版本讀取更未來的資料，對已在使用者機器上的舊版無效。此為「向前相容需在過去實作」的結構性限制，非實作缺漏 |
+| 殘餘風險控制 | macOS app 降版需使用者主動替換 bundle，非自動路徑，發生率低但非零。無遙測可量測實際發生率 |
+| 重新評估觸發 | 若本專案導入自動更新且支援自動回滾（rollback 使降版成為非使用者主動的自動路徑），此風險須重新評估並建立對應 ticket |
+
 ### A.6 恢復模型
 
 | 情境 | 驗證方式 |
 |------|---------|
 | 備份還原 | **本專案無自動備份機制**。使用者層級的復原手段為刪除儲存項後重新設定（等同回到 `defaults()`）。還原後驗證：讀入不拋例外、`fromJson(toJson())` round-trip 相等、`bindings` 無重複 `buttonNumber` |
 | 資料損毀 | 讀取降級為 `defaults()`；下一次寫入即以完整合法 payload 覆蓋損毀內容 |
-| 跨版本降級（新版寫入後被舊版讀取） | **不保證**：`fromJson()` 只挑已知鍵、`toJson()` 全量重寫，未知欄位不被保留。以新版寫入後再用舊版 app 儲存，新欄位資料永久遺失。此為已知契約限制，非缺陷 |
+| 跨版本降級（新版寫入後被舊版讀取） | **不保證**：`fromJson()` 只挑已知鍵、`toJson()` 全量重寫，未知欄位不被保留。以新版寫入後再用舊版 app 儲存，新欄位資料永久遺失。此為已知契約限制，非缺陷；已接受風險的完整判定與不可修復理由見 A.5「已接受風險：降級寫回截斷（direction B）」 |
 | `bindingsSeeded` 遷移中斷 | 旗標與綁定同一份 payload 寫出，中斷則旗標維持 false，下次啟動重跑遷移（冪等：綁定非空時不覆蓋使用者自訂） |
 
 ---
@@ -175,8 +233,8 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 
 | 項目 | 決策 | 說明 |
 |------|------|------|
-| Schema 演進策略 | 支援演進，採「加欄 + 預設值 fallback」，無版本分支 migration | 無 `onUpgrade` 鉤子；`fromJson()` 不讀 `schemaVersion`。依賴規則：只要維持 INV-03（只加欄、不改型別、不刪欄），此策略成立；一旦需要改變既有欄位語意，必須先引入以 `schemaVersion` 分派的顯式 migration 層 |
-| 例外：命令式 migration | `_migrateBindingSeed()`（`PreferencesSettingsService`）是目前唯一的命令式遷移 | 觸發條件為 `bindingsSeeded == false`（含缺鍵），非版本號比較。行為：綁定為空才補入 `defaults().bindings`（避免覆蓋 v3 早期使用者自訂），無論如何標記 seeded 並立即回寫 |
+| Schema 演進策略 | 支援演進，採「加欄 + 預設值 fallback」，無版本分支 migration | 無 `onUpgrade` 鉤子；`fromJson()` 不讀 `schemaVersion`。依賴規則：只要維持 INV-03（只加欄、不改型別、不刪欄），此策略成立。何時必須升級為以 `schemaVersion` 分派的顯式 migration 層，見 A.3「升級為版本分支解析（方案 B）的觸發條件」T-01 至 T-04 |
+| 例外：命令式 migration | `_migrateBindingSeed()`（`PreferencesSettingsService`）是目前唯一的命令式遷移；其觸發依據 `bindingsSeeded` 這個欄位級 migration 旗標，治理規則見 A.3 G-01 至 G-04 | 觸發條件為 `bindingsSeeded == false`（含缺鍵），非版本號比較。行為：綁定為空才補入 `defaults().bindings`（避免覆蓋 v3 早期使用者自訂），無論如何標記 seeded 並立即回寫 |
 | Seed 資料政策 | `SettingsModel.defaults()` 內含一筆預設綁定 | 側鍵拖曳滾動（`AppInputBinding.defaultDragScrollButton` + `DragScrollAction`，SPEC-007 FR-03），使功能首次啟動即可用；`defaults()` 的 `bindingsSeeded` 為 true |
 | v4 演進（規劃中） | 沿用加欄 + 預設值 fallback，不需命令式 migration | SPEC-008 FR-06 已聲明「v3 及更早資料缺欄 → 補預設值」；三項新設定皆有明確預設值，符合現行策略 |
 
@@ -212,3 +270,4 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | 1.0 | 2026-07-29 | 初始版本：記錄 schema v1–v3 既成事實與 v4 規劃條目（1.4.0-W1-007） |
+| 1.1 | 2026-07-29 | 回填 1.4.0-W1-011 評估結論：A.1 `bindingsSeeded` 標註為欄位級 migration 旗標並補正交性說明；A.3 補 `schemaVersion` 單向稽核標記的實測佐證、migration 治理規則 G-01–G-04、版本分支解析升級觸發條件 T-01–T-04；A.5 記錄降級寫回截斷（direction B）為已接受風險（1.4.0-W1-016） |
