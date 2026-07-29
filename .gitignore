@@ -68,6 +68,9 @@ htmlcov/
 .claude/TASK_AVOIDANCE_FIX_MODE
 *.md.lock
 .claude/scheduled_tasks.lock
+# ticket CLI 建立 ticket 時的併發鎖（runtime 產物，會落在 tickets/ 目錄下）
+# 不可用 *.lock 概括，那會誤擋必須進版控的 pubspec.lock
+.ticket-create.lock
 
 # 測試副作用洩漏：mock 物件被當路徑使用時生成的字面目錄（純垃圾）
 **/MagicMock/

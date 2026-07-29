@@ -129,6 +129,20 @@ versions:
       風險：需移除 sandbox（無法上架 MAS）+ 輔助使用授權；W1 先以最小 spike 驗證 CGEventTap
       攔截側鍵、合成滾輪、消費事件四項假設後再展開 TDD。macOS only。
 
+  - version: "1.4.0"
+    codename: "cursor-locator"
+    description: "滑鼠定位器：全域熱鍵 Cmd+Option+L 於游標所在螢幕播放定位特效（聚光燈壓暗 / 邊框閃爍 / 游標波紋），特效層為獨立原生視窗"
+    status: "active"
+    worklog: "docs/work-logs/v1/v1.4/v1.4.0/"
+    notes: |
+      源於 PROP-003：多螢幕環境常無法判斷游標在哪個螢幕；macOS 內建搖晃指標僅放大游標，
+      不解決「在哪個螢幕」。特效同時處理兩層：邊框閃爍標示螢幕、聚光燈與波紋標示位置。
+      觸發採全域鍵盤熱鍵而非擴充 SPEC-007 的 MouseAction —— 綁定模型以實體側鍵為鍵，
+      觸控板使用者無側鍵可綁；鍵盤熱鍵是唯一同時涵蓋滑鼠與觸控板的方式。
+      附帶效益：hotkey_manager 走 Carbon RegisterEventHotKey，不需輔助使用授權。
+      特效層採 Swift NSWindow + CALayer，不經 Flutter engine（SPEC-008 決策 1）。
+      SettingsModel schema 3→4（啟用開關 / 特效時長 / 主色調）。macOS only。
+
 # ============================================================
 # 開發核心原則
 # ============================================================
@@ -175,3 +189,7 @@ references:
       description: "SPEC-002 螢幕中央時鐘顯示"
     - path: "docs/spec/input/mouse-button-binding.md"
       description: "SPEC-007 滑鼠按鍵綁定 domain"
+    - path: "docs/proposals/PROP-003-cursor-locator.md"
+      description: "多螢幕環境滑鼠定位器提案"
+    - path: "docs/spec/user-experience/cursor-locator.md"
+      description: "SPEC-008 滑鼠定位器（含渲染技術與觸發機制兩項架構決策）"

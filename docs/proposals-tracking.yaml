@@ -60,3 +60,35 @@ proposals:
       - item: "未授權安全停用 + 既有功能非 sandbox 回歸"
         status: pending
         verified_by: null
+
+  PROP-003:
+    title: "多螢幕環境滑鼠定位器"
+    status: draft
+    proposed: "2026-07-29"
+    confirmed: null
+    target_version: "v1.4.0"
+    source: development
+    spec_refs:
+      - spec/user-experience/cursor-locator.md
+    usecase_refs:
+      - UC-06
+    ticket_refs: []
+    checklist:
+      - item: "全域熱鍵 Cmd+Option+L 觸發（滑鼠與觸控板使用者皆適用）"
+        status: pending
+        verified_by: null
+      - item: "游標所在螢幕判定與播放期間跨螢幕跟隨"
+        status: pending
+        verified_by: null
+      - item: "特效三組成：聚光燈壓暗 / 邊框閃爍 / 游標波紋"
+        status: pending
+        verified_by: null
+      - item: "特效層覆蓋假全螢幕應用（與時鐘遮罩讓位策略相反）"
+        status: pending
+        verified_by: null
+      - item: "設定面板：啟用開關 + 特效時長 + 主色調（schema 3→4）"
+        status: pending
+        verified_by: null
+      - item: "未取得輔助使用授權時功能仍正常；既有功能不回歸"
+        status: pending
+        verified_by: null
