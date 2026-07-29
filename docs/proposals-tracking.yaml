@@ -7,8 +7,8 @@ proposals:
     target_version: "v0.1.0"
     source: development
     spec_refs:
-      - spec/platform/transparent-overlay-window.md
-      - spec/display/center-clock.md
+      - spec/platform/SPEC-001-transparent-overlay-window.md
+      - spec/display/SPEC-002-center-clock.md
     usecase_refs:
       - UC-01
       - UC-02
@@ -36,7 +36,7 @@ proposals:
     target_version: "v1.3.0"
     source: development
     spec_refs:
-      - spec/input/mouse-button-binding.md
+      - spec/input/SPEC-007-mouse-button-binding.md
     usecase_refs:
       - UC-04
       - UC-05
@@ -69,7 +69,7 @@ proposals:
     target_version: "v1.4.0"
     source: development
     spec_refs:
-      - spec/user-experience/cursor-locator.md
+      - spec/user-experience/SPEC-008-cursor-locator.md
     usecase_refs:
       - UC-06
     ticket_refs: []

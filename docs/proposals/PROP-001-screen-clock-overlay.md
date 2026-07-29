@@ -12,8 +12,8 @@ evaluation_level: standard
 
 outputs:
   spec_refs:
-    - spec/platform/transparent-overlay-window.md
-    - spec/display/center-clock.md
+    - spec/platform/SPEC-001-transparent-overlay-window.md
+    - spec/display/SPEC-002-center-clock.md
   usecase_refs:
     - usecases/UC-01-launch-overlay-clock.md
     - usecases/UC-02-click-through-interaction.md
@@ -162,8 +162,8 @@ Flutter 桌面框架本身不直接提供 click-through API，需透過 `window_
 
 | 轉化類型 | 檔案 | 日期 | 狀態 |
 |---------|------|------|------|
-| 規格 | spec/platform/transparent-overlay-window.md | 2026-05-29 | created |
-| 規格 | spec/display/center-clock.md | 2026-05-29 | created |
+| 規格 | spec/platform/SPEC-001-transparent-overlay-window.md | 2026-05-29 | created |
+| 規格 | spec/display/SPEC-002-center-clock.md | 2026-05-29 | created |
 | 用例 | usecases/UC-01-launch-overlay-clock.md | 2026-05-29 | created |
 | 用例 | usecases/UC-02-click-through-interaction.md | 2026-05-29 | created |
 | 用例 | usecases/UC-03-exit-overlay.md | 2026-05-29 | created |

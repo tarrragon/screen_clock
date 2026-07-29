@@ -12,7 +12,7 @@ evaluation_level: standard
 
 outputs:
   spec_refs:
-    - spec/user-experience/cursor-locator.md
+    - spec/user-experience/SPEC-008-cursor-locator.md
   usecase_refs:
     - usecases/UC-06-locate-cursor.md
   ticket_refs: []
@@ -162,6 +162,6 @@ macOS 內建「搖晃滑鼠指標以尋找」僅放大游標，解決第 2 層�
 
 | 轉化類型 | 檔案 | 日期 | 狀態 |
 |---------|------|------|------|
-| 規格 | spec/user-experience/cursor-locator.md | 2026-07-29 | created |
+| 規格 | spec/user-experience/SPEC-008-cursor-locator.md | 2026-07-29 | created |
 | 用例 | usecases/UC-06-locate-cursor.md | 2026-07-29 | created |
 | Ticket | — | — | pending |

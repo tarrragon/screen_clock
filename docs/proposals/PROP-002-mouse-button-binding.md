@@ -12,7 +12,7 @@ evaluation_level: standard
 
 outputs:
   spec_refs:
-    - spec/input/mouse-button-binding.md
+    - spec/input/SPEC-007-mouse-button-binding.md
   usecase_refs:
     - usecases/UC-04-bind-drag-to-scroll.md
     - usecases/UC-05-bind-mouse-button-hotkey.md
@@ -172,7 +172,7 @@ Flutter 桌面框架本身不提供全域輸入攔截，也不提供系統層事
 
 | 轉化類型 | 檔案 | 日期 | 狀態 |
 |---------|------|------|------|
-| 規格 | spec/input/mouse-button-binding.md | 2026-06-15 | created |
+| 規格 | spec/input/SPEC-007-mouse-button-binding.md | 2026-06-15 | created |
 | 用例 | usecases/UC-04-bind-drag-to-scroll.md | — | pending |
 | 用例 | usecases/UC-05-bind-mouse-button-hotkey.md | — | pending |
 | Ticket | — | — | pending |
