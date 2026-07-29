@@ -324,6 +324,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | IMP-V1-006 | 大小寫不敏感檔案系統上 Edit 工具寫入成功，但 git pathspec 以不同大小寫尋址失敗 | 低 | — |
 | IMP-049 (hook-error-display-is-cli-bug) | "hook error" 顯示是 Claude Code CLI 已知 Bug，非 Hook 程式碼問題 | 低 | v0.17.3 |
 | IMP-049 (undefined-constants-in-hook-source) | Hook 原始碼引用未定義常數 | — | — |
+| IMP-BAL-004 | 豁免清單以檔名比對而非路徑錨定，使樹中任意深度的同名檔全數豁免 | — | — |
 
 ### 流程 (PROC)
 
@@ -555,6 +556,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-105 (feature-implemented-without-doc-integration) | 新功能實作後缺乏文件引導整合 | — | — |
 | PC-105 (pm-cli-syntax-autopilot) | PM 對 SKILL CLI 語法的 autopilot 假設 | 中 | v0.18.0 |
 | PC-BAL-014 | Skill 註冊表 session 快取遮蔽檔案系統變更 — 同 session 驗證得出假陰性 | 中 | v0.2.1 |
+| PC-SCLK-001 | 並行 agent 的 git commit --amend 改寫其他執行體的 commit | 高 | — |
 
 ---
 
