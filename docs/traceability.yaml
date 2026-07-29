@@ -1,0 +1,330 @@
+# 三軸追溯矩陣（1.4.0-W1-008）
+#
+# 欄位名一律取自 .claude/skills/doc/doc_system/core/tracking_schema.py 的
+# TRACEABILITY_SCHEMA（SSOT），禁止 inline 猜測欄位名。
+#
+# 三軸：
+#   mappings             — 垂直軸：spec/FR -> UC 使用者場景 -> tests
+#   domain_bundle_tests  — 水平軸：domain bundle -> 不變式 -> tests
+#   data_contract_tests  — 第三軸：SPEC-009 資料契約條目（INV-xx / A.x）-> tests
+#
+# 未覆蓋項一律留空（不填 tests 欄位，或省略該筆 data_contract_tests 條目），
+# 不以佔位字串使覆蓋看似完整。已知缺口與其追蹤 ticket 見各節註解與
+# 1.4.0-W1-008 Solution 記錄。
+
+version: "1.0"
+
+# ============================================================
+# 垂直軸：mappings（spec + usecase -> 場景 -> tests）
+# ============================================================
+mappings:
+  - spec: SPEC-001
+    usecase: UC-01
+    title: 啟動透明時鐘遮罩
+    main_flow:
+      - 啟動 app
+      - 初始化視窗（frameless/transparent/always-on-top/no-shadow/ignore-mouse 屬性設定）
+      - 顯示遮罩
+      - 背景持續更新
+    alt_scenarios:
+      - "01a: 螢幕解析度於啟動時為非預期值 -> fallback 1920x1080"
+      - "01b: 已有同 app instance 在執行 -> 依 macOS 預設行為"
+    tests:
+      - test/widget_test.dart
+
+  - spec: SPEC-002
+    usecase: UC-01
+    title: 啟動透明時鐘遮罩
+    main_flow:
+      - 顯示遮罩（中央顯示當前時間）
+      - 背景持續更新（逐秒更新）
+    tests:
+      - test/widgets/center_clock_test.dart
+
+  - spec: SPEC-001
+    usecase: UC-02
+    title: 在遮罩下繼續操作底下程式
+    main_flow:
+      - 點擊底下視窗
+      - 拖曳檔案
+      - 使用鍵盤輸入
+      - 捲動內容
+      - Hover 操作
+    alt_scenarios:
+      - "02a: 同時使用 Mission Control / Spaces"
+      - "02b: 切換到全螢幕應用"
+    # 缺口：主要成功場景 1-5（click-through 本身）為 macOS 原生行為，
+    # 無 Dart 自動化測試，須手動驗收（見 test/widget_test.dart 檔頭註記）。
+    # 僅替代場景 02b（全螢幕讓位）有自動化覆蓋。
+    tests:
+      - test/fullscreen_clock_visibility_test.dart
+
+  - spec: SPEC-001
+    usecase: UC-03
+    title: 退出遮罩
+    main_flow:
+      - 觸發退出
+      - 取消 timer
+      - 關閉視窗
+      - 結束 process
+    # 缺口：僅「取消 timer」步驟有自動化覆蓋（dispose 時 timer.cancel）；
+    # 視窗關閉與 process 結束為原生行為，無自動化測試。
+    tests:
+      - test/widgets/center_clock_test.dart
+
+  - spec: SPEC-007
+    usecase: UC-04
+    title: 綁定拖曳滾動
+    main_flow:
+      - 按下綁定鍵
+      - 垂直拖曳合成捲動
+      - 放開結束
+    alt_scenarios:
+      - "04a: 拖曳期間更新綁定清單"
+    # 缺口：Δy 換算捲動量的實際合成邏輯在原生 Swift 端（CGEventTap），
+    # 非 Dart 測試範圍。Dart 側僅涵蓋綁定資料模型與綁定同步。
+    tests:
+      - test/input/mouse_binding_test.dart
+      - test/input/input_binding_controller_test.dart
+
+  - spec: SPEC-007
+    usecase: UC-05
+    title: 綁定按鍵快捷鍵
+    main_flow:
+      - 按下綁定鍵
+      - 合成組合鍵事件
+      - 前景 app 接收
+      - 放開綁定鍵
+    # 缺口：keyDown/keyUp 合成與送出為原生 Swift 端實作，非 Dart 測試範圍。
+    # Dart 側涵蓋 HotkeyAction 資料模型與 channel 通道下傳/權限查詢。
+    tests:
+      - test/input/mouse_binding_test.dart
+      - test/input/input_binding_channel_test.dart
+
+  - spec: SPEC-008
+    usecase: UC-06
+    title: 快速定位滑鼠游標
+    main_flow:
+      - 觸發
+      - 判定目標螢幕
+      - 建立特效視窗
+      - 播放特效
+      - 結束
+      - 使用者找到游標
+    # 缺口：SPEC-008/UC-06 尚未實作。domain-map user-experience 標記
+    # CursorLocator / CursorLocatorDomain / CursorLocatorSettings 為
+    # 「規劃中」，無對應 lib/ 路徑，故無 tests。規格一致性另由
+    # 1.4.0-W1-009 追蹤，本票不重複建票。
+
+# ============================================================
+# 水平軸：domain_bundle_tests（bundle -> 不變式 -> tests）
+# 來源：1.4.0-W1-006 五份 docs/spec/{domain}/domain-map.md
+# 僅收錄各 domain-map「Bundle 不變式清單（per-bundle）」表中列出的
+# bundle（非 domain/infra 且無不變式紀錄的 bundle 如 WindowManager 整合
+# 不在此軸，該類配置性 bundle 未列不變式）。
+# ============================================================
+domain_bundle_tests:
+  # --- platform domain ---
+  - bundle: ScreenArg
+    layer: supporting VO
+    invariants:
+      - 未提供/格式錯誤/非數字/負數引數回傳 null
+      - 多次出現取最後一次
+    tests:
+      - test/platform/screen_arg_test.dart
+
+  - bundle: DisplayDetector
+    layer: read-model
+    invariants:
+      - 螢幕清單至少包含主螢幕
+      - 熱插拔事件觸發重新偵測
+    # 缺口：lib/platform/display_detector.dart 已實作但 test/ 無對應測試檔。
+    # 追蹤：1.4.0-W2-001。
+    tests: []
+
+  - bundle: FullscreenDetector
+    layer: read-model
+    invariants:
+      - 全螢幕狀態變更通知觀察者
+    tests:
+      - test/platform/fullscreen_detector_test.dart
+
+  - bundle: AutoLaunchService
+    layer: 非 domain（infra）
+    invariants:
+      - 啟用/停用操作冪等
+      - 查詢狀態反映最後一次操作
+    tests:
+      - test/services/auto_launch_service_test.dart
+
+  # --- display domain ---
+  - bundle: AgeFormatter
+    layer: read-model
+    # 不變式文字逐字取自 domain-map display.md（未修改來源文件）。
+    # 疑似複製貼上錯置（實際輸出為年齡分組字串，非 HH:MM:SS 時間格式），
+    # 已建 1.4.0-W2-002 追蹤修正 domain-map 本身，本檔僅如實反映來源。
+    invariants:
+      - 格式化輸出為 HH:MM:SS 格式
+      - 時分秒各補零至兩位
+    tests:
+      - test/age_formatter_test.dart
+
+  - bundle: CenterClock
+    layer: 非 domain（presentation）
+    invariants:
+      - 每秒更新時間顯示
+      - Widget 居中對齊
+    tests:
+      - test/widgets/center_clock_test.dart
+
+  # --- input domain ---
+  - bundle: MouseBinding
+    layer: aggregate + VO
+    invariants:
+      - 序列化後反序列化回原值
+      - 每個綁定關聯一個按鍵與一個動作
+    tests:
+      - test/input/mouse_binding_test.dart
+
+  - bundle: MouseAction
+    layer: supporting VO
+    invariants:
+      - 列舉值不重複
+      - 每個動作有對應顯示名稱
+    tests:
+      - test/input/mouse_binding_test.dart
+
+  - bundle: InputBindingController
+    layer: read-model / state
+    invariants:
+      - 偵測模式開啟時攔截下一次按鍵事件
+      - 非偵測模式正常轉發事件
+    tests:
+      - test/input/input_binding_controller_test.dart
+
+  - bundle: InputBindingChannel
+    layer: 非 domain（infra）
+    invariants:
+      - 平台通道訊息格式正確解析
+      - 無效訊息靜默忽略（有日誌）
+    tests:
+      - test/input/input_binding_channel_test.dart
+
+  # --- data-management domain ---
+  - bundle: SettingsModel
+    layer: aggregate + VO
+    invariants:
+      - 序列化後反序列化回原值（round-trip）
+      - copyWith 只改指定欄位
+      - 預設值合法
+    tests:
+      - test/models/settings_model_test.dart
+
+  - bundle: SettingsController
+    layer: read-model / state
+    invariants:
+      - 載入後狀態反映持久化值
+      - 儲存後持久化值反映當前狀態
+    # 缺口：目前僅有 test/widgets/settings_panel_binding_test.dart 的
+    # widget 層間接覆蓋（透過 persist() 呼叫次數與 UI 反映驗證），
+    # 無專屬單元測試直接驗證 controller 自身兩條不變式。
+    # 追蹤：1.4.0-W2-003。
+    tests:
+      - test/widgets/settings_panel_binding_test.dart
+
+  - bundle: SettingsService
+    layer: 非 domain（infra）
+    invariants:
+      - 讀取不存在的 key 回傳 null
+      - 寫入後讀取回原值
+    tests:
+      - test/services/settings_service_test.dart
+
+  # --- user-experience domain ---
+  - bundle: SettingsPanel
+    layer: 非 domain（presentation）
+    invariants:
+      - 熱鍵呼出切換面板可見性
+      - click-through 在面板開啟時動態解除
+    # 缺口：熱鍵呼出（FR-01）與 click-through 動態解除（FR-02）本身為
+    # 原生 macOS 行為與 main.dart 啟動流程整合，未見專屬自動化測試；
+    # 現有測試檔僅涵蓋面板內綁定管理區（SPEC-007 FR-06/07/08）。
+    tests:
+      - test/widgets/settings_panel_binding_test.dart
+
+  - bundle: CursorLocatorDomain
+    layer: read-model
+    invariants:
+      - 目標螢幕判定回傳有效螢幕
+      - 跨螢幕跟隨追蹤游標位置
+    # 缺口：SPEC-008 尚未實作（domain-map 標記「規劃中」，無對應 lib/ 路徑）。
+    # 規格一致性另由 1.4.0-W1-009 追蹤，本票不重複建票。
+    tests: []
+
+# ============================================================
+# 第三軸：data_contract_tests（SPEC-009 契約條目 -> tests）
+# 來源：docs/spec/data-management/SPEC-009-settings-storage-data-contract.md
+# 僅收錄可判定「有測試」或「明文豁免」的條目；INV-03（schema 演進只能
+# 加欄的人工把關規則）與 A.4 的 autoLaunch OS 對帳非原子交易邊界目前
+# 皆無自動化測試、亦非明文豁免項，依「未覆蓋項如實留空」原則不列入本軸
+# （列入會強迫填入不實的 no_test_needed），缺口說明見 1.4.0-W1-008
+# Solution 與 Test Results 章節。
+# ============================================================
+data_contract_tests:
+  - contract_ref: INV-01
+    description: 除 birthDate 外所有欄位 non-null（SPEC-009 A.3 INV-01）
+    no_test_needed: true
+    reason: 由 Dart null safety 與 SettingsModel 建構子必填參數在型別系統層級靜態保證（SPEC-009 B.1），非 runtime 可測項目
+
+  - contract_ref: INV-02
+    description: schemaVersion 單調遞增；寫出值恆等於當前 code 常數（SPEC-009 A.3 INV-02）
+    tests:
+      - test/models/settings_model_test.dart
+    reason_supplement: 測試僅驗證當前 schemaVersion 為 3，未涵蓋跨版本序列的單調遞增歷史驗證
+
+  - contract_ref: INV-04
+    description: fromJson() 對任意輸入永不拋例外；缺欄或型別錯誤時該欄取 defaults() 值（SPEC-009 A.3 INV-04）
+    tests:
+      - test/models/settings_model_test.dart
+      - test/services/settings_service_test.dart
+
+  - contract_ref: INV-05
+    description: fromJson(model.toJson()) == model（round-trip 相等，SPEC-009 A.3 INV-05）
+    tests:
+      - test/models/settings_model_test.dart
+      - test/services/settings_service_test.dart
+
+  - contract_ref: INV-06
+    description: bindings 內 buttonNumber 唯一（dedupeBindingsByButton 收斂，SPEC-009 A.3 INV-06）
+    tests:
+      - test/models/settings_model_test.dart
+
+  - contract_ref: INV-07
+    description: "bindingsSeeded 單向：一旦為 true 不再回 false（SPEC-009 A.3 INV-07）"
+    tests:
+      - test/services/settings_service_test.dart
+
+  - contract_ref: INV-08
+    description: 讀取任一舊版資料不得使 app 崩潰；最壞情況降級為 defaults()（SPEC-009 A.3 INV-08）
+    tests:
+      - test/models/settings_model_test.dart
+      - test/services/settings_service_test.dart
+
+  - contract_ref: INV-09
+    description: SettingsModel 為不可變物件；變更一律經 copyWith 產生新實例（SPEC-009 A.3 INV-09）
+    tests:
+      - test/models/settings_model_test.dart
+
+  - contract_ref: A.1-schema-evolution
+    description: schema v1/v2/v3 各代資料皆可被現行 code 正確解析為對應語意，缺欄補預設值不拋例外（SPEC-009 A.1 Schema 版本演進表）
+    tests:
+      - test/models/settings_model_test.dart
+      - test/services/settings_service_test.dart
+    reason_supplement: 目前測試涵蓋 v2（缺 bindings）與 v3-early（缺 bindingsSeeded）兩形態；v1 起點形態的獨立回歸測試待 1.4.0-W1-015（golden fixture）補齊
+
+  - contract_ref: A.5-accepted-risk-direction-b
+    description: 跨版本降級寫回會截斷新欄位資料，為已接受風險，不建修復 ticket（SPEC-009 A.5「已接受風險：降級寫回截斷（direction B）」）
+    no_test_needed: true
+    reason: SPEC-009 明文列為已接受風險且不可修復（讀取端為已發布舊版 binary，不受任何新版程式碼或本契約約束），非防護性不變式
+
+last_updated: "2026-07-29"
