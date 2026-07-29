@@ -12,10 +12,6 @@ UC 白名單 SSOT（Single Source of Truth）。
 本檔登錄所有合法 UC 編號與主流程摘要。新增 UC 時須同步在此註冊，並確保主流程內容與
 `docs/usecases/UC-XX-*.md` 完整用例文件一致，不可各自漂移。
 
-UC-04、UC-05 尚無完整用例文件（待 1.4.0-W1-005 補建 `docs/usecases/UC-04-bind-drag-to-scroll.md`
-與 `docs/usecases/UC-05-bind-mouse-button-hotkey.md`），本檔先列出標題與主流程骨架，供 SSOT
-白名單與四個 uc 子命令即時可用；分散檔補建後須回頭核對兩邊主流程是否一致。
-
 ---
 
 ## UC-01: 啟動透明時鐘遮罩
@@ -111,24 +107,22 @@ UC-04、UC-05 尚無完整用例文件（待 1.4.0-W1-005 補建 `docs/usecases/
 
 **來源提案**：PROP-002
 **對應規格**：SPEC-007
-**詳細用例**：待補（`docs/usecases/UC-04-bind-drag-to-scroll.md`，1.4.0-W1-005）
-
-> 骨架用例：行為依 `docs/spec/input/SPEC-007-mouse-button-binding.md` FR-03、FR-04 反推。
+**詳細用例**：`docs/usecases/UC-04-bind-drag-to-scroll.md`
 
 ### 主要成功場景
 
 1. **按下綁定鍵**
    - 使用者按下已綁定為拖曳滾動動作的滑鼠側鍵
-   - 原生端記錄起始游標 Y 座標，進入拖曳狀態
+   - 原生端記錄起始游標 Y 座標，進入拖曳狀態；該次按下事件被消費，原按鍵的系統預設動作不觸發
 
 2. **垂直拖曳合成捲動**
    - 使用者垂直移動滑鼠
-   - 原生端以 `Δy = 當前Y − 上次Y` 乘上 sensitivity 合成 `CGEventCreateScrollWheelEvent`
-   - 捲動事件注入游標下方目標 app，內容依設定方向（natural / inverted）捲動
+   - 原生端以 `Δy = 當前Y − 上次Y` 乘上 sensitivity 合成垂直滾輪事件（換算結果為 0 時取最小單位）
+   - 捲動事件注入游標下方目標 app，內容依設定方向（natural / inverted）捲動；該次移動事件同時被消費，游標圖示視覺上不隨之位移
 
 3. **放開結束**
    - 使用者放開綁定鍵
-   - 原生端離開拖曳狀態，停止合成捲動事件
+   - 原生端離開拖曳狀態，消費該次放開事件，停止合成捲動事件
 
 ---
 
@@ -136,9 +130,7 @@ UC-04、UC-05 尚無完整用例文件（待 1.4.0-W1-005 補建 `docs/usecases/
 
 **來源提案**：PROP-002
 **對應規格**：SPEC-007
-**詳細用例**：待補（`docs/usecases/UC-05-bind-mouse-button-hotkey.md`，1.4.0-W1-005）
-
-> 骨架用例：行為依 `docs/spec/input/SPEC-007-mouse-button-binding.md` FR-03、FR-05 反推。
+**詳細用例**：`docs/usecases/UC-05-bind-mouse-button-hotkey.md`
 
 ### 主要成功場景
 
@@ -152,6 +144,10 @@ UC-04、UC-05 尚無完整用例文件（待 1.4.0-W1-005 補建 `docs/usecases/
 
 3. **前景 app 接收**
    - 前景 app 收到並執行對應的快捷鍵動作（如複製、螢幕截圖）
+
+4. **放開綁定鍵**
+   - 使用者放開該側鍵
+   - 原生端未消費該次放開事件（僅拖曳滾動綁定的放開事件會被消費），依原樣放行
 
 ---
 

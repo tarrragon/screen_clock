@@ -108,6 +108,14 @@ usecases:
     title: "退出遮罩"
     status: draft
     path: usecases/UC-03-exit-overlay.md
+  - id: UC-04
+    title: "綁定拖曳滾動"
+    status: draft
+    path: usecases/UC-04-bind-drag-to-scroll.md
+  - id: UC-05
+    title: "綁定按鍵快捷鍵"
+    status: draft
+    path: usecases/UC-05-bind-mouse-button-hotkey.md
   - id: UC-06
     title: "快速定位滑鼠游標"
     status: draft
