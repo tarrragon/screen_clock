@@ -53,12 +53,14 @@ from typing import Dict, List, Optional, Tuple
 
 # 導入 hook_utils（package 形式）
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import (  # noqa: E402
     setup_hook_logging,
     run_hook_safely,
     read_json_from_stdin,
     get_project_root,
 )
+from lib.uv_tool_utils import is_shimmed_cli  # noqa: E402
 
 HOOK_NAME = "uv-tool-ownership-guard"
 
@@ -244,6 +246,13 @@ def _guard_command(command: str, project_root: Path, logger) -> None:
 
     for exe in invoked:
         skill = EXE_TO_SKILL[exe]
+
+        # cwd-resolving shim（ARCH-APP-002）：shim 依 cwd 解析源碼、無全域 ownership
+        # 概念；reinstall 會把 shim 蓋回。偵測為 shim 即放行，不做 receipt 比對。
+        if is_shimmed_cli(exe, logger):
+            logger.debug(f"{exe} 為 cwd-resolving shim，放行不 reinstall")
+            continue
+
         receipt_dir = _read_receipt_directory(skill.package_name, logger)
         expected = _expected_source_dir(project_root, skill)
 

@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import List, Tuple
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import setup_hook_logging, run_hook_safely, get_project_root
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import setup_hook_logging, run_hook_safely, get_project_root
 
 # description 長度閾值（字元數）
 WARNING_THRESHOLD = 250

@@ -26,7 +26,8 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import setup_hook_logging, run_hook_safely, get_project_root
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import setup_hook_logging, run_hook_safely, get_project_root
 from lib.hook_messages import ValidationMessages
 
 

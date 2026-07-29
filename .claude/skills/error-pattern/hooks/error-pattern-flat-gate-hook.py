@@ -20,7 +20,7 @@ Why: flat base 是 V1/APP 共享凍結核心，獨立累加會再撞號（proces
   AND 目標不存在於磁碟（= 新建）           → exit 2 deny
   否則（前綴號 / 無 ID / 既有檔編輯 / 非 error-patterns）→ exit 0 allow
 
-SSOT: 複用 .claude/hooks/lib/pattern_id.py 的 extract_pattern_id，禁再造 regex（ARCH-020）。
+SSOT: 複用 .claude/lib/pattern_id.py 的 extract_pattern_id，禁再造 regex（ARCH-020）。
 對應規則: quality-baseline 規則 4（deny 訊息寫 stderr + 引導 /error-pattern add）。
 來源 ticket: 1.0.0-W1-021（source 1.0.0-W1-019.3）。
 """
@@ -31,10 +31,12 @@ from pathlib import Path
 # 跨目錄 import：本 hook 位於 .claude/skills/error-pattern/hooks/，
 # 需指向 .claude/hooks/ 載入 hook_utils 與 lib.pattern_id（SSOT）。
 # parents[3] = .claude（hooks=[0] error-pattern=[1] skills=[2] .claude=[3]）
-_HOOKS_ROOT = Path(__file__).resolve().parents[3] / "hooks"
+_CLAUDE_ROOT = Path(__file__).resolve().parents[3]
+_HOOKS_ROOT = _CLAUDE_ROOT / "hooks"
+sys.path.insert(0, str(_CLAUDE_ROOT))
 sys.path.insert(0, str(_HOOKS_ROOT))
 
-from hook_utils import (  # noqa: E402
+from lib import (  # noqa: E402
     setup_hook_logging,
     run_hook_safely,
     read_json_from_stdin,

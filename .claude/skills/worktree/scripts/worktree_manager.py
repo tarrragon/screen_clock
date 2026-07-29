@@ -32,7 +32,7 @@ try:
     from .messages import MergeMessages, CleanupMessages, CommonMessages, CreateMessages
 except ImportError:
     # Fallback when running with scripts/ on sys.path (test 與直接執行情境)
-    from constants import (
+    from lib.constants import (
         FEAT_PREFIX,
         FEAT_PREFIX_LEN,
         TICKET_ID_PATTERN,
@@ -95,14 +95,14 @@ def _resolve_project_root() -> Path:
 
 try:
     project_root = _resolve_project_root()
-    sys.path.insert(0, str(project_root / ".claude" / "lib"))
+    sys.path.insert(0, str(project_root / ".claude"))
 except RuntimeError as e:
     print(f"[Warning] {e}", file=sys.stderr)
     print("[Warning] Worktree SKILL may not function properly", file=sys.stderr)
     project_root = Path(os.getcwd())  # 保底，後續 git_utils import 也會 fallback
 
 try:
-    from git_utils import (
+    from lib.git_utils import (
         run_git_command,
         get_project_root,
         get_current_branch,

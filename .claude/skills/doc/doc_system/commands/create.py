@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 
 from doc_system.core.file_locator import FileLocator
+from doc_system.core.tracking_schema import PROPOSALS_TRACKING_SCHEMA
 
 
 # type 到模板檔名和目標子目錄的對應
@@ -31,9 +32,58 @@ DOC_TYPE_CONFIG = {
         "id_prefix": "UC",
         "requires_domain": False,
     },
+    "data-contract": {
+        "template": "data-contract-template.md",
+        "target_dir": "docs/spec",
+        "id_prefix": "SPEC",
+        "requires_domain": True,
+    },
 }
 
 VALID_PROPOSAL_STATUSES = ("draft", "discussing", "confirmed", "implemented", "withdrawn")
+
+
+def _next_id(project_root: Path, doc_type: str) -> str:
+    """掃描現有文件分配下一個序號 ID。
+
+    Known limitation: TOCTOU — no file lock, parallel calls may allocate same ID.
+    Acceptable for single-user CLI; existing ID check in execute() catches collision.
+    """
+    config = DOC_TYPE_CONFIG[doc_type]
+    prefix = config["id_prefix"]
+    target_dir = Path(project_root) / config["target_dir"]
+
+    max_num = 0
+    if target_dir.exists():
+        pattern = re.compile(rf"^{prefix}-(\d+)", re.IGNORECASE)
+        for item in target_dir.rglob("*.md"):
+            m = pattern.match(item.stem)
+            if m:
+                max_num = max(max_num, int(m.group(1)))
+
+    next_num = max_num + 1
+    return f"{prefix}-{next_num:03d}"
+
+
+def execute_next_id(args: argparse.Namespace) -> None:
+    """唯讀查詢下一個可分配的 ID（不建立檔案）。"""
+    doc_type = args.type
+    if doc_type not in DOC_TYPE_CONFIG:
+        print(f"不支援的文件類型: {doc_type}")
+        sys.exit(1)
+
+    project_root = FileLocator.get_project_root()
+    print(_next_id(project_root, doc_type))
+
+
+def _suggest_domain_from_tracking(project_root: Path, doc_id: str) -> str | None:
+    """若 docs/spec/ 只有一個 domain 子目錄，自動選用。"""
+    spec_dir = Path(project_root) / "docs" / "spec"
+    if spec_dir.exists():
+        domains = [d.name for d in spec_dir.iterdir() if d.is_dir()]
+        if len(domains) == 1:
+            return domains[0]
+    return None
 
 
 def _slugify(title: str) -> str:
@@ -46,8 +96,27 @@ def _slugify(title: str) -> str:
 
 
 def _get_templates_dir() -> Path:
-    """取得 templates/ 目錄路徑。"""
-    return Path(__file__).resolve().parent.parent.parent / "templates"
+    """取得 templates/ 目錄路徑（W1-013 修復：不依賴原始碼樹與安裝目錄的相對位置）。
+
+    依序嘗試兩個候選位置，取第一個實際存在者：
+    1. 套件內建（`doc_system/templates/`）：`uv tool install` 後由 pyproject.toml
+       的 force-include 打包進安裝版，為主要路徑
+    2. 原始碼樹（skill 根目錄下 `templates/`）：僅在直接於原始碼樹執行時存在
+       （目前 doc CLI 僅支援 `uv tool install` 安裝後使用，此為防禦性 fallback）
+
+    舊實作以 `__file__` 上溯固定 3 層推算路徑，該假設僅在原始碼樹成立；
+    安裝後 `doc_system` 落在 site-packages/ 下，同樣的相對層數指向不存在的路徑，
+    導致 doc create 全數類型皆 FileNotFoundError（W1-013 根因）。
+    """
+    package_bundled = Path(__file__).resolve().parent.parent / "templates"
+    if package_bundled.is_dir():
+        return package_bundled
+
+    source_tree = Path(__file__).resolve().parent.parent.parent / "templates"
+    if source_tree.is_dir():
+        return source_tree
+
+    return package_bundled
 
 
 def _read_template(template_name: str) -> str:
@@ -91,34 +160,37 @@ def _add_tracking_entry(tracking_file: str, prop_id: str, title: str) -> None:
     """在 proposals-tracking.yaml 新增 proposal entry。"""
     path = Path(tracking_file)
     if not path.is_file():
-        # 建立基礎結構
+        # 建立基礎結構（對齊真實 proposals-tracking.yaml schema：僅 proposals/usecases/specs 三區塊）
         data = {
-            "version": "1.0",
-            "last_updated": date.today().isoformat(),
-            "proposals": {},
+            "proposals": [],
+            "usecases": [],
+            "specs": [],
         }
     else:
         raw = path.read_text(encoding="utf-8")
         data = yaml.safe_load(raw) or {}
 
-    proposals = data.setdefault("proposals", {})
-    if prop_id in proposals:
+    proposals = data.setdefault("proposals", [])
+    if any(entry.get("id") == prop_id for entry in proposals if isinstance(entry, dict)):
         # 已存在，不重複新增
         return
 
-    proposals[prop_id] = {
-        "title": title,
-        "status": "draft",
-        "proposed": date.today().isoformat(),
-        "confirmed": None,
-        "target_version": None,
-        "source": "",
-        "spec_refs": [],
-        "usecase_refs": [],
-        "ticket_refs": [],
-        "checklist": [],
-    }
-    data["last_updated"] = date.today().isoformat()
+    confirm_field = PROPOSALS_TRACKING_SCHEMA["confirm_date_field"]
+    proposals.append(
+        {
+            "id": prop_id,
+            "title": title,
+            "status": "draft",
+            "proposed": date.today().isoformat(),
+            confirm_field: None,
+            "target_version": None,
+            "source": "",
+            "spec_refs": [],
+            "usecase_refs": [],
+            "ticket_refs": [],
+            "checklist": [],
+        }
+    )
 
     path.write_text(
         yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
@@ -129,7 +201,7 @@ def _add_tracking_entry(tracking_file: str, prop_id: str, title: str) -> None:
 def execute(args: argparse.Namespace) -> None:
     """建立新文件：從模板複製並替換 ID。"""
     doc_type = args.type
-    doc_id = args.id
+    doc_id = getattr(args, "id", None)
     title = getattr(args, "title", None) or ""
     domain = getattr(args, "domain", None)
 
@@ -138,12 +210,28 @@ def execute(args: argparse.Namespace) -> None:
         print(f"不支援的文件類型: {doc_type}")
         sys.exit(1)
 
-    # spec 需要 --domain
-    if config["requires_domain"] and not domain:
-        print("spec 類型必須指定 --domain 參數")
-        sys.exit(1)
-
     project_root = FileLocator.get_project_root()
+
+    # ID 自動分配
+    if not doc_id:
+        doc_id = _next_id(project_root, doc_type)
+        print(f"[自動分配] ID: {doc_id}")
+
+    # spec domain 推導
+    if config["requires_domain"] and not domain:
+        suggested = _suggest_domain_from_tracking(project_root, doc_id)
+        if suggested:
+            domain = suggested
+            print(f"[建議] domain: {domain}")
+        else:
+            spec_dir = Path(project_root) / "docs" / "spec"
+            if spec_dir.exists():
+                domains = sorted(d.name for d in spec_dir.iterdir() if d.is_dir())
+                if domains:
+                    print(f"[提示] 可用 domain: {', '.join(domains)}")
+            print("spec 類型必須指定 --domain 參數")
+            sys.exit(1)
+
     locator = FileLocator(project_root)
 
     # 檢查 ID 是否已存在

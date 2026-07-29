@@ -91,6 +91,7 @@ from ticket_system.lib.ui_constants import (
 from ticket_system.lib.ticket_ops import (
     load_and_validate_ticket,
 )
+from ticket_system.lib.version import check_version_all_completed
 
 # 狀態值映射
 STATUS_MAP = {
@@ -132,6 +133,30 @@ def _check_yaml_error(ticket: Optional[Dict[str, Any]], ticket_id: str) -> bool:
         ))
         return True
     return False
+
+
+def _print_all_completed_warning(current_version: str) -> None:
+    """
+    若當前版本所有 ticket 皆為終結狀態，印出 warning。
+
+    Args:
+        current_version: 版本號（無 v 前綴，如 "1.3.0"）
+    """
+    all_completed, next_version = check_version_all_completed(current_version)
+    if not all_completed:
+        return
+
+    print()
+    print(format_msg(
+        TrackQueryMessages.VERSION_ALL_COMPLETED_WARNING,
+        version=current_version,
+    ))
+    if next_version:
+        print(format_msg(
+            TrackQueryMessages.VERSION_ALL_COMPLETED_NEXT,
+            next_version=next_version,
+        ))
+    print(TrackQueryMessages.VERSION_ALL_COMPLETED_HINT)
 
 
 def _print_cross_version_warning(current_version: str) -> None:
@@ -272,6 +297,7 @@ def execute_summary(args: argparse.Namespace, version: str) -> int:
     if formatted:
         print(formatted)
 
+    _print_all_completed_warning(version)
     _print_cross_version_warning(version)
 
     return 0
@@ -692,6 +718,7 @@ def _execute_list_all_versions(args: argparse.Namespace) -> int:
     # 聚合所有版本的篩選結果，統一排序 + 限制
     aggregated = []
     version_map = {}  # id -> ver_clean，輸出時依版本分組
+    full_filtered_by_version = {}  # ver_clean -> 篩選後全量清單（截斷前），供 total_stats 使用
     for ver in sorted(active_versions):
         ver_clean = ver.lstrip("v")
         all_tickets = list_tickets(ver_clean)
@@ -704,6 +731,7 @@ def _execute_list_all_versions(args: argparse.Namespace) -> int:
         if wave_value is not None:
             filtered = [t for t in filtered if t.get("wave") == wave_value]
 
+        full_filtered_by_version[ver_clean] = filtered
         for t in filtered:
             aggregated.append(t)
             version_map[t.get("id") or t.get("ticket_id") or id(t)] = ver_clean
@@ -717,7 +745,8 @@ def _execute_list_all_versions(args: argparse.Namespace) -> int:
         per_ver = [t for t in limited if version_map.get(t.get("id") or t.get("ticket_id") or id(t)) == ver_clean]
         if per_ver:
             found_any = True
-            _output_tickets(per_ver, ver_clean, output_format)
+            full_stats = get_ticket_stats(full_filtered_by_version.get(ver_clean, per_ver))
+            _output_tickets(per_ver, ver_clean, output_format, total_stats=full_stats)
 
     if not found_any:
         print(format_warning(WarningMessages.NO_TICKETS))
@@ -763,7 +792,8 @@ def _execute_list_cross_version(
     if limited:
         output_format = getattr(args, "format", "table")
         display_version = ", ".join(matched_versions) if matched_versions else default_version
-        return _output_tickets(limited, display_version, output_format)
+        full_stats = get_ticket_stats(sorted_tickets)
+        return _output_tickets(limited, display_version, output_format, total_stats=full_stats)
 
     if effective_top == 0:
         # --top 0 視為合法空集合，不報 NO_TICKETS
@@ -809,9 +839,10 @@ def _execute_list_single_version(
         print(format_warning(WarningMessages.NO_TICKETS))
         return 0
 
-    # 根據格式輸出
+    # 根據格式輸出（total_stats 用截斷前的 sorted_tickets 計算，避免截斷後低估總數）
     output_format = getattr(args, "format", "table")
-    result = _output_tickets(limited_tickets, version, output_format)
+    full_stats = get_ticket_stats(sorted_tickets)
+    result = _output_tickets(limited_tickets, version, output_format, total_stats=full_stats)
     _print_cross_version_warning(version)
     return result
 
@@ -840,14 +871,18 @@ def _build_status_filters(args: argparse.Namespace) -> set:
     return status_filters
 
 
-def _output_tickets(tickets: list, version: str, output_format: str) -> int:
+def _output_tickets(
+    tickets: list, version: str, output_format: str, total_stats: Optional[Dict[str, int]] = None
+) -> int:
     """
     以指定格式輸出 Ticket 列表。
 
     Args:
-        tickets: 篩選後的 Ticket 列表
+        tickets: 篩選後的 Ticket 列表（可能已被 --top 截斷）
         version: 版本號
         output_format: 輸出格式（table/ids/yaml）
+        total_stats: 截斷前的全量統計（僅 table 格式使用；None 時 fallback 為
+            從 tickets 自行計算，向後相容）
 
     Returns:
         int: 退出碼
@@ -858,7 +893,7 @@ def _output_tickets(tickets: list, version: str, output_format: str) -> int:
         return _output_yaml(tickets)
     else:
         # table 格式（預設）
-        return _output_table(tickets, version)
+        return _output_table(tickets, version, total_stats=total_stats)
 
 
 def _output_ids(tickets: list) -> int:
@@ -897,10 +932,29 @@ def _output_yaml(tickets: list) -> int:
     return 0
 
 
-def _output_table(tickets: list, version: str) -> int:
-    """以表格格式輸出 Ticket 列表（預設）"""
-    stats = get_ticket_stats(tickets)
-    print(format_msg(TrackQueryMessages.LIST_TITLE, version=version, completed=stats["completed"], total=stats["total"]))
+def _output_table(tickets: list, version: str, total_stats: Optional[Dict[str, int]] = None) -> int:
+    """
+    以表格格式輸出 Ticket 列表（預設）。
+
+    Args:
+        tickets: 顯示用的 Ticket 列表（可能已被 --top 截斷）
+        version: 版本號
+        total_stats: 截斷前的全量統計。提供時標題統計行以此為準（避免截斷後
+            清單低估總數，0.38.0-W1-003 根因修復）；未提供時 fallback 為從
+            tickets 自行計算（向後相容既有呼叫端）。
+    """
+    stats = total_stats if total_stats is not None else get_ticket_stats(tickets)
+    is_truncated = total_stats is not None and len(tickets) < stats["total"]
+    if is_truncated:
+        print(format_msg(
+            TrackQueryMessages.LIST_TITLE_TRUNCATED,
+            version=version,
+            completed=stats["completed"],
+            total=stats["total"],
+            shown=len(tickets),
+        ))
+    else:
+        print(format_msg(TrackQueryMessages.LIST_TITLE, version=version, completed=stats["completed"], total=stats["total"]))
     print(f"   {format_ticket_stats(stats)}")
     print(SEPARATOR_CHAR * SEPARATOR_WIDTH)
 

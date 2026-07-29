@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 import json
+import subprocess
 import yaml
 import stat
 
@@ -409,11 +410,18 @@ def check_tech_stack_section(project_root: Path) -> FrameworkFileInfo:
             path=None,
         )
 
-    # 讀取檔案內容並搜尋技術選型 section
+    # 讀取檔案內容並搜尋技術選型相關 section
     try:
         content = claude_md.read_text(encoding="utf-8")
-        # 搜尋技術選型相關標題
-        has_tech_section = "技術選型" in content
+        tech_keywords = [
+            "技術選型",
+            "語言特定規範",
+            "專案身份",
+            "開發語言",
+            "專案類型",
+            "技術架構",
+        ]
+        has_tech_section = any(kw in content for kw in tech_keywords)
         return FrameworkFileInfo(
             name="CLAUDE.md 技術選型",
             exists=has_tech_section,
@@ -617,6 +625,36 @@ def _has_gitignore_rule(content: str, pattern: str) -> bool:
     return False
 
 
+def _is_path_ignored_by_git(project_root: Path, relative_path: str) -> Optional[bool]:
+    """用 git check-ignore 判定路徑是否被 .gitignore 忽略（gitignore 語意正確）.
+
+    相較 _has_gitignore_rule 的字面比對，git check-ignore 由 git 引擎判定，正確處理
+    萬用字元（**）、根錨定（/）、具體檔名等所有 gitignore 語法，消除字面匹配的 false positive。
+
+    Args:
+        project_root: 專案根目錄（需為 git repo 才能判定）。
+        relative_path: 相對 project_root 的代表路徑（pattern matching 不需實際存在）。
+
+    Returns:
+        True: 被忽略；False: 未被忽略；None: 無法判定（git 不可用 / 非 git repo），
+        呼叫端應 fallback 至字面匹配。
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project_root), "check-ignore", "-q", relative_path],
+            capture_output=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        # git 不在 PATH / 逾時 / 其他 OS 錯誤 → 無法判定，交由呼叫端 fallback
+        return None
+    if result.returncode == 0:
+        return True  # 被忽略
+    if result.returncode == 1:
+        return False  # 未被忽略
+    return None  # 128（非 git repo）或其他錯誤 → fallback
+
+
 def _create_missing_gitignore_result(exists: bool = False) -> GitignoreCheckInfo:
     """建立 .gitignore 缺失或無法讀取的結果.
 
@@ -633,6 +671,7 @@ def _create_missing_gitignore_result(exists: bool = False) -> GitignoreCheckInfo
         has_worktrees_rule=False,
         has_tool_results_rule=False,
         has_handoff_rule=False,
+        has_dispatch_active_rule=False,
         has_pycache_rule=False,
         all_required_complete=False,
         missing_rules=[
@@ -642,6 +681,7 @@ def _create_missing_gitignore_result(exists: bool = False) -> GitignoreCheckInfo
             ".claude/worktrees/",
             ".claude/tool-results/",
             ".claude/handoff/",
+            ".claude/dispatch-active*",
             "__pycache__/",
         ],
     )
@@ -669,14 +709,23 @@ def check_gitignore_completeness(project_root: Path) -> GitignoreCheckInfo:
     except (OSError, UnicodeDecodeError):
         return _create_missing_gitignore_result(exists=True)
 
-    # 檢查每個必須規則
-    has_coverage = _has_gitignore_rule(content, "coverage") or _has_gitignore_rule(content, "htmlcov")
-    has_hook_logs = _has_gitignore_rule(content, ".claude/hook-logs")
-    has_worktrees = _has_gitignore_rule(content, ".claude/worktrees")
-    has_tool_results = _has_gitignore_rule(content, ".claude/tool-results")
-    has_handoff = _has_gitignore_rule(content, ".claude/handoff")
-    has_dispatch_active = _has_gitignore_rule(content, ".claude/dispatch-active")
-    has_pycache = _has_gitignore_rule(content, "__pycache__")
+    # 檢查每個必須規則：優先用 git check-ignore 語意判定（正確處理萬用字元 /
+    # 根錨定 / 具體檔名等所有 gitignore 語法），無 git / 非 git repo 時 fallback 字面匹配
+    def _rule_satisfied(probe_path: str, *patterns: str) -> bool:
+        ignored = _is_path_ignored_by_git(project_root, probe_path)
+        if ignored is not None:
+            return ignored
+        return any(_has_gitignore_rule(content, p) for p in patterns)
+
+    has_coverage = _rule_satisfied("coverage/_probe", "coverage") or _rule_satisfied(
+        "htmlcov/_probe", "htmlcov"
+    )
+    has_hook_logs = _rule_satisfied(".claude/hook-logs/_probe", ".claude/hook-logs")
+    has_worktrees = _rule_satisfied(".claude/worktrees/_probe", ".claude/worktrees")
+    has_tool_results = _rule_satisfied(".claude/tool-results/_probe", ".claude/tool-results")
+    has_handoff = _rule_satisfied(".claude/handoff/_probe", ".claude/handoff")
+    has_dispatch_active = _rule_satisfied(".claude/dispatch-active.json", ".claude/dispatch-active")
+    has_pycache = _rule_satisfied("__pycache__/_probe", "__pycache__")
 
     # 彙整缺失的規則
     missing = []
@@ -691,7 +740,7 @@ def check_gitignore_completeness(project_root: Path) -> GitignoreCheckInfo:
     if not has_handoff:
         missing.append(".claude/handoff/")
     if not has_dispatch_active:
-        missing.append(".claude/dispatch-active.json")
+        missing.append(".claude/dispatch-active*")
     if not has_pycache:
         missing.append("__pycache__/")
 
@@ -779,13 +828,32 @@ def check_claude_directory_structure(project_root: Path) -> ClaudeDirectoryCheck
     )
 
 
+def _find_hook_config_file(project_root: Path, filename: str,
+                           search_paths: list[str]) -> Path | None:
+    """在多個候選路徑中搜尋 Hook 配置檔.
+
+    Args:
+        project_root: 專案根目錄。
+        filename: 檔案名稱。
+        search_paths: 相對於 project_root 的候選目錄清單。
+
+    Returns:
+        找到的檔案 Path，或 None。
+    """
+    for rel_dir in search_paths:
+        candidate = project_root / rel_dir / filename
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def check_hook_configurations(project_root: Path) -> HookConfigurationCheckInfo:
     """檢查 Hook 配置檔完整性.
 
-    驗證 .claude/config/ 下存在所有必須設定檔：
-    - hook-language-classification.yaml
-    - hook-exclude-list.json
-    - settings.json
+    在多個候選路徑中搜尋必須設定檔：
+    - hook-language-classification.yaml: .claude/config/ → .claude/hooks/
+    - hook-exclude-list.json: .claude/config/ → .claude/hooks/
+    - settings.json: .claude/config/ → .claude/
 
     同時驗證 YAML 和 JSON 格式的有效性，並記錄詳細的權限資訊。
 
@@ -796,29 +864,21 @@ def check_hook_configurations(project_root: Path) -> HookConfigurationCheckInfo:
         HookConfigurationCheckInfo: Hook 配置檔檢查結果。
     """
     config_dir = project_root / ".claude" / "config"
+    config_dir_exists = config_dir.exists() and config_dir.is_dir()
 
-    if not config_dir.exists() or not config_dir.is_dir():
-        return HookConfigurationCheckInfo(
-            config_dir_exists=False,
-            has_language_classification_yaml=False,
-            has_exclude_list_json=False,
-            has_settings_json=False,
-            all_required_complete=False,
-            missing_files=[
-                "hook-language-classification.yaml",
-                "hook-exclude-list.json",
-                "settings.json",
-            ],
-        )
+    yaml_file = _find_hook_config_file(
+        project_root, HOOK_CONFIG_YAML,
+        [".claude/config", ".claude/hooks"])
+    json_exclude = _find_hook_config_file(
+        project_root, HOOK_CONFIG_EXCLUDE_JSON,
+        [".claude/config", ".claude/hooks"])
+    json_settings = _find_hook_config_file(
+        project_root, HOOK_CONFIG_SETTINGS_JSON,
+        [".claude/config", ".claude"])
 
-    # 檢查檔案存在
-    yaml_file = config_dir / HOOK_CONFIG_YAML
-    json_exclude = config_dir / HOOK_CONFIG_EXCLUDE_JSON
-    json_settings = config_dir / HOOK_CONFIG_SETTINGS_JSON
-
-    has_yaml = yaml_file.exists()
-    has_exclude = json_exclude.exists()
-    has_settings = json_settings.exists()
+    has_yaml = yaml_file is not None
+    has_exclude = json_exclude is not None
+    has_settings = json_settings is not None
 
     missing_files = []
     if not has_yaml:
@@ -863,7 +923,7 @@ def check_hook_configurations(project_root: Path) -> HookConfigurationCheckInfo:
     all_complete = len(missing_files) == 0 and yaml_valid and json_valid
 
     return HookConfigurationCheckInfo(
-        config_dir_exists=True,
+        config_dir_exists=config_dir_exists,
         has_language_classification_yaml=has_yaml,
         has_exclude_list_json=has_exclude,
         has_settings_json=has_settings,

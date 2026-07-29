@@ -43,18 +43,25 @@
 
 **Consequence**：若對 legacy 碰撞執行重編，會觸發跨檔引用 churn 且各專案需同步重編才能保持一致，違反「凍結不改寫既有 flat 號」的向後相容前提。
 
-**Action**：以下 6 組（`process-compliance` category）已知重號，引用時須以 slug 區辨語意，**禁止重編**：
+**Action**：以下 7 組（跨 category：`process-compliance` 5 組、`architecture` 1 組、`implementation` 1 組）已知重號，引用時須以 slug 區辨語意，**禁止重編**：
 
 | Flat 號 | 教訓 A（slug） | 教訓 B（slug） |
 |---------|---------------|---------------|
+| ARCH-010 | module-assembly-omission | overengineered-state-management |
+| IMP-049 | hook-error-display-is-cli-bug | undefined-constants-in-hook-source |
 | PC-010 | pm-skipped-checkpoint-after-ticket-complete | task-tracking-in-memory |
-| PC-018 | parallel-agents-overlapping-followup-tickets | pm-resume-incomplete-5w1h-dispatch |
 | PC-019 | design-decision-memory-only | worktree-merge-state-loss |
 | PC-020 | fix-at-consumer-instead-of-producer | plan-execution-dispatch-mismatch |
 | PC-030 | agent-slash-command-unreachable | phase4-unused-code-incomplete-grep |
 | PC-105 | feature-implemented-without-doc-integration | pm-cli-syntax-autopilot |
 
-> **PC-165 例外（已由去重解決，非凍結）**：PC-165 原亦為重號（auq-dispatch + false-positive-fix-chain），但 auq-dispatch 已本地重編為 `PC-171`（含編號溯源註記），上游遺留的 `PC-165-auq-dispatch-*` 孤兒檔已刪除。現 `PC-165` 唯一指涉 false-positive-fix-chain。
+> **PC-018 已移除（0.2.1-W3-111 查證）**：舊版登記表列有 PC-018，但 `.claude/error-patterns/` 實測僅有 1 個 `PC-018-*.md` 檔案，非重號，已從登記表移除。
+
+> **PC-165 狀態為專案相對事實，非全域已完成聲明（0.2.1-W3-111 查證）**：舊版文字以完成式「auq-dispatch 已本地重編為 `PC-171`……上游遺留孤兒檔已刪除」陳述 PC-165 重號已解決。此為單一來源專案的歷史事件，經 full-overlay sync 帶入其他專案後即失真——sync 只複製文件敘述本身，不複製「已完成」的執行結果（重編後的檔案），讀者因此無從分辨陳述是否適用自己所在的專案。
+>
+> 本專案（flutter_balance）查證：`.claude/error-patterns/process-compliance/` 目前僅有單一 `PC-165-false-positive-fix-chain.md`，PC-165 在本專案並非重號。`git log --all --diff-filter=A -- '*PC-171*'` 與本檔案自身的 `git log --follow` 歷史，皆確認本專案自初次匯入（commit `f375ae6`）起從未出現任何 `PC-171-*` 或 `PC-165-auq-dispatch-*` 檔案。框架共用 `CHANGELOG.md`（跨專案同步內容）第 1716 行記有「新增 PC-171（上游 PC-165 重編號避免本地撞號）」，顯示此重編動作曾在框架歷史某處發生，但對應檔案從未隨 sync 抵達本專案（編號序列亦見缺口：`PC-170` 之後直接是 `PC-172`）。
+>
+> 結論：對本專案而言此陳述屬「從未執行」，且因本專案無 PC-165 碰撞可修，不需建執行 ticket。已以 `add-spawn-request` 記錄此編號斷層供 PM 評估是否影響其他同步專案。
 
 ---
 
@@ -72,6 +79,17 @@
 **Consequence**：若無回流通道，同一通用教訓會以多個前綴版本永久碎片化於各專案命名空間，dedup 候選清單隨專案數無限增長，知識庫退化為「N 份重複教訓」而非「一份 canonical 集」。
 
 **Action**：當某 staging 教訓被識別為通用且穩定，可**升格**——於凍結 base 賦予一個 canonical alias（或在共享 repo 將其視為 canonical），前綴版標註指向 canonical。升格屬低頻、刻意動作，不是每筆 staging 都需升格。
+
+### 升格時可建框架 issue 並 link（issue 作升格產出錨點）
+
+升格時可在框架 repo（`tarrragon/claude`）建立一個 framework issue 作 canonical 錨點，並以 `framework-issue link` 把該 issue ref stamp 回 error-pattern：
+
+1. 用 `framework-issue list --search "<關鍵字>"` 查既有 canonical issue 避免重複；無則 `framework-issue create` 建立。
+2. 用 `framework-issue link <error-pattern-id> <issue-ref>` 把 `| canonical_issue | <issue-ref> |` 寫入該 error-pattern 的「## 分類資訊」表格。
+
+**Why（issue 是升格產出，非捕獲前置）**：framework issue 在此作升格產出的 canonical 錨點（軸 B link + provenance），而非新增 error-pattern 的前置條件。捕獲新教訓時零摩擦不需任何 issue；只有在「升格為 canonical」這個低頻刻意動作時才介入 issue，避免 issue-first 強制前置殺死無摩擦捕獲（對齊 PC-V1-009）。canonical_issue 為可選欄，未升格的 staging pattern 不填。
+
+詳見 `.claude/skills/framework-issue/SKILL.md`。
 
 ---
 
@@ -117,8 +135,8 @@ flat base 碰撞已存在於所有同步專案（發散狀態，63~309 檔）。
 **Action（各專案 pull 框架更新後依序執行）**：
 
 1. 跑 `.claude/scripts/detect_pc_collision.py` 取得本專案碰撞清單
-2. **共同 base 碰撞（8 組 + ARCH-021）**：凍結保留，不重編（見上「已知 legacy intra-dir 重號」），引用以 slug 區辨
-3. **本專案獨有未處理碰撞**：套用既定 canonical 重編（重編 ID 對齊上游 canonical：auq-dispatch→PC-171、defensive-rule→PC-181、ui-test-green→PC-182；刪上游遺留孤兒檔），grep 更新引用
+2. **共同 base 碰撞（見上「已知 legacy intra-dir 重號」表，現 7 組）**：凍結保留，不重編，引用以 slug 區辨
+3. **本專案獨有未處理碰撞**：依 detect 結果逐一決定新編號並套用 canonical 重編，刪上游遺留孤兒檔，grep 更新引用。**不可直接沿用本文件過去列過的範例 ID**——舊版曾列 auq-dispatch→PC-171、defensive-rule→PC-181、ui-test-green→PC-182，經 0.2.1-W3-111 查證，三者皆非 flutter_balance 實際碰撞，`PC-171`/`PC-181`/`PC-182` 三檔本專案自匯入起從未存在（見上方 PC-165 查證註記）。每個專案的獨有碰撞集合不同，須以自身 detect 輸出為準，不得沿用其他專案的歷史範例
 4. 重編後再跑 detect 確認獨有碰撞歸零（共同 base 仍在屬正常）
 
 **部署序列 gate**：
@@ -149,5 +167,5 @@ flat base 碰撞已存在於所有同步專案（發散狀態，63~309 檔）。
 
 ---
 
-**Last Updated**: 2026-06-09
-**Version**: 1.0.0
+**Last Updated**: 2026-07-28
+**Version**: 1.1.0 — 校正兩組與檔案系統事實不符的陳述：(1) 碰撞登記表移除已非碰撞的 PC-018、補列 ARCH-010 與 IMP-049、範圍宣告改為跨 category（原 6 組僅 process-compliance→現 7 組跨 3 category）；(2) PC-165「已本地重編為 PC-171」與部署序列步驟 3 範例 ID（auq-dispatch→PC-171、defensive-rule→PC-181、ui-test-green→PC-182）改為查證後的專案相對陳述——三檔本專案自匯入起從未存在，且 PC-165 在本專案本非碰撞（0.2.1-W3-111，承接 0.2.1-W3-110 查證）。

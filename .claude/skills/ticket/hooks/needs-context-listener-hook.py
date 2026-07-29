@@ -29,9 +29,10 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hooks"))
 
-from hook_utils import (
+from lib import (
     setup_hook_logging,
     read_json_from_stdin,
     extract_tool_input,

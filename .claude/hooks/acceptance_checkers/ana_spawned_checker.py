@@ -36,10 +36,13 @@ from typing import Optional, Tuple, List
 
 # 加入 hooks 目錄（acceptance_checkers 的上層）
 _hooks_dir = Path(__file__).parent.parent
+_claude_dir = _hooks_dir.parent
+if str(_claude_dir) not in sys.path:
+    sys.path.insert(0, str(_claude_dir))
 if str(_hooks_dir) not in sys.path:
     sys.path.insert(0, str(_hooks_dir))
 
-from hook_utils import find_ticket_file, parse_ticket_frontmatter
+from lib import find_ticket_file, parse_ticket_frontmatter
 from lib.hook_messages import GateMessages, format_message
 from acceptance_checkers.ticket_parser import extract_children_from_frontmatter
 # 單一真實來源：terminal 狀態定義由 children_checker 集中管理（W12-004）

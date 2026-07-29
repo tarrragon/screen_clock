@@ -38,8 +38,9 @@ from typing import Dict, List, Optional, Tuple
 
 # 加入 hooks/ 到 sys.path 以便 import hook_utils package
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hook_utils import (  # noqa: E402
+from lib import (  # noqa: E402
     setup_hook_logging,
     run_hook_safely,
     read_json_from_stdin,
@@ -217,11 +218,13 @@ def build_regex_table() -> List[PhraseRule]:
     flags = re.IGNORECASE | re.MULTILINE
     return [
         # M1: Phase X 再決定（遞迴推給未來 phase）
+        # 「評估」單獨要求前接「再|在」才觸發（W2-017：「Phase 4 重構評估」是
+        # 標準章節名非延後話術，但「Phase 5 再評估」仍需攔截）。
         PhraseRule(
             id="M1",
             level="BLOCK",
             pattern=re.compile(
-                r"Phase\s*[0-9]+[^\n]{0,30}?(?:再|在)?(?:決定|決斷|判斷|評估)",
+                r"Phase\s*[0-9]+[^\n]{0,30}?(?:(?:再|在)?(?:決定|決斷|判斷)|(?:再|在)評估)",
                 flags,
             ),
             rationale="遞迴推給未來 phase，PC-093 核心反模式",

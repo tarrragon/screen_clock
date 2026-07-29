@@ -1,4 +1,4 @@
-# 混合測試策略方法論（30 秒核心）
+# 混合測試策略方法論
 
 > **本檔已瘦身（W8-018.2）**：通用測試策略選擇（測試金字塔、測試類型選擇、邊界條件、技術性必檢項目）已在 `/tdd` skill 的 `.claude/skills/tdd/references/phase2-test-design.md`。本檔僅保留本方法論的 distinct 核心：依 Clean Architecture 層級選測試方法的決策樹。需要 GWT 設計、場景覆蓋、測試案例格式時直接讀 phase2-test-design.md。
 
@@ -25,6 +25,7 @@
 | 需求 | 讀這裡 |
 |------|--------|
 | 測試金字塔、測試類型選擇、GWT 設計、場景覆蓋、邊界條件識別、技術性必檢項目 | `.claude/skills/tdd/references/phase2-test-design.md` |
+| 五層分工完整版（判斷流程、覆蓋率語意、monitor 專案對應） | `.claude/skills/tdd/references/layered-test-strategy.md` |
 | BDD Given-When-Then 格式與行為鏈、前置條件驗證 | `.claude/methodologies/bdd-testing-methodology.md` |
 | Sociable vs Solitary 測試邊界選擇 | `.claude/methodologies/behavior-first-tdd-methodology.md` |
 

@@ -10,20 +10,20 @@ from pathlib import Path
 # 添加父目錄到 Python 路徑
 hooks_path = Path(__file__).parent.parent
 sys.path.insert(0, str(hooks_path))
-sys.path.insert(0, str(hooks_path / "lib"))
+sys.path.insert(0, str(hooks_path.parent))
 
-from ticket_quality.detectors import (
+from lib.ticket_quality.detectors import (
     check_god_ticket_automated,
     check_incomplete_ticket_automated,
     check_ambiguous_responsibility_automated
 )
-from ticket_quality.extractors import (
+from lib.ticket_quality.extractors import (
     extract_file_paths,
     extract_section,
     has_section,
     extract_acceptance_criteria
 )
-from ticket_quality.analyzers import determine_layer
+from lib.ticket_quality.analyzers import determine_layer
 
 
 def test_empty_ticket():
@@ -251,7 +251,7 @@ def test_c3_layer_0_infrastructure():
 - [ ] 環境 配置驗證完成
 
 ## 修改檔案
-.claude/hooks/lib/ticket_quality/detectors.py
+.claude/lib/ticket_quality/detectors.py
 """
 
     result = check_ambiguous_responsibility_automated(infrastructure_ticket)
@@ -268,7 +268,7 @@ def test_c3_layer_0_infrastructure():
 - [ ] 測試通過
 
 ## 修改檔案
-.claude/hooks/lib/ticket_quality/detectors.py
+.claude/lib/ticket_quality/detectors.py
 """
 
     result = check_ambiguous_responsibility_automated(infrastructure_ticket_without_keywords)
@@ -298,7 +298,7 @@ def test_c3_layer_0_infrastructure():
 - [ ] {sample_text}
 
 ## 修改檔案
-.claude/hooks/lib/ticket_quality/detectors.py
+.claude/lib/ticket_quality/detectors.py
 """
         result = check_ambiguous_responsibility_automated(ticket)
         assert result["details"]["acceptance_aligned"], f"C3: 應識別關鍵詞「{keyword}」在驗收條件中（{idx+1}/11）"

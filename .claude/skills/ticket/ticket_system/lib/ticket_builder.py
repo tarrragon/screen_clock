@@ -22,7 +22,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
-from ticket_system.lib.constants import STATUS_PENDING, DEFAULT_UNDEFINED_VALUE
+from ticket_system.lib.constants import (
+    CANONICAL_BODY_SECTIONS,
+    DEFAULT_UNDEFINED_VALUE,
+    PROTOCOL_VERSION_CURRENT,
+    STATUS_PENDING,
+)
 from ticket_system.lib.paths import GIT_TOPLEVEL_TIMEOUT, get_project_root
 from ticket_system.lib.ticket_loader import (
     get_tickets_dir,
@@ -158,7 +163,7 @@ class TicketConfig(TypedDict, total=False):
     version: str                # 版本號（如 0.31.0）
     wave: int                   # Wave 編號（如 5）
     title: str                  # 標題（「動詞 + 目標」格式）
-    ticket_type: str            # 類型（IMP/TST/ADJ/RES/ANA/INV/DOC）
+    ticket_type: str            # 類型（正典 IMP/ADJ/ANA/DOC；TST/RES/INV 為歷史化石）
     priority: str               # 優先級（P0/P1/P2/P3）
 
     # 5W1H 資訊（7 個欄位）
@@ -192,7 +197,7 @@ def get_default_acceptance_criteria(ticket_type: str) -> List[str]:
     """取得預設驗收條件（依 Ticket 類型）。
 
     Args:
-        ticket_type: Ticket 類型（IMP, TST, ADJ, RES, ANA, INV, DOC）
+        ticket_type: Ticket 類型（正典 IMP, ADJ, ANA, DOC；TST/RES/INV 化石鍵保留供讀取容忍）
 
     Returns:
         預設驗收條件清單
@@ -740,6 +745,7 @@ def create_ticket_frontmatter(config: TicketConfig) -> Dict[str, Any]:
         "completed_at": None,
         "created": datetime.now().strftime("%Y-%m-%d"),
         "updated": datetime.now().strftime("%Y-%m-%d"),
+        "protocol_version": PROTOCOL_VERSION_CURRENT,
     }
 
 
@@ -771,43 +777,84 @@ def _ana_reproduction_section(ticket_type: str) -> str:
 """
 
 
+_SCHEMA_NOTES = {
+    "ANA": {
+        "Problem Analysis": "必填",
+        "Solution": "必填",
+        "Test Results": "選填（ANA 若有實驗輸出才填；無實驗可留 placeholder）",
+        "Completion Info": "必填",
+    },
+    "IMP": {
+        "Problem Analysis": "選填（小型 IMP 可留 placeholder；大型 IMP 建議填寫）",
+        "Solution": "選填",
+        "Test Results": "必填（至少記錄執行指令與通過數或 commit SHA）",
+        "Completion Info": "必填",
+    },
+    "DOC": {
+        "Problem Analysis": "選填（若 DOC 起因於缺陷或盤點結論可填）",
+        "Solution": "免填（DOC 類型以變更摘要取代）",
+        "Test Results": "免填（DOC 類型無需測試）",
+        "Completion Info": "必填（需附變更摘要：哪些文件/章節更新）",
+    },
+}
+
+
+def get_schema_note(ticket_type: str, section: str) -> str:
+    """回傳指定 type/section 的 schema note 文字。
+
+    用於 complete 阻擋訊息附加內容引導，以及 _schema_marker HTML 註解。
+    未知 type 或未定義章節回傳空字串（向後相容）。
+    """
+    return _SCHEMA_NOTES.get(ticket_type, {}).get(section, "")
+
+
 def _schema_marker(ticket_type: str, section: str) -> str:
     """回傳 Schema 標註註解（type-aware body schema）。
 
     依 .claude/pm-rules/ticket-body-schema.md 映射章節填寫要求。未知 type 或
     未定義章節回傳空字串（向後相容）。
-
-    Args:
-        ticket_type: Ticket 類型（ANA/IMP/DOC 等）
-        section: 章節名稱（Problem Analysis/Solution/Test Results/Completion Info）
-
-    Returns:
-        HTML 註解標註字串（含前綴換行）或空字串
     """
-    schema = {
-        "ANA": {
-            "Problem Analysis": "必填",
-            "Solution": "必填",
-            "Test Results": "選填（ANA 若有實驗輸出才填；無實驗可留 placeholder）",
-            "Completion Info": "必填",
-        },
-        "IMP": {
-            "Problem Analysis": "選填（小型 IMP 可留 placeholder；大型 IMP 建議填寫）",
-            "Solution": "選填",
-            "Test Results": "必填（至少記錄執行指令與通過數或 commit SHA）",
-            "Completion Info": "必填",
-        },
-        "DOC": {
-            "Problem Analysis": "選填（若 DOC 起因於缺陷或盤點結論可填）",
-            "Solution": "免填（DOC 類型以變更摘要取代）",
-            "Test Results": "免填（DOC 類型無需測試）",
-            "Completion Info": "必填（需附變更摘要：哪些文件/章節更新）",
-        },
-    }
-    note = schema.get(ticket_type, {}).get(section)
+    note = get_schema_note(ticket_type, section)
     if not note:
         return ""
     return f"\n<!-- Schema[{ticket_type}/{section}]: {note}（.claude/pm-rules/ticket-body-schema.md） -->"
+
+
+_TYPE_PLACEHOLDERS = {
+    "ANA": {
+        "pa_root_cause": "（必填：問題發生的直接原因是什麼？影響範圍有多大？）",
+        "pa_impact": "（必填：哪些檔案、模組或功能受影響？已驗證的事實 vs 仍未驗證的假設？）",
+        "pa_error_pattern": "（必填：是否有相關的已知錯誤模式？執行 /error-pattern query 確認）",
+        "solution": "（必填：分析結論、至少 2 個候選方案含利弊、Spawn 規劃表）",
+        "test_results": "（選填：若有實驗輸出才填，無實驗可留 placeholder）",
+        "completion_extra": "",
+    },
+    "IMP": {
+        "pa_root_cause": "（選填：問題如何發現？直接原因是什麼？）",
+        "pa_impact": "（選填：哪些檔案、模組或功能受影響？）",
+        "pa_error_pattern": "（選填：是否有相關的已知錯誤模式？執行 /error-pattern query 確認）",
+        "solution": "（選填：修復方式概述、修改的檔案和驗證方式）",
+        "test_results": "（必填：測試執行指令、通過數/失敗數或 commit SHA）",
+        "completion_extra": "",
+    },
+    "DOC": {
+        "pa_root_cause": "（選填：文件變更的背景和原因）",
+        "pa_impact": "（選填：哪些文件或章節受影響？）",
+        "pa_error_pattern": "（選填：是否有相關的已知錯誤模式？）",
+        "solution": "（免填：DOC 類型以 Completion Info 變更摘要取代）",
+        "test_results": "（免填：DOC 類型無需測試）",
+        "completion_extra": "\n（必填：變更摘要——哪些文件或章節更新、新增或刪除）",
+    },
+}
+
+_DEFAULT_PLACEHOLDERS = {
+    "pa_root_cause": "（待填寫：問題發生的直接原因是什麼？）",
+    "pa_impact": "（待填寫：哪些檔案、模組或功能受影響？）",
+    "pa_error_pattern": "（待填寫：是否有相關的已知錯誤模式？執行 /error-pattern query 確認）",
+    "solution": "<!-- To be filled by executing agent -->",
+    "test_results": "<!-- To be filled by executing agent -->",
+    "completion_extra": "",
+}
 
 
 def create_ticket_body(what: str, who: str, ticket_type: str = "") -> str:
@@ -865,6 +912,7 @@ def create_ticket_body(what: str, who: str, ticket_type: str = "") -> str:
     sol_marker = _schema_marker(ticket_type, "Solution")
     tr_marker = _schema_marker(ticket_type, "Test Results")
     ci_marker = _schema_marker(ticket_type, "Completion Info")
+    ph = _TYPE_PLACEHOLDERS.get(ticket_type, _DEFAULT_PLACEHOLDERS)
     return f"""# Execution Log
 
 ## Task Summary
@@ -877,15 +925,15 @@ def create_ticket_body(what: str, who: str, ticket_type: str = "") -> str:
 
 ### 問題根因
 
-（待填寫：問題發生的直接原因是什麼？）
+{ph["pa_root_cause"]}
 
 ### 影響範圍
 
-（待填寫：哪些檔案、模組或功能受影響？）
+{ph["pa_impact"]}
 
 ### 相關 Error Pattern
 
-（待填寫：是否有相關的已知錯誤模式？執行 /error-pattern query 確認）
+{ph["pa_error_pattern"]}
 
 <!-- 調查過程記錄（可選）：
 搜尋指令：grep -rn "pattern" path/ --include="*.py"
@@ -898,13 +946,13 @@ def create_ticket_body(what: str, who: str, ticket_type: str = "") -> str:
 {_ana_reproduction_section(ticket_type)}
 ## Solution{sol_marker}
 
-<!-- To be filled by executing agent -->
+{ph["solution"]}
 
 ---
 
 ## Test Results{tr_marker}
 
-<!-- To be filled by executing agent -->
+{ph["test_results"]}
 
 ---
 
@@ -924,7 +972,7 @@ def create_ticket_body(what: str, who: str, ticket_type: str = "") -> str:
 
 <!-- 代理人結束時以 YAML 格式回報（W17-010 schema）：
 ```yaml
-status: success        # 枚舉: success|needs_context|blocked|partial_success|failed
+exit_status: success        # 枚舉: success|needs_context|blocked|partial_success|failed
 reason: ""             # 狀態原因說明
 confidence: 1.0        # 0.0-1.0 信心度
 acceptance_met: []     # 已完成的 acceptance index 列表
@@ -937,11 +985,20 @@ estimated_recovery_effort: ""  # 若 needs_context/blocked，預估補料成本
 
 ---
 
+## Spawn Requests
+
+<!-- agent 執行中發現應開新 ticket 的議題時，用
+`ticket track add-spawn-request <id> --what ... --why ... --type ... --priority ...`
+追加結構化請求。PM 處理後標記 status: processed（已建 ticket）或
+dismissed（評估後不建）+ reason。 -->
+
+---
+
 ## Completion Info{ci_marker}
 
 **Completion Time**: (pending)
 **Executing Agent**: {who}
-**Review Status**: pending
+**Review Status**: pending{ph["completion_extra"]}
 """
 
 
@@ -1113,18 +1170,9 @@ def update_source_spawned_tickets(source_ticket_id: str, new_ticket_id: str) -> 
 # 原樣以免誤刪 ANA 重現實驗或 H3 自由結構。
 # ---------------------------------------------------------------------------
 
-# Schema 章節清單（與 .claude/rules/core/agent-definition-standard.md 「章節結構規則」一致）
-SCHEMA_H2_SECTIONS: Tuple[str, ...] = (
-    "Task Summary",
-    "Problem Analysis",
-    "重現實驗結果",
-    "Solution",
-    "Test Results",
-    "Context Bundle",
-    "NeedsContext",
-    "Exit Status",
-    "Completion Info",
-)
+# Schema 章節清單：自 constants.CANONICAL_BODY_SECTIONS 衍生（單一序列來源，
+# 與 append-log 白名單同源），順序即自動補建的物理定位權威
+SCHEMA_H2_SECTIONS: Tuple[str, ...] = CANONICAL_BODY_SECTIONS
 
 # Placeholder pattern：純 frontmatter 模板殘留判定
 # 命中即視為「無實質內容」：

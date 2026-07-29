@@ -18,6 +18,7 @@ Exit codes:
     0 - Missing/unregistered hooks detected (warning, does not block)
 """
 
+import json
 import os
 import stat
 import subprocess
@@ -31,9 +32,10 @@ _CLAUDE_DIR = _HOOKS_DIR.parent
 _PROJECT_INIT_DIR = _CLAUDE_DIR / "skills" / "project-init"
 
 sys.path.insert(0, str(_HOOKS_DIR))
+sys.path.insert(0, str(_CLAUDE_DIR))  # for `from lib import ...`
 sys.path.insert(0, str(_PROJECT_INIT_DIR))
 
-from hook_utils import setup_hook_logging, run_hook_safely
+from lib import setup_hook_logging, run_hook_safely
 from project_init.lib.hook_checker import (
     extract_registered_hooks,
     extract_registered_skill_hooks,
@@ -150,6 +152,90 @@ def find_duplicate_registrations(
         if len(labels) > 1:
             dups.append((event_type, path_str, sorted(labels)))
     return dups
+
+
+def find_local_hook_registrations(
+    settings_local: Optional[dict], project_root: Path
+) -> List[Tuple[str, str]]:
+    """找出 settings.local.json 內的任何 hook 註冊（latent ghost 預防）。
+
+    單一註冊來源原則：hook 註冊一律歸 settings.json，settings.local.json
+    僅放 permissions / env / mcp / outputStyle。即使 local 層的註冊目前
+    合法（檔案存在、未重複），一旦該 hook relocate，local 副本即成幽靈，
+    而 sync 排除 local 檔無法自癒。故在註冊「尚未出事」時即示警，把偵測
+    時機從 relocate 後提前到註冊當下（對應 hook relocate phantom 根因）。
+
+    Returns:
+        [(event_type, command 字串), ...]，settings.local.json 內每個 hook 註冊一筆。
+    """
+    registrations: List[Tuple[str, str]] = []
+    if not settings_local:
+        return registrations
+    for event_type, _matcher, command in extract_registered_commands(settings_local):
+        registrations.append((event_type, command))
+    return registrations
+
+
+def prune_phantom_local_registrations(
+    settings_local_path: Path, project_root: Path, apply: bool = False
+) -> List[Tuple[str, str]]:
+    """移除 settings.local.json 中 command 指向不存在 .py 檔的幽靈 hook 註冊。
+
+    opt-in remediation：只刪「command 解析出的 .py 路徑不存在」的 entry，保留
+    working hook（檔案存在）與 inline 非 .py 指令（無法驗證存在性）。`apply=False`
+    為 dry-run（僅回報、不寫檔）。幽靈刪除後清理空的 matcher group / event 陣列 /
+    `hooks` key，避免殘留空殼。
+
+    僅作用於 settings.local.json：該層為 sync 排除檔，relocate 後無法自癒
+    （ARCH-TUNL-001）；settings.json 的幽靈由 sync overlay 自癒且屬 SSOT，不在此
+    自動改寫範圍。設計依據：1.4.0-W2-013.2 reality-test、PC-148 固化原則。
+
+    Returns:
+        [(event_type, 解析後不存在的路徑字串), ...]，已移除（或 dry-run 將移除）的 entry。
+    """
+    removed: List[Tuple[str, str]] = []
+    if not settings_local_path.is_file():
+        return removed
+    try:
+        data = json.loads(settings_local_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return removed
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict):
+        return removed
+
+    for event_type in list(hooks.keys()):
+        kept_groups = []
+        for group in hooks.get(event_type) or []:
+            if not isinstance(group, dict):
+                kept_groups.append(group)
+                continue
+            kept_inner = []
+            for entry in group.get("hooks", []):
+                command = entry.get("command", "") if isinstance(entry, dict) else ""
+                path = _resolve_command_path(command, project_root)
+                if path is not None and not path.exists():
+                    removed.append((event_type, str(path)))
+                    continue  # 幽靈 entry，丟棄
+                kept_inner.append(entry)
+            if kept_inner:
+                group["hooks"] = kept_inner
+                kept_groups.append(group)
+            # group 內 hooks 全為幽靈 → 整個 group 丟棄
+        if kept_groups:
+            hooks[event_type] = kept_groups
+        else:
+            del hooks[event_type]
+
+    if not hooks:
+        data.pop("hooks", None)
+
+    if apply and removed:
+        settings_local_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
+    return removed
 
 
 def _check_and_fix_permissions(hooks_dir, logger):
@@ -477,6 +563,48 @@ def main():
         advice = "建議: 同一 hook 僅在單一 settings 檔註冊，避免 auto-resume 類副作用重複觸發"
         print(advice)
         logger.warning(advice)
+
+    # latent ghost 預防：settings.local.json 不該註冊 hook（單一註冊來源原則）
+    local_hook_regs = find_local_hook_registrations(settings_local, project_root)
+    if local_hook_regs:
+        header = (
+            "\n[WARNING] settings.local.json 內含 hook 註冊"
+            "（違反單一註冊來源原則，relocate 後會變幽靈）:"
+        )
+        print(header)
+        logger.warning(header)
+        for event_type, command in local_hook_regs:
+            line = f"  - {event_type}: {command}"
+            print(line)
+            logger.warning(line)
+        advice = (
+            "建議: hook 註冊一律移至 settings.json；"
+            "settings.local.json 僅放 permissions / env / mcp / outputStyle"
+        )
+        print(advice)
+        logger.warning(advice)
+
+    # --- opt-in prune（1.4.0-W2-013.4）：--fix 移除 settings.local.json 幽靈 hook ---
+    # 偵測層（上方 WARNING）一律執行；移除動作僅在明示 --fix 時觸發（opt-in，不誤動）。
+    if "--fix" in sys.argv:
+        pruned = prune_phantom_local_registrations(
+            settings_local_path, project_root, apply=True
+        )
+        if pruned:
+            header = (
+                f"\n[HookCheck --fix] 已從 settings.local.json 移除 "
+                f"{len(pruned)} 個幽靈 hook 註冊（command 指向不存在檔）:"
+            )
+            print(header)
+            logger.info(header)
+            for event_type, path in pruned:
+                line = f"  - [{event_type}] {path}"
+                print(line)
+                logger.info(line)
+        else:
+            msg = "\n[HookCheck --fix] settings.local.json 無幽靈 hook 註冊，無需修正"
+            print(msg)
+            logger.info(msg)
 
     log_output = "=" * 60
 

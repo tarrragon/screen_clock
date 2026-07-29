@@ -254,7 +254,7 @@ def validate_completable_status(
     返回三元組 (can_complete, message, is_already_complete)。
 
     狀態機制:
-    - completed: 已完成（返回友好訊息，用於幂等操作）
+    - completed: 已完成（返回友好訊息，用於冪等操作）
     - pending: 未認領（阻止，需先 claim）
     - blocked: 被阻塞（阻止，需先解除依賴）
     - in_progress: 可完成
@@ -270,7 +270,7 @@ def validate_completable_status(
         Tuple[bool, Optional[str], bool]: (可完成, 訊息, 已完成標誌)
         - (True, None, False): 允許完成（in_progress）
         - (False, error_message, False): 阻止完成，返回原因
-        - (True, friendly_message, True): 已完成（幂等返回）
+        - (True, friendly_message, True): 已完成（冪等返回）
 
     Examples:
         >>> validate_completable_status("0.31.0-W3-001", "in_progress")
@@ -286,7 +286,7 @@ def validate_completable_status(
     from .constants import STATUS_COMPLETED, STATUS_PENDING, STATUS_BLOCKED
 
     # Guard Clause 1：已完成的 Ticket
-    # 返回友好訊息（實現幂等操作：多次 complete 都返回 0）
+    # 返回友好訊息（實現冪等操作：多次 complete 都返回 0）
     if current_status == STATUS_COMPLETED:
         # 若提供了完成時間，包含在訊息中；否則簡短訊息
         friendly_msg = f"{ticket_id} 已完成於 {completed_at}" if completed_at else f"{ticket_id} 已完成"
@@ -398,9 +398,32 @@ def _is_placeholder(text: str) -> bool:
         re.MULTILINE | re.IGNORECASE,
     )
     target_after_descriptive = descriptive_na_line.sub("", target_content).strip()
-    # 若描述性 N/A 行剝除後仍有 N/A keyword，視為真實 placeholder；
-    # 若剝除後不再含 N/A，但其他 keyword（TBD/TODO/pending）仍命中，照樣判 placeholder。
-    if re.search(r"\(pending\)|\bTBD\b|\bTODO\b|\bN/A\b", target_after_descriptive, re.IGNORECASE):
+    # W2-028：英文佔位符改採「行首佔位標記」語意（對齊中文佔位符的 strip-and-check 精神）。
+    # 真實佔位符 / 模板標記必為「行首關鍵字」（如 `TODO`、`TODO: 待處理`、`# TODO: implement`、
+    # `(pending)`、`N/A`、`N/A.`），中段提及（如 Test Results 描述「修正內文字面 TODO 誤判」）
+    # 屬合法正文，不應誤擋 complete。
+    # 規則：keyword 必須位於行首（容許 markdown bullet `-*+` / heading `#` / 引用 `>` 前綴），
+    # 其後僅接行尾、空白後跟非英數內容（如冒號 / 中文說明 / 標點），不允許接「英文單字延續」。
+    # 保守設計：誤擋合法 complete（false-positive）比漏放空殼章節傷害大，本檢查刻意偏向少誤擋。
+    placeholder_marker = re.compile(
+        r"^[\s\-\*\+>#]*(?:\(pending\)|(?:TBD|TODO|N/A)\b)",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    # W2-036：補「行尾空殼」偵測，修 W2-028 僅行首語意造成的回歸。
+    # W2-028 改為「僅行首 keyword」後，會放行「label: keyword<行尾>」這類空殼
+    #（如 `Found the root cause: N/A`、`Layer 1: TODO`、`這段需要實作: N/A`——
+    # 看似填了值，實際值為 N/A/TODO 等於沒填），導致 4 個保護測試紅燈。
+    # 精確區分點：W2-028 prose 案例 keyword 後皆有內容延續（`N/A，因...`、`TODO 誤判...bug`），
+    # 4 測試 shell 案例 keyword 為行尾最末 token（其後僅容許空白 + 至多一個尾標點 . / 。）。
+    # 規則：keyword 出現在「行首」或「冒號標籤後」，且其後到行尾僅有空白 + 至多一個尾標點。
+    # 兩者 OR 命中即判 placeholder；placeholder_marker 保留 W2-028 行首語意不破壞。
+    shell_end_marker = re.compile(
+        r"(?:^|[:：]\s*)(?:\(pending\)|(?:TBD|TODO|N/A))[ \t]*[.。]?[ \t]*$",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    if placeholder_marker.search(target_after_descriptive) or shell_end_marker.search(
+        target_after_descriptive
+    ):
         return True
     # 若剝除描述性 N/A 行後內容變空（且原本只由描述性 N/A 行組成），
     # 視為作者明示「該章節各層級皆不適用」，視為非 placeholder 直接返回。
@@ -424,6 +447,8 @@ def _is_placeholder(text: str) -> bool:
 # 擷取 section 內容時只把這些章節名當作邊界，避免 agent 自定義 H2
 # （如 `## 實作摘要`）把 schema section 範圍切斷。
 # 來源：.claude/pm-rules/ticket-body-schema.md
+# Spawn Requests 於 0.0.1-W1-011 補列（canonical 清單新增此成員後三處驗證端清單漏同步，
+# PC-BAL-001；補列為資料層修正，不改依賴方向，方案 A「驗證端 import 建立端常數」仍排除）。
 _SCHEMA_SECTION_NAMES: List[str] = [
     "Task Summary",
     "Problem Analysis",
@@ -434,6 +459,7 @@ _SCHEMA_SECTION_NAMES: List[str] = [
     "Exit Status",
     "重現實驗結果",
     "Context Bundle",
+    "Spawn Requests",
 ]
 
 
@@ -637,6 +663,88 @@ def validate_execution_log_by_type(
             unfilled.append(section)
 
     return len(unfilled) == 0, unfilled
+
+
+# Layer 1 自檢子章節（`### 自檢結果`）gate 阻擋適用範圍（0.4.1-W2-010）。
+# DOC 沿用免填規則（不納入本檢查），對齊 0.4.1-W2-008 ANA 決策。
+_SELF_CHECK_GATE_TYPES = {"IMP", "ANA"}
+_SELF_CHECK_MISSING_LABEL = "Solution > ### 自檢結果"
+
+
+def _detect_self_check_subsection(body: str) -> bool:
+    """
+    偵測 body 之 Solution 章節是否含 `### 自檢結果` 子章節。
+
+    Lazy import `.claude/hooks/acceptance_checkers` 共用判定邏輯（避免與
+    PreToolUse hook 的 warning 判定雙實作漂移）；import 失敗（非 hook 環境）
+    時降級為 inline 正則判斷，維持相同行為。
+    """
+    try:
+        import sys
+        from pathlib import Path as _Path
+
+        # ticket_validator.py: .claude/skills/ticket/ticket_system/lib/ticket_validator.py
+        # → 上溯 5 層至 .claude/
+        claude_dir = _Path(__file__).resolve().parents[4]
+        hooks_dir = claude_dir / "hooks"
+        if str(hooks_dir) not in sys.path:
+            sys.path.insert(0, str(hooks_dir))
+        from acceptance_checkers.self_check_visibility_checker import (
+            solution_has_self_check_subsection,
+        )
+        return solution_has_self_check_subsection(body)
+    except Exception:  # noqa: BLE001 — import 失敗降級 inline 判斷
+        solution_match = re.search(
+            r"^## Solution\s*$(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL
+        )
+        if not solution_match:
+            return False
+        return bool(
+            re.search(
+                r"^### 自檢結果(?:[\s（(].*)?$",
+                solution_match.group(1),
+                flags=re.MULTILINE,
+            )
+        )
+
+
+def validate_self_check_subsection(
+    ticket_type: str,
+    body: str,
+) -> Tuple[bool, Optional[str]]:
+    """
+    驗證 IMP/ANA ticket 的 Solution 章節是否含 `### 自檢結果` 子章節（0.4.1-W2-010）。
+
+    W17-064 warning 級提示 8/8（加上 0.4.1-W1-001 共 9 次）全被忽略，
+    0.4.1-W2-008 ANA 決策供給側義務（dispatch template）落地後升級為 gate 阻擋。
+    DOC 沿用免填規則，不納入本檢查。
+
+    Args:
+        ticket_type: Ticket type（IMP/ANA/DOC/...）
+        body: Ticket body 文字（不含 frontmatter）
+
+    Returns:
+        (passed, missing_label)
+        - passed=True：不適用 type，或 Solution 已含自檢子章節
+        - missing_label：未通過時回傳可插入未填寫清單的標籤字串；否則 None
+
+    Examples:
+        >>> validate_self_check_subsection("DOC", "")
+        (True, None)
+        >>> validate_self_check_subsection("IMP", "## Solution\\n內容")
+        (False, 'Solution > ### 自檢結果')
+        >>> validate_self_check_subsection("IMP", "## Solution\\n### 自檢結果\\n- [x] 已檢視")
+        (True, None)
+    """
+    if (ticket_type or "").upper() not in _SELF_CHECK_GATE_TYPES:
+        return True, None
+
+    if not body or not isinstance(body, str):
+        return False, _SELF_CHECK_MISSING_LABEL
+
+    if _detect_self_check_subsection(body):
+        return True, None
+    return False, _SELF_CHECK_MISSING_LABEL
 
 
 def validate_acceptance_criteria(

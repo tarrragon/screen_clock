@@ -36,8 +36,9 @@ import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hook_utils import setup_hook_logging, run_hook_safely, read_json_from_stdin, emit_hook_output
+from lib import setup_hook_logging, run_hook_safely, read_json_from_stdin, emit_hook_output
 from lib.hook_messages import WorkflowMessages
 
 # ============================================================================
@@ -48,7 +49,8 @@ EXIT_SUCCESS = 0
 
 # 已由其他 Hook 處理的命令模式（避免重複提醒）
 # - pre-fix-evaluation-hook 處理測試和程式碼品質命令
-# - skill-cli-error-feedback-hook 處理 ticket/skill CLI 命令
+# - cli-error-feedback-hook 的 check_skill_cli_error 處理 ticket/skill CLI 命令
+#   （原 skill-cli-error-feedback-hook 已於 0.0.1-W1-005 合併刪除）
 HANDLED_BY_OTHER_HOOKS = [
     "flutter test",
     "dart test",

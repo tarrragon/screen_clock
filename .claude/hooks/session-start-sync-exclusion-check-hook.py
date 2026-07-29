@@ -30,16 +30,16 @@ from typing import List, Dict, Any
 
 # 加入 hook_utils 路徑
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import (  # noqa: E402
     setup_hook_logging,
     run_hook_safely,
     read_json_from_stdin,
     get_project_root,
 )
 
-sys.path.insert(0, str(Path(__file__).parent / "lib"))
-from dispatch_tracker import cleanup_expired  # noqa: E402
-from sync_exclude_manifest import (  # noqa: E402
+from lib.dispatch_tracker import cleanup_expired  # noqa: E402
+from lib.sync_exclude_manifest import (  # noqa: E402
     LOCAL_ONLY_PATTERNS,
     GITIGNORE_EXPECTED,
 )

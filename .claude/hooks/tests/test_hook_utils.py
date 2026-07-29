@@ -21,7 +21,7 @@ import pytest
 
 # 動態導入 hook_utils（可能不存在）
 try:
-    from hook_utils import (
+    from lib import (
         setup_hook_logging,
         run_hook_safely,
         get_current_version_from_todolist,
@@ -94,6 +94,23 @@ def project_root(tmp_path):
     return tmp_path
 
 
+@pytest.fixture(autouse=True)
+def _disable_worktree_detection_for_hermetic_tests(monkeypatch):
+    """停用 get_project_root() 的 worktree 偵測（0.38.1-W2-020）。
+
+    Why：hook_base.get_project_root() 優先偵測 linked worktree（真實
+    subprocess git 呼叫），測試若在 git worktree 環境下執行且僅用
+    monkeypatch.setenv 設定 CLAUDE_PROJECT_DIR 指向 tmp_path，worktree
+    偵測會忽略該 env var、回傳真實 worktree 根目錄，使本檔大量依賴
+    CLAUDE_PROJECT_DIR 隔離的測試斷言失敗。
+    """
+    monkeypatch.setattr(
+        "lib.hook_base._linked_worktree_root",
+        lambda: None,
+        raising=False,
+    )
+
+
 @pytest.fixture
 def mock_env_var(monkeypatch):
     """Mock 環境變數"""
@@ -109,7 +126,7 @@ def mock_env_var(monkeypatch):
 def mock_time():
     """固定時間戳以驗證檔名"""
     fixed_time = datetime(2026, 2, 25, 10, 0, 0)
-    with patch('hook_utils.datetime') as mock_dt:
+    with patch('lib.hook_logging.datetime') as mock_dt:
         mock_dt.now.return_value = fixed_time
         # 也需要能呼叫 datetime 本身的方法
         mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -1537,21 +1554,21 @@ class TestImportsAndExports:
 
     def test_import_validate_tool_input(self):
         """驗證 validate_tool_input 可從 hook_utils 匯入"""
-        from hook_utils import validate_tool_input as imported_func
+        from lib import validate_tool_input as imported_func
 
         assert callable(imported_func)
         assert imported_func.__name__ == "validate_tool_input"
 
     def test_import_validate_ticket_unified(self):
         """驗證 validate_ticket_unified 可從 hook_utils 匯入"""
-        from hook_utils import validate_ticket_unified as imported_func
+        from lib import validate_ticket_unified as imported_func
 
         assert callable(imported_func)
         assert imported_func.__name__ == "validate_ticket_unified"
 
     def test_existing_exports_still_available(self):
         """驗證既有符號仍可匯入"""
-        from hook_utils import (
+        from lib import (
             setup_hook_logging,
             run_hook_safely,
             validate_hook_input,
@@ -1585,13 +1602,13 @@ def clear_caches():
     yield
     # Teardown: 清空所有快取
     try:
-        from hook_utils import clear_handoff_recovery_cache
+        from lib import clear_handoff_recovery_cache
         clear_handoff_recovery_cache()
     except (ImportError, AttributeError):
         pass
 
     try:
-        from hook_utils import clear_error_pattern_mtime_cache
+        from lib import clear_error_pattern_mtime_cache
         clear_error_pattern_mtime_cache()
     except (ImportError, AttributeError):
         pass
@@ -1604,93 +1621,73 @@ def clear_caches():
 class TestIsHandoffRecoveryModeCache:
     """is_handoff_recovery_mode() 快取機制測試"""
 
-    def test_cache_miss_first_call_executes_glob(self, clear_caches, tmp_path):
-        """測試案例 1.1：快取未命中，首次呼叫執行 glob"""
-        from hook_utils import is_handoff_recovery_mode, clear_handoff_recovery_cache
+    def test_cache_miss_first_call_executes_glob(self, clear_caches, env_with_project_root):
+        """測試案例 1.1：快取未命中，首次呼叫掃描目錄並取得 True"""
+        from lib import is_handoff_recovery_mode, clear_handoff_recovery_cache
 
-        # Setup: 建立 .claude/handoff/pending 目錄和 .json 檔案
-        handoff_dir = tmp_path / ".claude" / "handoff" / "pending"
-        handoff_dir.mkdir(parents=True, exist_ok=True)
-        (handoff_dir / "test.json").write_text("{}")
-
-        # Mock Path.glob 檢查是否被呼叫
-        with patch('pathlib.Path.glob') as mock_glob:
-            mock_glob.return_value = iter([(handoff_dir / "test.json")])
-
-            # 清除快取（模擬首次呼叫）
-            clear_handoff_recovery_cache()
-
-            # Act
-            with patch('pathlib.Path.cwd', return_value=tmp_path):
-                with patch.object(Path, 'glob', return_value=iter([Path("test.json")])):
-                    # 因為直接修補會複雜，用簡單方式：驗證函式返回值
-                    result = is_handoff_recovery_mode()
-
-            # Assert：返回值應為 True（有 .json 檔案）
-            assert result == True
-
-    def test_cache_hit_second_call_no_glob(self, clear_caches, tmp_path):
-        """測試案例 1.2：快取命中，重複呼叫不執行 glob"""
-        from hook_utils import is_handoff_recovery_mode, clear_handoff_recovery_cache
-
-        # Setup
-        handoff_dir = tmp_path / ".claude" / "handoff" / "pending"
-        handoff_dir.mkdir(parents=True, exist_ok=True)
+        # Setup: pending 目錄由 tmp_project_root fixture 預建，置入 .json 檔案
+        handoff_dir = env_with_project_root / ".claude" / "handoff" / "pending"
         (handoff_dir / "test.json").write_text("{}")
 
         clear_handoff_recovery_cache()
 
-        with patch('pathlib.Path.cwd', return_value=tmp_path):
-            # 第一次呼叫
-            with patch.object(Path, 'glob', return_value=iter([Path("test.json")])):
-                result1 = is_handoff_recovery_mode()
-                assert result1 == True
+        result = is_handoff_recovery_mode()
 
-            # 第二次呼叫（應該使用快取，不呼叫 glob）
-            # 模擬 glob 返回空以驗證快取
-            with patch.object(Path, 'glob', return_value=iter([])):
-                result2 = is_handoff_recovery_mode()
-                # 若快取有效，應返回前一個值（True）
-                assert result2 == True
+        assert result == True
 
-    def test_clear_cache_forces_rescan(self, clear_caches, tmp_path):
+    def test_cache_hit_second_call_no_glob(self, clear_caches, env_with_project_root):
+        """測試案例 1.2：快取命中，重複呼叫不重新掃描目錄
+
+        以「刪除檔案後結果不變」證明第二次呼叫未觸及檔案系統。
+        """
+        from lib import is_handoff_recovery_mode, clear_handoff_recovery_cache
+
+        handoff_dir = env_with_project_root / ".claude" / "handoff" / "pending"
+        json_file = handoff_dir / "test.json"
+        json_file.write_text("{}")
+
+        clear_handoff_recovery_cache()
+
+        result1 = is_handoff_recovery_mode()
+        assert result1 == True
+
+        # 移除檔案但不清快取：若第二次呼叫重新掃描會得到 False
+        json_file.unlink()
+
+        result2 = is_handoff_recovery_mode()
+        assert result2 == True
+
+    def test_clear_cache_forces_rescan(self, clear_caches, env_with_project_root):
         """測試案例 1.3：清空快取後重新掃描"""
-        from hook_utils import is_handoff_recovery_mode, clear_handoff_recovery_cache
+        from lib import is_handoff_recovery_mode, clear_handoff_recovery_cache
 
-        # Setup
-        handoff_dir = tmp_path / ".claude" / "handoff" / "pending"
-        handoff_dir.mkdir(parents=True, exist_ok=True)
+        handoff_dir = env_with_project_root / ".claude" / "handoff" / "pending"
 
         clear_handoff_recovery_cache()
 
-        with patch('pathlib.Path.cwd', return_value=tmp_path):
-            # 第一次呼叫：空目錄，返回 False
-            with patch.object(Path, 'glob', return_value=iter([])):
-                result1 = is_handoff_recovery_mode()
-                assert result1 == False
+        # 第一次呼叫：空目錄，返回 False
+        result1 = is_handoff_recovery_mode()
+        assert result1 == False
 
-            # 清空快取
-            clear_handoff_recovery_cache()
+        # 新增檔案但先不清快取：仍應返回快取的 False
+        (handoff_dir / "test.json").write_text("{}")
+        assert is_handoff_recovery_mode() == False
 
-            # 第二次呼叫：模擬有新檔案，應重新掃描並返回 True
-            with patch.object(Path, 'glob', return_value=iter([Path("test.json")])):
-                result2 = is_handoff_recovery_mode()
-                assert result2 == True
+        clear_handoff_recovery_cache()
 
-    def test_cache_with_no_logger(self, clear_caches, tmp_path):
+        # 清快取後應重新掃描並返回 True
+        result2 = is_handoff_recovery_mode()
+        assert result2 == True
+
+    def test_cache_with_no_logger(self, clear_caches, env_with_project_root):
         """測試案例 1.4：邊界條件 - 無 logger"""
-        from hook_utils import is_handoff_recovery_mode, clear_handoff_recovery_cache
-
-        handoff_dir = tmp_path / ".claude" / "handoff" / "pending"
-        handoff_dir.mkdir(parents=True, exist_ok=True)
+        from lib import is_handoff_recovery_mode, clear_handoff_recovery_cache
 
         clear_handoff_recovery_cache()
 
-        with patch('pathlib.Path.cwd', return_value=tmp_path):
-            with patch.object(Path, 'glob', return_value=iter([])):
-                # 不傳遞 logger，應正常執行
-                result = is_handoff_recovery_mode(logger=None)
-                assert result == False
+        # 不傳遞 logger，空的 pending 目錄應正常返回 False
+        result = is_handoff_recovery_mode(logger=None)
+        assert result == False
 
 
 # ============================================================================
@@ -1702,7 +1699,7 @@ class TestCheckErrorPatternsChangedCache:
 
     def test_mtime_cache_hit_no_stat_call(self, clear_caches, tmp_path):
         """測試案例 2.1：mtime 快取命中，已快取檔案不執行 stat"""
-        from hook_utils import check_error_patterns_changed, clear_error_pattern_mtime_cache
+        from lib import check_error_patterns_changed, clear_error_pattern_mtime_cache
 
         # Setup
         error_patterns_dir = tmp_path / ".claude" / "error-patterns"
@@ -1738,7 +1735,7 @@ class TestCheckErrorPatternsChangedCache:
 
     def test_new_file_triggers_stat(self, clear_caches, tmp_path):
         """測試案例 2.2：新檔案觸發 stat，舊檔案使用快取"""
-        from hook_utils import check_error_patterns_changed, clear_error_pattern_mtime_cache
+        from lib import check_error_patterns_changed, clear_error_pattern_mtime_cache
 
         error_patterns_dir = tmp_path / ".claude" / "error-patterns"
         error_patterns_dir.mkdir(parents=True, exist_ok=True)
@@ -1773,7 +1770,7 @@ class TestCheckErrorPatternsChangedCache:
 
     def test_clear_mtime_cache_forces_rescan(self, clear_caches, tmp_path):
         """測試案例 2.3：清空快取後重新掃描"""
-        from hook_utils import check_error_patterns_changed, clear_error_pattern_mtime_cache
+        from lib import check_error_patterns_changed, clear_error_pattern_mtime_cache
 
         error_patterns_dir = tmp_path / ".claude" / "error-patterns"
         error_patterns_dir.mkdir(parents=True, exist_ok=True)
@@ -1807,29 +1804,26 @@ class TestCheckErrorPatternsChangedCache:
 class TestCacheFunctionalCorrectness:
     """驗證快取不影響原有功能正確性"""
 
-    def test_handoff_mode_cache_correctness(self, clear_caches, tmp_path):
+    def test_handoff_mode_cache_correctness(self, clear_caches, env_with_project_root):
         """測試案例 3.1：快取不影響 is_handoff_recovery_mode() 功能"""
-        from hook_utils import is_handoff_recovery_mode, clear_handoff_recovery_cache
+        from lib import is_handoff_recovery_mode, clear_handoff_recovery_cache
 
-        handoff_dir = tmp_path / ".claude" / "handoff" / "pending"
-        handoff_dir.mkdir(parents=True, exist_ok=True)
+        handoff_dir = env_with_project_root / ".claude" / "handoff" / "pending"
 
         clear_handoff_recovery_cache()
 
-        with patch('pathlib.Path.cwd', return_value=tmp_path):
-            # 測試空目錄
-            with patch.object(Path, 'glob', return_value=iter([])):
-                assert is_handoff_recovery_mode() == False
+        # 測試空目錄
+        assert is_handoff_recovery_mode() == False
 
-            clear_handoff_recovery_cache()
+        clear_handoff_recovery_cache()
 
-            # 測試有檔案
-            with patch.object(Path, 'glob', return_value=iter([Path("test.json")])):
-                assert is_handoff_recovery_mode() == True
+        # 測試有檔案
+        (handoff_dir / "test.json").write_text("{}")
+        assert is_handoff_recovery_mode() == True
 
     def test_error_patterns_cache_correctness(self, clear_caches, tmp_path):
         """測試案例 3.2：快取不影響 check_error_patterns_changed() 功能"""
-        from hook_utils import check_error_patterns_changed, clear_error_pattern_mtime_cache
+        from lib import check_error_patterns_changed, clear_error_pattern_mtime_cache
 
         error_patterns_dir = tmp_path / ".claude" / "error-patterns"
         error_patterns_dir.mkdir(parents=True, exist_ok=True)

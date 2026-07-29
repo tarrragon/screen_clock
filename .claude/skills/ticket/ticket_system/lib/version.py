@@ -36,6 +36,81 @@ def get_current_version() -> Optional[str]:
     return _scan_worklog_directories()
 
 
+def check_version_all_completed(
+    version: str, tickets: Optional[list] = None
+) -> tuple[bool, Optional[str]]:
+    """
+    檢查指定版本的所有 ticket 是否皆為終結狀態。
+
+    Args:
+        version: 版本號（無 v 前綴，如 "1.3.0"）
+        tickets: 已載入的 ticket 清單；None 時自行 list_tickets。
+
+    Returns:
+        tuple[bool, Optional[str]]:
+            - bool: 是否全部終結（completed / closed）
+            - Optional[str]: 下一個 active 版本 ID（無 v 前綴），若無則 None
+    """
+    from .constants import TERMINAL_STATUSES
+
+    if tickets is None:
+        from .ticket_loader import list_tickets
+        tickets = list_tickets(version)
+    if not tickets:
+        return (False, None)
+
+    all_terminal = all(
+        t.get("status", "pending") in TERMINAL_STATUSES
+        for t in tickets
+    )
+
+    if not all_terminal:
+        return (False, None)
+
+    next_version = _find_next_active_version(version)
+    return (True, next_version)
+
+
+def _find_next_active_version(current_version: str) -> Optional[str]:
+    """
+    從 todolist.yaml 找出排在 current_version 之後的第一個 active 版本。
+
+    Returns:
+        Optional[str]: 版本號（無 v 前綴），若無則 None
+    """
+    root = get_project_root()
+    todolist_path = root / "docs" / "todolist.yaml"
+
+    if not todolist_path.exists():
+        return None
+
+    try:
+        import yaml
+        with open(todolist_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        versions = data.get("versions", [])
+        found_current = False
+        for v in versions:
+            v_str = str(v.get("version", ""))
+            if v_str == current_version:
+                found_current = True
+                continue
+            if found_current and v.get("status") == "active":
+                return v_str
+        # current 可能排第一，往前找其他 active
+        for v in versions:
+            v_str = str(v.get("version", ""))
+            if v_str == current_version:
+                continue
+            if v.get("status") == "active":
+                return v_str
+    except Exception:
+        pass
+
+    return None
+
+
 def get_active_versions() -> list[str]:
     """
     回傳所有 status=active 的版本（支援分支並行開發）
@@ -309,6 +384,157 @@ def validate_version_registered(version: str) -> tuple[bool, str]:
 
     error_msg = ErrorMessages.VERSION_NOT_REGISTERED.format(version=version)
     return (False, error_msg)
+
+
+def is_version_registered(version: str) -> bool:
+    """
+    檢查版本是否已在 todolist.yaml 中註冊（不限狀態）。
+
+    與 validate_version_registered() 不同：本函式只檢查「是否存在於
+    todolist.yaml」，不檢查是否為 active。適用於 migrate 等允許遷入
+    planned/active/completed 版本的場景——這些場景合法（如提前規劃跨版本
+    遷移），只有完全未註冊的版本才需要阻擋並引導使用者先建立版本。
+
+    Args:
+        version: 版本號（無 v 前綴，如 "1.0.0"）
+
+    Returns:
+        bool: 已註冊，或 todolist.yaml 不存在（向後相容）時回傳 True；
+              版本不在 todolist.yaml 的 versions 列表中則回傳 False
+    """
+    root = get_project_root()
+    todolist_path = root / "docs" / "todolist.yaml"
+
+    if not todolist_path.exists():
+        return True
+
+    try:
+        import yaml
+        with open(todolist_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except Exception as e:
+        logger.warning(
+            f"is_version_registered: 解析 todolist.yaml 失敗 "
+            f"({type(e).__name__}: {e})，跳過驗證"
+        )
+        return True
+
+    versions_list = data.get("versions", [])
+    return any(str(entry.get("version", "")) == version for entry in versions_list)
+
+
+_FEAT_ACTIONS = frozenset({"實作", "新增", "建立", "開發"})
+_PATCH_TYPES = frozenset({"ANA", "ADJ", "DOC", "RES"})
+
+
+def suggest_version_for_ticket(
+    ticket_type: str,
+    action: str,
+) -> Optional[tuple[str, str]]:
+    """根據 ticket 類型和 action 建議目標版本。
+
+    規則：
+    - 新功能（IMP + 實作/新增/建立/開發）→ 下一個大版本（0.x+1.0）
+    - 修復/改善/分析/文件 → 最新已完成版本 +1 patch（0.x.y+1）
+    - ANA/ADJ/DOC/RES 類型 → 一律 patch
+
+    Args:
+        ticket_type: Ticket 類型（IMP, ANA, DOC 等）
+        action: --action 參數值（如「實作」「修復」「分析」）
+
+    Returns:
+        (suggested_version, reason) 或 None（無法判斷）
+    """
+    root = get_project_root()
+    todolist_path = root / "docs" / "todolist.yaml"
+    if not todolist_path.exists():
+        return None
+
+    try:
+        import yaml
+        with open(todolist_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except Exception:
+        return None
+
+    versions = data.get("versions", [])
+    if not versions:
+        return None
+
+    is_new_feature = (
+        ticket_type == "IMP" and action in _FEAT_ACTIONS
+    )
+
+    if is_new_feature or ticket_type == "INV":
+        return _suggest_next_major(versions)
+
+    if ticket_type in _PATCH_TYPES or not is_new_feature:
+        return _suggest_next_patch(versions)
+
+    return None
+
+
+def _suggest_next_patch(
+    versions: list[dict],
+) -> Optional[tuple[str, str]]:
+    """找最新已完成版本，回傳 patch +1。"""
+    completed = [
+        v for v in versions
+        if v.get("status") == "completed"
+    ]
+    if not completed:
+        return None
+
+    latest = completed[-1]
+    ver_str = str(latest.get("version", ""))
+    parts = ver_str.split(".")
+    if len(parts) != 3:
+        return None
+
+    try:
+        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+
+    suggested = f"{major}.{minor}.{patch + 1}"
+
+    # 若建議版本已存在（active 或 completed），直接回傳該版本
+    for v in versions:
+        if str(v.get("version", "")) == suggested:
+            return (suggested, "修復/改善/分析/文件類型歸小版本")
+
+    return (suggested, "修復/改善/分析/文件類型歸小版本（版本尚未在 todolist 註冊）")
+
+
+def _suggest_next_major(
+    versions: list[dict],
+) -> Optional[tuple[str, str]]:
+    """找最高的大版本 active，或算出下一個大版本。"""
+    active = [
+        v for v in versions
+        if v.get("status") == "active"
+    ]
+    # 找有 proposals 的 active 版本（大版本特徵）
+    for v in active:
+        if v.get("proposals"):
+            return (str(v["version"]), "新功能歸大版本")
+
+    # fallback: 取最高版本 minor+1
+    all_vers = []
+    for v in versions:
+        ver_str = str(v.get("version", ""))
+        parts = ver_str.split(".")
+        if len(parts) == 3:
+            try:
+                all_vers.append((int(parts[0]), int(parts[1]), int(parts[2])))
+            except ValueError:
+                continue
+    if not all_vers:
+        return None
+
+    max_ver = max(all_vers)
+    suggested = f"{max_ver[0]}.{max_ver[1] + 1}.0"
+    return (suggested, "新功能歸大版本")
 
 
 if __name__ == "__main__":

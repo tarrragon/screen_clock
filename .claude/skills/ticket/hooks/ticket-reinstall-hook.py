@@ -42,12 +42,14 @@ from pathlib import Path
 from typing import Optional, Set, Dict, Tuple
 
 # 導入 hook_utils 與共用 lib
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hooks"))
-from hook_utils import setup_hook_logging, run_hook_safely, get_project_root
+from lib import setup_hook_logging, run_hook_safely, get_project_root
 from lib.uv_tool_utils import (
     compute_file_hashes as _compute_file_hashes_shared,
     find_installed_module_dir,
     compare_hash_sets,
+    is_shimmed_cli,
     DEFAULT_EXCLUDE_DIRS,
 )
 
@@ -268,6 +270,13 @@ def main() -> int:
 
     project_root = get_project_root()
     logger.debug(f"Project root: {project_root}")
+
+    # cwd-resolving shim（ARCH-APP-002）：ticket 為 shim 時依 cwd 解析源碼、
+    # 無 site-packages snapshot；reinstall 會把 shim 蓋回。偵測為 shim 即略過。
+    if is_shimmed_cli("ticket", logger):
+        logger.info("ticket CLI 為 cwd-resolving shim，略過 reinstall")
+        print("[TicketSync] ticket CLI 為 cwd-resolving shim，略過 reinstall")
+        return 0
 
     # Find source code
     source_dir = project_root / ".claude" / "skills" / "ticket" / "ticket_system"

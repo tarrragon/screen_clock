@@ -59,6 +59,10 @@ class ErrorMessages:
     MISSING_TICKET_ID = "[Error] 未提供 Ticket ID"
     NO_VALID_TICKETS = "[Error] 未提供有效的 Ticket ID"
     MISSING_FIELD_NAME = "[Error] 未指定欄位名稱"
+    MISSING_FIELD_VALUE = (
+        "[Error] {ticket_id} 未提供 {field_name} 的新值：請提供位置參數 value，"
+        "或對應的子欄位 flag（如 --current / --layer / --files / --task-type / --strategy）"
+    )
     FIELD_NOT_FOUND = "[Error] {ticket_id} 無 '{field_name}' 欄位"
     MISSING_WAVE_PARAMETER = "[Error] 建立根任務必須指定 --wave"
     INVALID_SECTION = "[Error] 無效的 section: {section}"
@@ -119,6 +123,10 @@ class WarningMessages:
         "[Warning] 新子任務 {ticket_id} 深度為 {depth}，已達/超過嵌套上限 MAX_TICKET_DEPTH={max_depth}\n"
         "   嵌套派發深度上限為平台保留邊距（W1-056.5 協議 v2 D3）；此 ticket 不應再往下派發子任務\n"
         "   查詢深度：ticket track depth {ticket_id}"
+    )
+    CHILDREN_COUNT_HIGH = (
+        "[Warning] 父票 {parent_id} 已有 {count} 個子任務，超過建議閾值 {threshold}\n"
+        "   巨型父票增加認知負擔與管理成本；考慮拆分為多個獨立 group 或使用 Wave 分批"
     )
     EXECUTION_LOG_NOT_FILLED = "[WARNING] 以下執行日誌區段尚未填寫:"
     EXECUTION_LOG_SUGGESTION = "建議使用以下命令填寫:"

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import yaml
 
-from doc_system.commands.create import execute
+from doc_system.commands.create import _get_templates_dir, execute, execute_next_id
 from doc_system.core.file_locator import FileLocator
 
 
@@ -32,6 +32,10 @@ def _setup_project(tmp_path):
     (templates_dir / "spec-template.md").write_text(
         '---\nid: SPEC-NNN\ntitle: "{規格標題}"\nstatus: draft\n'
         'created: "YYYY-MM-DD"\n---\n# SPEC-{NNN}\n'
+    )
+    (templates_dir / "data-contract-template.md").write_text(
+        '---\nid: SPEC-NNN\ntitle: "{資料表/契約標題}"\nstatus: draft\n'
+        'created: "YYYY-MM-DD"\n---\n# SPEC-{NNN} 資料契約\n'
     )
 
     return str(tmp_path)
@@ -71,8 +75,50 @@ class TestCreateProposal:
         tracking = tmp_path / "docs" / "proposals-tracking.yaml"
         assert tracking.is_file()
         data = yaml.safe_load(tracking.read_text())
-        assert "PROP-006" in data["proposals"]
-        assert data["proposals"]["PROP-006"]["status"] == "draft"
+        assert isinstance(data["proposals"], list)
+        entry = next(e for e in data["proposals"] if e["id"] == "PROP-006")
+        assert entry["status"] == "draft"
+        assert "confirmed_at" in entry
+        # 對齊真實 proposals-tracking.yaml schema：頂層僅 proposals/usecases/specs 三區塊
+        assert "last_updated" not in data
+        assert "version" not in data
+        assert set(data.keys()) == {"proposals", "usecases", "specs"}
+
+    def test_create_proposal_against_real_list_format_tracking_file(self, tmp_path, capsys):
+        """對真實 list-based tracking.yaml 新增 proposal 不應 crash（活 bug 回歸測試）。"""
+        project_root = _setup_project(tmp_path)
+        templates_dir = tmp_path / "templates"
+
+        tracking = tmp_path / "docs" / "proposals-tracking.yaml"
+        tracking.write_text(
+            yaml.dump(
+                {
+                    "proposals": [
+                        {"id": "PROP-001", "title": "既有提案", "status": "confirmed"},
+                    ],
+                    "usecases": [],
+                    "specs": [],
+                },
+                allow_unicode=True,
+                sort_keys=False,
+            )
+        )
+
+        args = argparse.Namespace(
+            type="proposal", id="PROP-007", title="new-feature", domain=None,
+        )
+
+        with (
+            patch.object(FileLocator, "get_project_root", return_value=project_root),
+            patch("doc_system.commands.create._get_templates_dir", return_value=templates_dir),
+        ):
+            execute(args)
+
+        data = yaml.safe_load(tracking.read_text())
+        assert isinstance(data["proposals"], list)
+        ids = [e["id"] for e in data["proposals"]]
+        assert "PROP-001" in ids
+        assert "PROP-007" in ids
 
     def test_create_usecase(self, tmp_path, capsys):
         """建立 usecase 應產生檔案，不更新 tracking.yaml。"""
@@ -171,3 +217,174 @@ class TestCreateProposal:
 
         content = created_file.read_text()
         assert "id: SPEC-009" in content
+
+
+class TestCreateDataContract:
+    """create data-contract 的測試案例（0.2.1-W1-001：接線 DOC_TYPE_CONFIG）。"""
+
+    def test_create_data_contract_with_domain(self, tmp_path, capsys):
+        """建立 data-contract 應在 docs/spec/{domain}/ 產生檔案。"""
+        project_root = _setup_project(tmp_path)
+        templates_dir = tmp_path / "templates"
+
+        args = argparse.Namespace(
+            type="data-contract", id="SPEC-010", title="accounts-data-contract", domain="balance-sheet",
+        )
+
+        with (
+            patch.object(FileLocator, "get_project_root", return_value=project_root),
+            patch("doc_system.commands.create._get_templates_dir", return_value=templates_dir),
+        ):
+            execute(args)
+
+        output = capsys.readouterr().out
+        assert "已建立" in output
+
+        created_file = tmp_path / "docs" / "spec" / "balance-sheet" / "SPEC-010-accounts-data-contract.md"
+        assert created_file.is_file()
+        content = created_file.read_text()
+        assert "id: SPEC-010" in content
+
+    def test_create_data_contract_requires_domain(self, tmp_path, capsys):
+        """建立 data-contract 時未指定 --domain 應報錯。"""
+        project_root = _setup_project(tmp_path)
+        templates_dir = tmp_path / "templates"
+
+        args = argparse.Namespace(
+            type="data-contract", id="SPEC-010", title="accounts-data-contract", domain=None,
+        )
+
+        with (
+            patch.object(FileLocator, "get_project_root", return_value=project_root),
+            patch("doc_system.commands.create._get_templates_dir", return_value=templates_dir),
+        ):
+            try:
+                execute(args)
+            except SystemExit:
+                pass
+
+        output = capsys.readouterr().out
+        assert "domain" in output.lower()
+
+    def test_data_contract_shares_spec_number_sequence(self, tmp_path, capsys):
+        """data-contract 與 spec 共用同一 SPEC-NNN 編號空間，不可各自從頭編。"""
+        project_root = _setup_project(tmp_path)
+        templates_dir = tmp_path / "templates"
+
+        # 既有一筆 spec，序號為 SPEC-009
+        existing_spec_dir = tmp_path / "docs" / "spec" / "balance-sheet"
+        existing_spec_dir.mkdir(parents=True)
+        (existing_spec_dir / "SPEC-009-existing.md").write_text("---\nid: SPEC-009\n---\n")
+
+        args = argparse.Namespace(
+            type="data-contract", id=None, title="accounts-data-contract", domain="balance-sheet",
+        )
+
+        with (
+            patch.object(FileLocator, "get_project_root", return_value=project_root),
+            patch("doc_system.commands.create._get_templates_dir", return_value=templates_dir),
+        ):
+            execute(args)
+
+        output = capsys.readouterr().out
+        assert "SPEC-010" in output
+
+        created_file = tmp_path / "docs" / "spec" / "balance-sheet" / "SPEC-010-accounts-data-contract.md"
+        assert created_file.is_file()
+
+
+class TestNextId:
+    """doc next-id 子命令測試（0.2.1-W1-001：唯讀查詢，不建立檔案）。"""
+
+    def test_next_id_returns_next_number_without_creating_file(self, tmp_path, capsys):
+        """next-id 應輸出下一個序號但不建立任何檔案。"""
+        project_root = _setup_project(tmp_path)
+
+        existing = tmp_path / "docs" / "proposals" / "PROP-006-existing.md"
+        existing.write_text("---\nid: PROP-006\n---\n")
+
+        args = argparse.Namespace(type="proposal")
+
+        with patch.object(FileLocator, "get_project_root", return_value=project_root):
+            execute_next_id(args)
+
+        output = capsys.readouterr().out.strip()
+        assert output == "PROP-007"
+        # 未建立任何新檔案
+        assert list((tmp_path / "docs" / "proposals").iterdir()) == [existing]
+
+    def test_next_id_shares_spec_sequence_with_data_contract(self, tmp_path, capsys):
+        """next-id spec 應計入既有 data-contract 檔案的編號（共用序列）。"""
+        project_root = _setup_project(tmp_path)
+
+        contract_dir = tmp_path / "docs" / "spec" / "balance-sheet"
+        contract_dir.mkdir(parents=True)
+        (contract_dir / "SPEC-010-accounts-data-contract.md").write_text("---\nid: SPEC-010\n---\n")
+
+        args = argparse.Namespace(type="spec")
+
+        with patch.object(FileLocator, "get_project_root", return_value=project_root):
+            execute_next_id(args)
+
+        output = capsys.readouterr().out.strip()
+        assert output == "SPEC-011"
+
+    def test_next_id_unsupported_type_exits(self, tmp_path, capsys):
+        """不支援的文件類型應報錯並結束。"""
+        project_root = _setup_project(tmp_path)
+        args = argparse.Namespace(type="unknown")
+
+        with patch.object(FileLocator, "get_project_root", return_value=project_root):
+            try:
+                execute_next_id(args)
+            except SystemExit:
+                pass
+
+        output = capsys.readouterr().out
+        assert "不支援" in output
+
+
+class TestGetTemplatesDir:
+    """_get_templates_dir 候選路徑 fallback 邏輯測試（W1-013 修復）。
+
+    舊實作以固定相對層數（__file__ 上溯 3 層）推算 templates/，該假設僅在
+    原始碼樹成立；安裝後 doc_system 落在 site-packages/ 下，同樣層數指向
+    不存在的路徑，doc create 全數類型皆 FileNotFoundError。修復後改為依序
+    嘗試套件內建（doc_system/templates/，由 pyproject.toml force-include
+    打包）與原始碼樹（skill 根目錄 templates/）兩個候選，取第一個實際存在者。
+    """
+
+    def _package_bundled_path(self) -> Path:
+        from doc_system.commands import create as create_module
+        return Path(create_module.__file__).resolve().parent.parent / "templates"
+
+    def _source_tree_path(self) -> Path:
+        from doc_system.commands import create as create_module
+        return Path(create_module.__file__).resolve().parent.parent.parent / "templates"
+
+    def test_prefers_package_bundled_when_exists(self):
+        """套件內建位置（doc_system/templates/）存在時優先採用（uv tool install 後主路徑）。"""
+        package_bundled = self._package_bundled_path()
+
+        with patch.object(Path, "is_dir", lambda self: self == package_bundled):
+            result = _get_templates_dir()
+
+        assert result == package_bundled
+
+    def test_falls_back_to_source_tree_when_package_bundled_missing(self):
+        """套件內建位置不存在、原始碼樹位置存在時，回退採用原始碼樹位置。"""
+        source_tree = self._source_tree_path()
+
+        with patch.object(Path, "is_dir", lambda self: self == source_tree):
+            result = _get_templates_dir()
+
+        assert result == source_tree
+
+    def test_returns_package_bundled_as_default_when_neither_exists(self):
+        """兩個候選皆不存在時，回傳套件內建路徑（讓錯誤訊息指向預期安裝位置，利於除錯）。"""
+        package_bundled = self._package_bundled_path()
+
+        with patch.object(Path, "is_dir", lambda self: False):
+            result = _get_templates_dir()
+
+        assert result == package_bundled

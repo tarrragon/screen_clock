@@ -299,11 +299,12 @@ logging.basicConfig(
 uv run --with pytest python -m pytest .claude/lib/tests/ -v
 ```
 
-Hook tests under `.claude/hooks/tests/` may include PEP 723 inline dependencies. Before running them, inspect the file header and follow `.claude/hooks/tests/README.md`:
+`.claude/hooks/tests/` 下的測試一律指向 `.claude/hooks` 這個 uv 專案執行，依賴由該處 `pyproject.toml` 與 `uv.lock` 提供，不需 `--with` 旗標：
 
-- PEP 723 test file: `uv run .claude/hooks/tests/<test-file>.py`
-- Ordinary pytest file: `uv run --with pytest python -m pytest .claude/hooks/tests/<test-file>.py -v`
-- Targeted selection on a PEP 723 file: mirror dependencies with `--with <package>`
+- 全量：`uv run --directory .claude/hooks pytest`
+- 單檔或單一測項：`uv run --directory .claude/hooks pytest tests/<test-file>.py`
+
+不要從 repo 根目錄以 `uv run --with pytest python -m pytest .claude/hooks/tests/` 執行——repo 根目錄無 `pyproject.toml`，uv 會改用僅含 `--with` 套件的臨時環境，導致 9 個模組出現 `ModuleNotFoundError: No module named 'yaml'` 並中斷收集。完整說明與 PEP 723 檔案的處理見 `.claude/hooks/tests/README.md`。
 
 ### 配置外部化
 
@@ -314,9 +315,27 @@ Hook tests under `.claude/hooks/tests/` may include PEP 723 inline dependencies.
 
 詳細 API 參考請見：[共用模組 README](../lib/README.md)
 
-### Hook 維護與擴展流程
+### Hook 註冊單一來源原則（settings.json 唯一，settings.local.json 禁註冊 hook）
 
-**Hook 新增流程**：識別新的品質控制需求 -> 設計檢查邏輯和閾值 -> 實作 hook 腳本 -> 更新 `$CLAUDE_PROJECT_DIR/.claude/settings.local.json` -> 建立說明文件 -> 測試和驗證。
+**原則**：所有 hook 註冊一律寫入 `settings.json`（追蹤檔、被 sync 同步）。`settings.local.json` 僅放 `permissions` / `env` / `enabledMcpjsonServers` / `outputStyle` 等專案私有、不該散佈的配置，**禁止註冊任何 hook**。
+
+**Why**：hook 的「實際位置」（檔案系統）與「註冊路徑」（settings.json 內的字串）是同一事實的兩份副本，搬檔不會自動更新註冊。一旦 hook relocate（如 `.claude/hooks/` → `.claude/skills/*/hooks/`），舊註冊即成幽靈，每次對應 event 觸發 runtime `No such file or directory`。
+
+**Consequence（為何 local 層特別危險）**：`settings.local.json` 是 sync 排除檔，上游 relocate hook 並更新 canonical `settings.json` 後，**無任何機制能清理下游 local 層的舊註冊**——sync 碰不到 local 檔，孤兒 `--audit` 也掃不到 local 內部的孤兒註冊。故 local 層的 hook 註冊即使當下合法，relocate 後必成無法自癒的幽靈。同一 hook 跨 `settings.json` + `settings.local.json` 重複註冊則因 additive 合併語意而重複執行（auto-resume 類有副作用風險）。
+
+**Action**：
+
+| 場景 | 正確做法 |
+|------|---------|
+| 新增 hook | 註冊到 `settings.json`（非 `settings.local.json`） |
+| 發現 local 層已有 hook 註冊 | 移至 `settings.json`，從 local 移除 |
+| hook relocate | 更新 `settings.json` 的路徑；掃所有 settings 檔清理舊註冊 |
+
+**強制層**：`hook-completeness-check.py`（SessionStart）偵測三類問題並發出 WARNING——(1) 幽靈註冊（檔不存在）、(2) 跨檔重複註冊、(3) `settings.local.json` 內含任何 hook 註冊（latent ghost 預防，即使當下合法）。
+
+### Hook 維護與擴充流程
+
+**Hook 新增流程**：識別新的品質控制需求 -> 設計檢查邏輯和閾值 -> 實作 hook 腳本 -> 註冊到 `$CLAUDE_PROJECT_DIR/.claude/settings.json`（依上方單一註冊來源原則，禁用 settings.local.json）-> 建立說明文件 -> 測試和驗證。
 
 **效能優化流程**：Performance Monitor Hook 自動偵測 -> 分析效能瓶頸根因 -> 實施優化策略 -> 驗證改善效果 -> 更新效能基準。
 

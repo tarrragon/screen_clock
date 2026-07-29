@@ -1,9 +1,9 @@
 ---
 name: compositional-writing
-description: "Composes atomic, intent-revealing, grep-friendly writing (Zettelkasten) for code comments, docs, logs, prompts, schema/ticket fields, external-analysis transformation, and long-form technical articles. Use when cognitive load and token cost matter. **Also triggers during multi-round review / batch review / 寫作 audit** — provides the keyword bank (正向陳述 / 口語修辭 / 地區用語 / 廢話前綴 / 裝飾符號 / 對讀者喊話 / 自評誇飾 / 必然性框架) and frame-specific check lists that multi-round-review reviewer agents need. Triggers: 寫註解, 寫文件, 寫日誌, 寫 prompt, 寫文章, 技術文章, 商業分析, 外部分析文章, post-mortem, 架構決策, 除錯復盤, 欄位設計, atomic, reusable, 多輪審查, multi-round review, batch review, 寫作 audit, 正向陳述, 口語修辭, 字句層 grep."
+description: "Composes atomic, intent-revealing, grep-friendly writing (Zettelkasten) for code comments, docs, logs, prompts, schema/ticket fields, external-analysis transformation, and long-form technical articles. Use when cognitive load and token cost matter. **Also triggers during multi-round review / batch review / 寫作 audit** — provides the keyword bank (正向陳述 / 口語修辭 / 地區用語 / 廢話前綴 / 裝飾符號 / 對讀者喊話 / 自評誇飾 / 必然性框架 / 澄清式框架) and frame-specific check lists that multi-round-review reviewer agents need. Triggers: 寫註解, 寫文件, 寫日誌, 寫 prompt, 寫文章, 技術文章, 商業分析, 外部分析文章, 經驗談轉教學, 訪談整理, 機制重建, post-mortem, 架構決策, 除錯復盤, 欄位設計, atomic, reusable, 多輪審查, multi-round review, batch review, 寫作 audit, 正向陳述, 口語修辭, 字句層 grep, SOLID, 文章拆分, 結構決策, 擴充點, 依賴方向, 讀者分流."
 license: MIT
 metadata:
-  version: 0.15.0
+  version: 0.30.0
   category: writing-methodology
 ---
 
@@ -53,7 +53,29 @@ metadata:
 
 **選項數由議題本身的合理選項數決定**：機會成本的精神是「教思考方式」 — 議題有幾個合理選項就寫幾個（2 個寫 A/B、3 個寫 A/B/C、4 個寫 A/B/C/D）。強湊到固定數量會把「教思考」退化成「填格式」、生出「實務上幾乎不存在」的低品質假反模式。真正的反模式直接標「D：反模式 — 違反 X 原則」、給讀者明確的「為什麼這條路該避開」、保持誠實。
 
+**讀者定位聲明（生成端前置步驟）**：每個教學模組在第一篇文章生成前，顯式聲明讀者定位——一段話描述目標讀者的背景、已有能力、缺的經驗。這份聲明是後續所有生成和 review 的可檢查基準。缺少顯式聲明時，LLM 預設用「教外行人」的姿態寫教學內容，這個預設不被 review 挑戰（reviewer 共享同一個預設），導致宣導語氣通過多輪審查。per [outside-in reader frames report](/report/review-lacks-outside-in-reader-frames/)
+
+**讀者定位：缺經驗的專業人士、不是外行人**：技術教材的讀者是在特定領域缺乏經驗的專業人士，不是完全不懂的外行人。寫法是補足經驗缺口（直接描述情境與操作需求），不是從零科普（故事線導入、比喻堆疊、宣導語氣）。宣導式語氣（「你可能沒注意到」「把 X 想成 Y」「跑得好好的」）預設讀者無能、降低教材可信度。詳見 [audience-is-professional-not-layperson](references/principles/audience-is-professional-not-layperson.md)。
+
+**跨專業溝通用情境遞進、不用比喻堆疊**：向非本領域的專業人士（管理層、決策者）解釋技術議題時，減少術語並從簡單情境遞進到複雜情境。比喻傳遞形狀但不傳遞嚴重性、在細節處崩解、且隱含「對方聽不懂」的預設。用決策者熟悉的維度（影響範圍、恢復時間、成本量級）表達。詳見 [cross-expertise-scenario-not-analogy](references/principles/cross-expertise-scenario-not-analogy.md)。
+
+**技術教材內嵌管理層可彙報的資訊**：技術段落旁嵌入成本量級、時程估算、進度指標與決策簽核點（各 1-2 句），讓讀者學完技術做法的同時拿到向上彙報的素材。成本用量級不用精確數、時程用範圍不用單點、進度用可查詢指標。詳見 [management-reportable-info-in-technical-content](references/principles/management-reportable-info-in-technical-content.md)。
+
+**知識卡建卡判準用「最不熟悉的讀者」**：知識卡的建卡判準是「目標讀者群裡最不熟悉的那端能不能理解這個術語」，不是「作者覺得夠不夠常見」。常識是相對於背景的——.htaccess 對 PHP 工程師是常識、對 Node.js 工程師完全陌生。跨背景讀者群的教材裡，幾乎所有領域特定術語都需要建卡。建卡的邊際成本低（40-50 行）、讀者缺卡的代價高（離開教材去 Google、可能找到不一致的解釋）。per [常識是相對於讀者背景的](/report/common-knowledge-is-relative-to-reader-background/)。
+
+**操作步驟帶環境專屬工具路徑**：操作型文章的每一步至少帶一條工具路徑（用什麼軟體、輸入什麼指令）。同一個動作在不同環境（container / VM / 共享主機）的工具路徑可能完全不同——「拍下現況」在 container 是 `docker commit`、在 VM 是 AMI 快照、在共享主機是 FTP mirror + phpinfo。文章涵蓋多種環境時、每一步要按環境分列工具、或標明適用環境。自測問題：「讀者坐在電腦前，下一個動作是打開什麼軟體？」答不出來就是缺口。per [操作指引要帶環境專屬工具路徑](/report/operational-how-needs-environment-specific-tooling/)。
+
 **Case 引用段落的三段式結構**：三段式是案例引用段落的順序紀律 — 把「概念 → 案例 → 操作」三層分開承擔（段首給概念定義、case 引用居中、通用工程知識展開）、讓段落結構跟讀者學習新概念的認知順序對齊。LLM 從 case 反推內容容易把 case 揭露當概念出發點、實證觀察 11/12 段都犯這個錯。詳見 [case-citation-three-part-structure](references/principles/case-citation-three-part-structure.md)。
+
+**知識目標決定文章結構**：文章寫完後讀者帶走的是判斷能力（面對新情境能自己評估）還是操作步驟（照做能解決特定問題）——兩者需要不同的結構。判斷力導向把機制理解當主線、操作當自然推導的結果；流程導向把步驟當主線。多數教學文章應走判斷力導向——文章的價值在於提供判斷力、這是官方文件不做的事。詳見 [teach-judgment-not-procedure](references/principles/teach-judgment-not-procedure.md)。
+
+**判準寫到條件層**：判準有三個成熟度——口訣（無推導的結論）、維度清單（「判斷看 A / B / C」）、條件映射（「A 成立 → 做 X；A 破 → 切 Y」加失效情境）——教學要交付到第三層。維度清單是判準的空殼：有判準動詞、每個維度都有機制支撐、通過字句與機制審查，卻在讀者要做決定的那一刻斷線；且機制重建完成後它仍會殘留（機制正確與判準到位是兩個獨立檢查）。驗收用重算測試：讀者帶自己的參數進來能不能走出行動。條件不可窮舉的決策，用自查問句組（把變數轉成讀者可自答的問題）＋排序規則，同樣算第三層。詳見 [criteria-need-condition-action-mapping](references/principles/criteria-need-condition-action-mapping.md)。
+
+**教學模組要有推導源頭**：分析導向的教學模組（判準密集、讀者要帶走判斷力），模組級結構要是推導體系、不是主題集合——一個源頭機制（成本結構 / 約束 / 生命週期，各篇判準能折算回去的基準）、每篇承擔一條展開、模組入口能一句話說出推導起點。源頭買到：判準同尺、跨篇矛盾現形、擴篇有掛載點、推導式閱讀路線成立。目錄型模組與異質 case 記錄不適用；源頭是折算基準、不是開場模板。詳見 [teaching-module-needs-derivation-anchor](references/principles/teaching-module-needs-derivation-anchor.md) 與 `references/managing-article-collections.md` 的對應段。
+
+**複合問題先拆機制再談交互**：問題由多個概念交互導致時、先各自教 A / B / C 的機制、再談 A×B×C 交互。讀者理解各元件後交互作用是自然推導的。各概念獨立成篇、文章之間用連結而非重複來串接。判讀訊號是文章裡出現「另外還有一個原因是...」的堆疊式展開。詳見 [compound-problem-decompose-then-interact](references/principles/compound-problem-decompose-then-interact.md)。
+
+**原子筆記要有向上的議題入口**：承載知識的原子筆記（Zettelkasten 卡 / glossary / 術語條目）不是字典條目 — 字典答「這個詞是什麼」、承載知識答「你在討論什麼、撞到什麼問題、才需要這知識」。撰寫者有預設情境讀者沒有、所以每張卡（或其上層）要從情境進入而非劈頭給定義：建議題 hub（以讀者遇到的問題為題）討論再分流到原子卡、卡頂回指議題、讓搜尋直接落地者也有回路。沒這層卡淪字典、讀者沒有觸發點、不知何時用。詳見 [atomic-note-needs-situational-entry](references/principles/atomic-note-needs-situational-entry.md)。
 
 ### 4. 可查詢性（Searchability）
 
@@ -65,7 +87,7 @@ metadata:
 
 ### 6. 多輪 Re-read Pass（Multi-pass Review）
 
-寫完不是 done — 是進入 review 階段。一次寫對全部維度違反 working memory、實際結果是「每維度都做一半」。設計 N 輪 re-read、每輪用不同 frame：
+完稿即進入 review 階段。一次寫對全部維度違反 working memory、實際結果是「每維度都做一半」。設計 N 輪 re-read、每輪用不同 frame：
 
 | 輪  | Frame                                                                                                         | 抓什麼                                                                            |
 | --- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -83,7 +105,7 @@ Naming 是這條原則最容易跳的子場景 — 第一版命名幾乎不對�
 
 **高 stakes 內容追加輪 E（epistemic rigor、conditional opt-in）**：reader 照做後錯誤不可逆的內容（資安 / concurrency 正確性 / distributed consistency / financial / medical）在 5 輪基本 frame 之外、追加 stakes 軸的 epistemic rigor pass——比照學術 peer review 跑 claim / evidence / method / threats / citation 五個 sub-check、加上 audit recommendation tier（accept / minor / major / withdraw）。一般內容 5 輪夠、不跑輪 E；高 stakes 內容兩軸都跑。詳見 `references/auditing-articles.md` 跟 `references/principles/writing-multi-pass-review.md` 的「stakes-conditional 追加輪」段。
 
-**Production 教學文章追加輪 8-10（字句層 catch、跑 N 輪仍漏時觸發）**：跑了 5 輪基本 frame 仍系統性漏 catch 字句層問題（口語修辭 / 廢話前綴 / 地區漂移 / 依賴 code / **裝飾符號 emoji** / 對讀者喊話 / 自評誇飾 / 必然性框架）時、追加三個換軸機制——輪 8 keyword bank（換工具、含 emoji / 裝飾 unicode 掃描）、輪 9 reader simulation（換視角、兩 lens：自包含性 + register/stance）、輪 10 self-criticism（換層次、審視 framework 本身覆蓋度）。短文 / 即時 note 不需要、production 教學文章在跑 5 輪後仍漏同類問題時 opt-in。**keyword bank 命中是候選、不是判決**——grep 命中後仍要一個語意判定步驟（這個命中是建立概念的違規、還是合規的反例對照 / hook），reviewer 容易把違規合理化放行；偵測（bank）跟判定（語意）是兩個認知步驟。**register/stance 類（喊話 / 誇飾 / 必然）無穩定關鍵詞、keyword bank 抓不到、輪 9 reader-sim 是主 keyword bank 是輔、且最依賴 external cold-read**。漏抓後補機制前先分 **design gap**（框架缺 frame、改框架）vs **execution gap**（框架有 frame 但只跑了臨時子集、改執行不是改框架）——「加 keyword」對 execution gap 跟無關鍵詞的類都無效。詳見 [multi-pass-review-frame-granularity](references/principles/multi-pass-review-frame-granularity.md)、[decorative-symbols-keyword-bank](references/principles/decorative-symbols-keyword-bank.md)、[teaching-prose-neutral-register](references/principles/teaching-prose-neutral-register.md) 跟 `references/writing-articles.md` 輪 8-10 段。
+**Production 教學文章追加輪 8-10（字句層 catch、跑 N 輪仍漏時觸發）**：跑了 5 輪基本 frame 仍系統性漏 catch 字句層問題（口語修辭 / 廢話前綴 / 地區漂移 / 依賴 code / **裝飾符號 emoji** / 對讀者喊話 / 自評誇飾 / 必然性框架 / 恐嚇式語氣 / 歸因語氣）時、追加三個換軸機制——輪 8 keyword bank（換工具、含 emoji / 裝飾 unicode 掃描）、輪 9 reader simulation（換視角、四 lens：自包含性 + register/stance + meta 殘留 + AI 歸因過度）、輪 10 self-criticism（換層次、審視 framework 本身覆蓋度）。短文 / 即時 note 不需要、production 教學文章在跑 5 輪後仍漏同類問題時 opt-in。**keyword bank 命中是候選、不是判決**——grep 命中後仍要一個語意判定步驟（這個命中是建立概念的違規、還是合規的反例對照 / hook），reviewer 容易把違規合理化放行；偵測（bank）跟判定（語意）是兩個認知步驟。**register/stance 類（喊話 / 誇飾 / 必然）無穩定關鍵詞、keyword bank 抓不到、輪 9 reader-sim 是主 keyword bank 是輔、且最依賴 external cold-read**。漏抓後補機制前先分 **design gap**（框架缺 frame、改框架）vs **execution gap**（框架有 frame 但只跑了臨時子集、改執行不是改框架）——「加 keyword」對 execution gap 跟無關鍵詞的類都無效。詳見 [multi-pass-review-frame-granularity](references/principles/multi-pass-review-frame-granularity.md)、[decorative-symbols-keyword-bank](references/principles/decorative-symbols-keyword-bank.md)、[teaching-prose-neutral-register](references/principles/teaching-prose-neutral-register.md) 跟 `references/writing-articles.md` 輪 8-10 段。
 
 **批量 sibling 寫作的生成端輪替**：一次寫多份同類文檔時、cadence 同質化會在六個層發生（title 形式 / 開場句式 / 章節標題 / 敘事骨架 / 條目形態 / 跨檔引用句）、單份 review 全部抓不到、且 review 端抓過的同骨會在下一批復發 — 同類 finding 第二次出現、就把規則升到生成端：寫之前排好開場 frame 輪替（規則先行 / 後果先行 / 動作先行 / 反差先行）、條目形態輪替、敘事視角輪替、引用句去重。詳見 [cadence-homogenization](references/principles/cadence-homogenization.md)。
 
@@ -95,21 +117,22 @@ Naming 是這條原則最容易跳的子場景 — 第一版命名幾乎不對�
 
 ## When to Consult This Skill（觸發路由）
 
-| 觸發情境                                                                                                                                                                    | 讀哪份 reference                                                                                                   |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 要寫或改一段程式碼註解 / doc comment                                                                                                                                        | `references/writing-code-comments.md`                                                                              |
-| 要起草 / 改寫一份文件（worklog、spec、README）                                                                                                                              | `references/writing-documents.md`                                                                                  |
-| 要設計 log / 錯誤訊息 / 結構化輸出                                                                                                                                          | `references/writing-logs.md`                                                                                       |
-| 要撰寫給 AI 的 prompt / instruction / Agent 派發 / Ticket Context Bundle                                                                                                    | `references/writing-prompts.md`（為 `.claude/rules/core/ai-communication-rules.md` 的詳細版庫，portability-allow） |
-| 要撰寫完整長篇技術文章（blog post / post-mortem / 架構決策 / 除錯復盤 / 技術評估）                                                                                          | `references/writing-articles.md`                                                                                   |
-| 要把外部分析文章 / 產業評論 / 投資人備忘錄 / 高密度研究材料轉成教學型分析文章，或把 AI 改寫稿從摘要升級成可遷移框架                                                         | `references/source-to-teaching-analysis.md`                                                                        |
-| 要翻譯 / 轉譯文章、把英文材料改寫成中文、檢查術語誤譯或中文譯名放回句子後是否成立                                                                                           | `references/translation-review.md`                                                                                 |
-| 要管理多篇相關文章的結構（系列、文集、知識庫、素材庫比例、MOC、跨篇引用、何時抽抽象層 / Pattern 卡片）                                                                      | `references/managing-article-collections.md`                                                                       |
-| 要對既有高 stakes 內容（資安 / concurrency / distributed / financial / medical）做 reviewer-style audit、找 false sense of security / 對位失效 / context 缺 / citation 過時 | `references/auditing-articles.md`                                                                                  |
-| 要設計 ticket 欄位 / schema frontmatter / 表單欄位                                                                                                                          | `references/designing-fields.md`                                                                                   |
-| 想驗證寫作品質（認知負擔、獨立理解率）                                                                                                                                      | `references/meta-metrics.md`                                                                                       |
-| 要新增或修改一份 Skill reference（撰寫品質規範、結構標準）                                                                                                                  | `references/reference-authoring-standards.md`                                                                      |
-| 要驗收 Skill 發布品質（語意層驗收、Phase 2 dry-run）                                                                                                                        | `references/dry-run-guide.md`                                                                                      |
+| 觸發情境                                                                                                                                                                              | 讀哪份 reference                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 要寫或改一段程式碼註解 / doc comment                                                                                                                                                  | `references/writing-code-comments.md`                                                                              |
+| 要起草 / 改寫一份文件（worklog、spec、README）                                                                                                                                        | `references/writing-documents.md`                                                                                  |
+| 要設計 log / 錯誤訊息 / 結構化輸出                                                                                                                                                    | `references/writing-logs.md`                                                                                       |
+| 要撰寫給 AI 的 prompt / instruction / Agent 派發 / Ticket Context Bundle                                                                                                              | `references/writing-prompts.md`（為 `.claude/rules/core/ai-communication-rules.md` 的詳細版庫，portability-allow） |
+| 要撰寫完整長篇技術文章（blog post / post-mortem / 架構決策 / 除錯復盤 / 技術評估）                                                                                                    | `references/writing-articles.md`                                                                                   |
+| 要把外部分析文章 / 產業評論 / 投資人備忘錄 / 高密度研究材料轉成教學型分析文章，把從業者經驗談（訪談 / 社群貼文 / 口述）轉成分析教學（機制重建），或把 AI 改寫稿從摘要升級成可遷移框架 | `references/source-to-teaching-analysis.md`                                                                        |
+| 要翻譯 / 轉譯文章、把英文材料改寫成中文、檢查術語誤譯或中文譯名放回句子後是否成立                                                                                                     | `references/translation-review.md`                                                                                 |
+| 要管理多篇相關文章的結構（系列、文集、知識庫、素材庫比例、MOC、跨篇引用、何時抽抽象層 / Pattern 卡片）                                                                                | `references/managing-article-collections.md`                                                                       |
+| 要做文章 / 模組 / 系列的結構決策（該不該拆篇、擴充點設計、方法論與案例的依賴方向、多讀者分流）、或用結構原則 review 既有文集                                                          | `references/structuring-with-solid.md`                                                                             |
+| 要對既有高 stakes 內容（資安 / concurrency / distributed / financial / medical）做 reviewer-style audit、找 false sense of security / 對位失效 / context 缺 / citation 過時           | `references/auditing-articles.md`                                                                                  |
+| 要設計 ticket 欄位 / schema frontmatter / 表單欄位                                                                                                                                    | `references/designing-fields.md`                                                                                   |
+| 想驗證寫作品質（認知負擔、獨立理解率）                                                                                                                                                | `references/meta-metrics.md`                                                                                       |
+| 要新增或修改一份 Skill reference（撰寫品質規範、結構標準）                                                                                                                            | `references/reference-authoring-standards.md`                                                                      |
+| 要驗收 Skill 發布品質（語意層驗收、Phase 2 dry-run）                                                                                                                                  | `references/dry-run-guide.md`                                                                                      |
 
 每份 reference 自包含：以該情境為核心，把核心原則翻譯成可直接套用的檢查項與範例。閱讀任一 reference 不需要回來看其他 reference。
 
@@ -145,14 +168,20 @@ Naming 是這條原則最容易跳的子場景 — 第一版命名幾乎不對�
 
 - **multi-round-review** 規劃 frame 切換結構（Round 1 compliance / Round 2 cadence / Round 3 self-application）跟跨輪 finding 整合工作流
 - **本 skill（compositional-writing）** 提供每輪 frame 的字句層 keyword bank — Round 1-A 寫作規範 reviewer 必須跑：
-  - **正向陳述優先 grep**：`rg "不[行可是要能該支對符夠必]|無法|沒[做有]|而非|而不是"` — 主要敘述要正向、反例對照的少量負向可保留
+  - **正向陳述優先 grep**：`rg "不[行可是要能該支對符夠必]|無法|沒[做有]|而非|而不是"`、加上**否定起手定義句**（原 pattern 漏「而是」、抓不到「不是 X、而是 Y」的後半）：`rg "不是.{0,30}而是|不是.{0,20}、是|與其.{0,20}不如|不只.{0,15}更"` — 主要敘述要正向、反例對照的少量負向可保留；判別在「核心概念第一次正面出現在句首、還是被擠到『而是』之後」
   - **口語修辭 grep**：`rg "其實|實務上|真的|碰巧|立刻撞牆|沒事"`
-  - **地區用語 grep**：`rg "集群|默認|質量|視頻|函數|文件夾|接口"`
+  - **地區用語 grep**：單詞層 `rg "集群|默認|質量|視頻|函數|文件夾|接口"`（封閉集合、掃得到）；慣用語層 `rg "拍腦袋|拍板|靠譜|給力|接地氣|一波|死磕|躺平|內卷"`（已知個案、**非窮舉**——慣用語是開放集合、grep 追不完、新個案要靠目標地區讀者冷讀，同源 reviewer 回報「地區用語 clean」對慣用語層不可當真，見 [`regional-idioms-evade-keyword-bank`](references/principles/regional-idioms-evade-keyword-bank.md)）
   - **廢話前綴 grep**：`rg "值得注意的是|需要說明的是|實際上|基本上|事實上"`
   - **裝飾符號 grep**：`rg "✅|❌|⚠️|🚨|🟡|🟢|⭐|📌|✓|✗"`
-  - **對讀者喊話 grep**：`rg "很多人|大家|不少人|你天天|你會|你可能|先讀懂|先釐清|別搞混|別被"` — 教材中性陳述、不安撫情緒 / 不第二人稱代入 / 不祈使控制閱讀（hook / narrative 段落輕度第二人稱可留）
+  - **對讀者喊話 grep**：`rg "很多人|大家|不少人|你的|你在|你把|你天天|你會|你可能|先讀懂|先釐清|別搞混|別被"` — 教材中性陳述、不安撫情緒 / 不第二人稱代入 / 不祈使控制閱讀（hook / narrative 段落輕度第二人稱可留）。**裸所有格 / 主詞（你的 X / 你在 X）也算、不限「你 + 動詞」的祈使 / 預測句型**；grep 對裸『你』非窮舉、真防線是 reader-simulation 冷讀（同源 grep 抓不到 register、見 [multi-pass-review-frame-granularity](references/principles/multi-pass-review-frame-granularity.md)）
   - **自評誇飾 grep**：`rg "教科書級|堪稱|可謂|完美|經典|範本級|大師級|漂亮地|優雅地|最佳實踐|best practice"` — 品質 verdict 頂替技術理由、換成機制 / 條件
   - **必然性框架 grep**：`rg "天生|與生俱來|本質就是|本來就是|必然|唯一|註定|理所當然"` — 把設計選擇講成自然法則、還原成條件性（物理 / 法律 / 數學事實除外）
+  - **澄清式框架 grep**：`rg "最容易誤|容易誤判|常見的?誤判|要點破|直覺會?帶偏|抵抗.*的直覺|你以為|會困惑|值得記"` — 把「讀者會誤解」當敘事中心是知識缺口訊號、不是澄清時機；補正向模型與機制讓誤解無從發生、不提醒讀者一個他本不需要有的困惑。界線是具體第一人稱實測敘事跟真實診斷區分（逾時 vs 被拒、症狀層 vs 根因層）保留、只有把假想誤會當主題句起手的才改；同義變體多、grep 抓不全、靠 reader-simulation 語意判定（「這段在補正向知識、還是在提醒讀者會犯錯？」）。見 [fill-knowledge-gap-not-center-misconception](references/principles/fill-knowledge-gap-not-center-misconception.md)
+  - **歸因語氣 grep**：`rg "承認|暴露了|證明了失敗|被迫"` — 描述系統行為用「信號」「反映」「顯示」等中性觀測詞、避免「承認」「暴露」等責任歸因詞；「被迫」在描述外部強制約束時可保留
+  - **宣導語氣 grep**：`rg "你可能沒注意|你可能不知道|想像一下|把.{1,5}想成|跑得好好的|聽起來很|其實很簡單|說穿了就是|等於拆未爆彈|乾瞪眼|延遲引爆"` — 預設讀者無知或用情緒管理取代事實陳述；讀者是專業人士、直接描述情境與後果
+  - **泛用詞濫用 grep**：`rg "坑|東西|搞|弄|處理一下|情況"` — 同一個泛用詞蓋過不同具體情境時、依情境換精確詞（意外 / 陷阱 / 出問題 / 發生狀況）；命中密集且各指不同事才算違規、真泛指 / 引號引用 / 輕度 hook 合規；「坑」另有地區偏移面（某些地區高頻、某些少用）。見 [avoid-overused-generic-words](references/principles/avoid-overused-generic-words.md)
+  - **用詞搭配錯位 grep**：`rg "說完的話|背後.{0,8}的話|想告訴|潛台詞|訊號很直接|訊號.{0,4}很直接"` — 把抽象概念（角度 / 框架 / 訊號 / 數字）配上不貼合屬性的謂語：擬人化錯配（角度不會「說」、數字不會「想告訴」）與形容詞錯配（訊號的可辨識度是「清晰 / 明確」不是「直接」）。無穩定關鍵詞、grep 只抓已知形態、真防線是異源冷讀（跟 register 類同屬同源盲區）。見 [word-choice-fits-concept-attributes](references/principles/word-choice-fits-concept-attributes.md)
+  - **這些 grep 曝光候選、不做自動判定**：命中後要不要算違規有品味核心；且 LLM reviewer 跟作者共享文體、同源自審對 register 類（否定起手 / 喊話 / 誇飾 / 概念前置）有結構上限 ——「不是 X、而是 Y」這種 LLM 高頻自產句型最容易全員放水。grep + 同源判定只負責曝光候選、register 層的真防線是文體異源視角（human cold-read 或 prompt 採「挑剔否定起手 / 概念後置」對抗姿態的 reviewer）、同源回報的「clean」不可當真
 
 詳細各維度的判讀規則跟修法、見對應 reference（writing-articles / writing-documents 等）跟 `references/principles/` 內的 cadence-homogenization / colloquial-rhetoric / regional-terminology / decorative-symbols / multi-pass-review-frame-granularity 等卡。
 
@@ -180,6 +209,7 @@ compositional-writing/
     ├── source-to-teaching-analysis.md     # 情境 5a：外部分析材料 → 教學型分析文章
     ├── translation-review.md             # 情境 5b：文章翻譯 / 轉譯的句內邏輯 review
     ├── managing-article-collections.md   # 情境 5c：跨多篇文章的結構（三層、素材庫比例、MOC、Pattern 卡片）
+    ├── structuring-with-solid.md         # 情境 5d：結構決策判準（SOLID 寫作映射：拆分 / 擴充點 / 依賴方向 / 讀者分流）
     ├── designing-fields.md               # 情境 6：欄位設計（含六欄位角度總表）
     ├── designing-fields-ticket-6w.md     # 六欄位詳細範例：正確 + 混淆共 12 項（按需讀取）
     ├── meta-metrics.md                   # 品質量化驗收（M1-M5）
@@ -197,6 +227,30 @@ compositional-writing/
 3. 想驗證成果 → 讀 `meta-metrics.md` 做自評
 
 ---
+
+**Last Updated**: 2026-07-20
+**Version**: 0.32.0 — keyword bank 新增「用詞搭配錯位」grep（擬人化謂語 + 形容詞誤搭：分析角度不會「說」、訊號的可辨識度是「清晰」不是「直接」）、新增 principle 卡 [word-choice-fits-concept-attributes](references/principles/word-choice-fits-concept-attributes.md)；從一次多輪審查中兩處搭配錯位由人類冷讀 catch（agent 同源多輪 register / cadence / 冷讀全漏）抽出，是 register 同源盲區需異源的實例
+**Version**: 0.31.0 — `writing-articles.md` 規則二後新增「分析型文章的開頭：定位問題先行、不放敘事或寫作動機」：分析文章開頭第一段直接進定位問題（對象在什麼結構位置、什麼特徵值得判讀），是規則二「商業邏輯先於 CASE」在開頭層的具體形式；抓兩種失焦——敘事性引言（創辦人故事 / 沿革當暖場、對認識有用對判讀沒用）與寫作動機框架（「我們為什麼分析」是編輯層資訊、不是內容層、洩漏編輯決策給讀者）；自檢是拿掉來歷句與動機句後開頭還能不能給出判讀錨點。從商業分析文章的多輪審查回流
+**Version**: 0.30.0 — 新增 `structuring-with-solid.md` reference（情境 5d：結構決策判準）：SOLID 五原則的寫作映射——S 一篇一變動理由（拆分測試：變動理由 / 刪除）、O 擴充點設計（管結構骨架、不管敘事內容——顯式劃界避免模板化滑坡）、L 介面承諾 vs 實作履行（title / description / index hook 對內文、同分類功能契約）、I 讀者分流三層（模組路線表 / 文章視角分段 / 術語卡外移）、D 具體依賴抽象（案例引方法論、方法論不反向依賴）；含結構同構表、每原則錯對範例、結構檢查清單（條件 → 行動）、類比邊界三聲明（review 是執行機制 / L 最弱 / 模板化滑坡）。定位在組合層、跟原子化原則分層分工（S 是兩層接縫）。從一次「個體案例 vs 跨個體比較」的實際 SRP 拆分經驗抽出。觸發詞加 SOLID / 文章拆分 / 結構決策 / 擴充點 / 依賴方向 / 讀者分流；metadata.version 同步修正漂移（0.28.0 → 0.30.0）
+**Last Updated**: 2026-07-15
+**Version**: 0.29.0 — 對讀者喊話 keyword bank 補裸第二人稱（使用者冷讀觸發：一張 report 卡整篇用「你的環境」「你在一台機器」通過作者自審）：grep 加 `你的|你在|你把`、SKILL.md + multi-round-review mirror 同步、principle 卡 teaching-prose-neutral-register 的「第二人稱代入」段補裸所有格 / 主詞例；根因是原 grep `你天天|你會|你可能` 只抓「你 + 明顯動詞」的祈使 / 預測句型、抓不到裸『你的』『你在』——這正是 multi-pass-review-frame-granularity 講的同源盲區（register 類 grep 非窮舉、真防線是異源冷讀），作者自審的同源 grep 漏掉、人類冷讀一眼抓到
+**Last Updated**: 2026-07-10
+**Version**: 0.28.0 — 從一次教學模組重寫的 before / after retrospective 抽出建構端兩原則（重寫前為經驗談攤平結構、重寫後為推導體系，對比揭露主題集合與空殼判準兩個結構缺陷）：(1) 原則 3 加「判準寫到條件層」——口訣 / 維度清單 / 條件映射三成熟度、重算測試驗收、機制重建完成後空殼仍會殘留（同 batch 兩個版本各踩一次的實證）、自查問句組是條件不可窮舉時的合法變體，新增 principle 卡 [criteria-need-condition-action-mapping](references/principles/criteria-need-condition-action-mapping.md)；(2) 原則 3 加「教學模組要有推導源頭」＋ managing-article-collections 新增對應段——推導體系 vs 主題集合、源頭買到判準同尺 / 矛盾現形 / 擴篇掛載 / 推導式路線四件事、目錄型模組豁免、源頭是折算基準不是開場模板，新增 principle 卡 [teaching-module-needs-derivation-anchor](references/principles/teaching-module-needs-derivation-anchor.md)
+**Version**: 0.27.0 — source-to-teaching-analysis 加「Source Type Gate + 經驗談機制重建 pass」（使用者判定觸發：採購 planning 模組被判定「講故事不是商業分析教學」）：轉換第一步判別 source 類型——分析文自帶分析層、走拆層；經驗談（訪談 / 社群貼文 / 口述）只有事實 + 判讀、分析層要重建。機制重建對承擔判準的斷言問四個問題（成本結構 / 閾值反推 / 設計者誘因 / 既有分析語言）、三層分工表（事實保留 / 判讀當 hypothesis / 機制補建）、停止線（氛圍性敘述降 hook、心態內容路由成篇）；自檢清單 + 反模式表同步；新增 principle 卡 [anecdotal-source-needs-mechanism-reconstruction](references/principles/anecdotal-source-needs-mechanism-reconstruction.md)；觸發詞加「經驗談轉教學 / 訪談整理 / 機制重建」；metadata.version 同步修正長期漂移（0.18.0 → 與 changelog 對齊）
+**Version**: 0.26.0 — 新增「澄清式框架」字句層 frame（使用者回饋觸發：教材把「讀者會誤解」當敘事中心）：keyword bank 加 `rg "最容易誤|容易誤判|常見的?誤判|要點破|直覺會?帶偏|抵抗.*的直覺|你以為|會困惑|值得記"`、同步 description bank 清單、新增 principle 卡 [fill-knowledge-gap-not-center-misconception](references/principles/fill-knowledge-gap-not-center-misconception.md)（「容易誤會」是知識缺口訊號、補正向模型而非澄清警告、界線是具體實測敘事與真實診斷區分保留）；是 teaching-prose-neutral-register 的 stance 軸之外的知識供給軸 sibling；從遠端 agent 工作機教材三輪 review catch 6 處同構框架抽出（對應 report #215）
+**Version**: 0.25.0 — 原則 3 加文章結構上游決策：(1) 新增 principle 卡 [teach-judgment-not-procedure](references/principles/teach-judgment-not-procedure.md)（知識目標決定文章結構、判斷力導向 vs 流程導向、多數教學文章走判斷力導向）；(2) 新增 principle 卡 [compound-problem-decompose-then-interact](references/principles/compound-problem-decompose-then-interact.md)（複合問題先拆機制再談交互、各概念獨立成篇用連結串接）；(3) teaching-prose-neutral-register 補「壓縮結論」共同根因段（喊話/誇飾/必然/恐嚇/威脅/命令/教訓共享「作者走完推導但只輸出最後一步」機制、命名四類違反的統一解釋）
+**Version**: 0.24.0 — 地區用語 keyword bank 加慣用語層：新增 `regional-idioms-evade-keyword-bank` portable principle（地區慣用語直譯是開放集合、grep 列舉不完、同源讀得懂會放行、跟 register 同源盲區同構、需目標地區讀者異源冷讀）；地區用語 grep 拆單詞層（封閉、掃得到）+ 慣用語層（拍腦袋/靠譜/給力… 已知個案、非窮舉）；從 devops 容量規劃多輪審查漏抓「拍腦袋」的 self-case 抽出（三輪 agent reviewer 都沒抓到、使用者在地冷讀點出）
+**Version**: 0.23.0 — 新增「泛用詞濫用」字句層 frame（讀者回饋觸發：反覆用「坑」把不同情境壓成同一模糊標籤、繁中少用）：keyword bank 加 `rg "坑|東西|搞|弄|處理一下|情況"`、新增 principle 卡 [avoid-overused-generic-words](references/principles/avoid-overused-generic-words.md)（依情境換精確詞、跟 colloquial/regional/cadence 三卡的軸區分）、writing-articles 輪 8 清單同步；命中密集且各指不同事才違規、真泛指 / 引號 / 輕度 hook 合規
+
+**Version**: 0.22.0 — 原則 3 加「知識卡建卡判準用最不熟悉的讀者」；常識是相對於讀者背景的、跨背景讀者群幾乎所有領域特定術語都需要建卡
+**Version**: 0.21.0 — 原則 3 加「操作步驟帶環境專屬工具路徑」（同動作在 container/VM/共享主機的工具不同）
+**Version**: 0.20.0 — 原則 3 加「讀者定位聲明」生成端前置步驟；從 infra 模組 retrospective 抽出（讀者定位未預設導致宣導語氣通過三輪審查）
+**Version**: 0.19.0 — 新增三張 principle 卡（audience-is-professional-not-layperson / cross-expertise-scenario-not-analogy / management-reportable-info-in-technical-content）、原則 3 加讀者定位與跨專業溝通子原則、keyword bank 加宣導語氣 grep；從 infra 教學模組的寫作 retrospective 抽出
+
+**Version**: 0.18.0 — 輪 9 reader-sim 加第四 lens「AI 歸因過度」（AI 生成內容系統性把通用 pattern 框為 AI 特有、縮窄適用範圍且背上無法證實的舉證負擔；判準：「AI」換成「作者」論點仍成立 → 改通用觀察）；提交自檢清單加第 4 個生成端自問句（AI 歸因測試）。
+**Version**: 0.17.0 — keyword bank 新增歸因語氣 grep + 否定起手定義句 pattern；輪 8-10 描述補恐嚇式語氣 / 歸因語氣；移除 comment-qa-hook / worklog-format-check hook（職責已由其他機制覆蓋）；references 更新（atomic-note / teaching-prose / writing-articles / writing-documents）。
+
+**Version**: 0.16.0 — 從工具 opinion 文章的三輪審查 + 使用者回饋回流 6 張 report 卡（WRAP 分析後選混合方案）：(1) keyword bank 加歸因語氣 grep（`承認|暴露了|證明了失敗|被迫`）— 唯一有穩定關鍵詞的新 design gap；(2) `teaching-prose-neutral-register` 加第四類「恐嚇式語氣」（把讀者放在被警告位置、判別線是「你→我們」替換測試）；(3) writing-articles 輪 9 reader-sim 加第三 lens「meta 資訊 vs 內容」（涵蓋 meta-commentary 殘留 + 主題偏移兩個 gap）；(4) writing-articles 提交自檢清單加 3 個生成端自問句（恐嚇式 hook / meta 刪除測試 / 歸因語氣）。不新增 principle 卡（27 張已夠、新議題融入現有卡）、不增 SKILL.md 主體段落（密度飽和、改動集中在 keyword bank 一行 + 下游 reference）。
 
 **Last Updated**: 2026-06-11
 **Version**: 0.15.0 — 對七張同批 report 卡（#157-#163 主題：語意錨 / 決策表 / 入口分流 / 跨 surface / 摘要模態 / 引用詞彙 / 欄位契約）跑三 reviewer audit 後的回饋：(1) 新增 principle 卡 [cadence-homogenization](references/principles/cadence-homogenization.md)（同時修復 SKILL.md 長期 dangling 的引用）— 六個同骨層實測清單 + 生成端輪替規則 + 「同類 finding 第二次出現升生成端」的升級原則（觸發：上一輪抓過的「判準句同模」在本批復發、擴到 4/7）；(2) 原則 6 surface enumeration 補 description 模態檢查（實測 4/7 份 description 模態漂移、其中一份把同批另一張卡才立的「候選」壓成「證據」）；(3) 原則 6 補批量 sibling 生成端輪替段；(4) 原則 2 補「語意錨單一字串 + 引用他卡用對方詞彙」段（關係宣告 28 條核對抓到 2 條：被引卡沒漏的宣稱成漏、對方的 navigation surface 被轉述成 metadata surface）。

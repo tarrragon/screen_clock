@@ -14,22 +14,37 @@ docs/spec/{domain}/{feature}.md
 
 ### Domain 列表
 
-| Domain | 核心責任 | 依賴 |
-|--------|---------|------|
-| core | 資料模型、錯誤處理、事件系統 | 無（基礎層） |
-| extraction | 從網頁提取書籍資料 | core, platform, messaging |
-| platform | 平台偵測、適配器管理 | core |
-| data-management | 儲存、匯入匯出、同步 | core |
-| messaging | 跨 context 通訊 | core |
-| page | 頁面偵測、Content Script | core, messaging |
-| system | 生命週期、健康監控 | core |
-| user-experience | UI、搜尋、篩選 | core, data-management |
+Domain 清單依專案而異，不在本文件固定列舉（固定列舉會綁死特定專案，違反框架資產與專案產物分離原則）。查詢當前專案實際 domain 與其下 spec：
+
+```bash
+doc domain          # 無參數：動態列出 docs/spec/ 下所有 domain 子目錄
+doc domain <name>   # 帶 domain 名稱：列出該 domain 下的 spec 清單與關聯 UC
+```
+
+domain 之間的核心責任與依賴關係屬專案知識，記錄於該專案的 `docs/domain-map.md`（單 domain）或 `docs/spec/{domain}/domain-map.md`（多 domain），非本 Skill 範疇。
 
 ## 模板
 
+### 功能規格模板（預設）
+
 模板位置：`.claude/skills/doc/templates/spec-template.md`
 
-### 必填 frontmatter
+適用於功能需求、API 規格、資料模型等一般性規格文件。
+
+### Design System 規格模板
+
+模板位置：`.claude/skills/doc/templates/design-system-spec-template.md`
+
+適用於定義專案統一視覺規格（配色、間距、圓角、陰影、字體、元件尺寸）。包含：
+- Token 表格格式：`| Token | 值 | Dart/JS 對應 | 用途 |`
+- 常數配置策略（集中 vs 分散的判斷決策表）
+- 跨語言目錄結構對照（Flutter/JS/TS/React/Vue/Electron）
+- WCAG 對比度要求
+- 跨平台對齊章節
+
+使用時機：新專案建立 UI design system 規格，或既有專案統一視覺 token 管理。
+
+### 功能規格模板必填 frontmatter
 
 | 欄位 | 說明 |
 |------|------|
@@ -58,3 +73,38 @@ docs/spec/{domain}/{feature}.md
 | `部分實作` | 有基本架構但功能不完整 |
 | `[ ] 未實作` | 尚未有實作 |
 | `刻意暫置` | 程式碼已寫但刻意不啟用 |
+
+## 介面規格章節指引
+
+Spec 的「介面規格」和「資料模型」章節需要比 FR 更具體的設計細節（endpoint 路徑、參數格式、回應結構、DDL）。這些細節的來源：
+
+| 來源 | 優先序 | 說明 |
+|------|--------|------|
+| 專案既有設計文件（教學/RFC/ADR） | 最高 | 若 CLAUDE.md 指向既有設計文件，介面設計以該文件為準 |
+| SaaS 決策記錄 §2 介面契約段 | 次高 | 訪談中確認的介面契約 |
+| 教學/範例程式碼中的具體定義 | 中 | 教學文章中的 Go interface、SQL DDL、config YAML |
+| Claude 推導填補 | 最低 | 標記為 `<!-- inferred -->`（見 saas skill 推導標記規範） |
+
+撰寫介面規格時，先查來源 1-3 再推導。推導的設計必須標記，交付時附推導項清單。
+
+## Spec → Ticket 轉換指引
+
+Spec 完成後轉為 ticket 時，依以下原則拆分：
+
+| 拆分依據 | 說明 | 範例 |
+|---------|------|------|
+| 功能邊界 | 每個 FR 群組可獨立測試 | Storage DDL + Store + Query = 一個 ticket |
+| 依賴順序 | 被依賴的先做 | interface 定義先於實作 |
+| 認知負擔 | 單一 ticket 修改 ≤ 5 個檔案 | 大 FR 拆成子 ticket |
+
+轉換後須執行三方交叉比對驗證：
+
+1. **Spec FR ↔ Ticket**：每個 FR 至少被一個 ticket 覆蓋
+2. **UC 場景 ↔ Ticket**：每個 UC 主成功/替代/例外場景都有 ticket 對應
+3. **Proposal 驗收條件 ↔ Ticket**：每項驗收條件都有 ticket 對應
+
+任一比對有遺漏即需補 ticket 或修 Spec。
+
+## 銜接 TDD 流程
+
+Spec/UC 轉為 TDD 流程時，見 `.claude/skills/tdd/references/doc-handoff.md`。銜接流程把 Spec FR→Phase 1 功能規格種子、UC 步驟→GWT 行為場景種子、UC 資訊鏈→整合測試映射。銜接由 TDD 端消費（`/tdd start` 時偵測 doc 文件自動觸發），doc 端不需額外操作。

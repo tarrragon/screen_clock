@@ -37,8 +37,9 @@ from typing import Dict, Any, Optional, Tuple, List
 
 # 加入 hook_utils 路徑（相同目錄）
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hook_utils import (
+from lib import (
     setup_hook_logging, run_hook_safely, read_json_from_stdin,
     extract_tool_input, validate_hook_input, get_project_root,
     is_subagent_environment, get_effort_level,
@@ -601,14 +602,7 @@ def main() -> int:
             }, ensure_ascii=False, indent=2))
             return EXIT_SUCCESS
 
-        # Effort 感知（v2.1.133+，W14-036）：low effort 短路放行
         effort = get_effort_level(input_data)
-        if effort == "low":
-            logger.info("effort=low，phase-completion-gate 短路放行")
-            print(json.dumps({
-                "hookSpecificOutput": {"hookEventName": "PostToolUse"}
-            }, ensure_ascii=False, indent=2))
-            return EXIT_SUCCESS
         logger.info("effort=%s，執行完整 phase-completion 驗證", effort)
 
         # 偵測 subagent 環境：agent_id 僅在 subagent 中出現

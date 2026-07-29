@@ -51,3 +51,9 @@ from acceptance_checkers.sibling_checker import (
 from acceptance_checkers.multi_view_checker import (
     check_multi_view_status,
 )
+from acceptance_checkers.spawn_request_checker import (
+    check_spawn_requests,
+)
+from acceptance_checkers.phase4_review_checker import (
+    check_phase4_review_evidence,
+)

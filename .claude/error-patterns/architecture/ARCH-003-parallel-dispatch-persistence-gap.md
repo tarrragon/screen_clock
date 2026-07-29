@@ -1,3 +1,10 @@
+---
+id: ARCH-003
+title: 並行代理人持久化落差
+category: architecture
+severity: high
+created: 2026-02-26
+---
 # ARCH-003: 並行代理人持久化落差
 
 ## 基本資訊

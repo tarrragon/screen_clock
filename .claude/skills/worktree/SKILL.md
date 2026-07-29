@@ -29,6 +29,16 @@ Claude Code 的 Agent tool 設定 `isolation: "worktree"` 派發 subagent 時，
 
 **Why**：worktree 隔離讓 subagent 的檔案改動與主 repo 解耦，避免並行派發時互相覆蓋；lock + PID 是 cc 對 git GC 的防護，確保長時間 agent 執行不被 `git worktree prune` 中斷。
 
+### Base ref 與隔離邊界（W3-007 / W3-008）
+
+| 議題 | 事實 | 對策 |
+|------|------|------|
+| worktree base 取自哪裡 | cc runtime 以 `origin/main`（remote-tracking ref）為 base，**非** local main HEAD。local main 領先 origin/main 時 worktree 建在 stale 基底（W3-007 實證） | 派發前先 `git push origin main`；`worktree-commit-before-dispatch-hook.py` 在 origin/main 落後時 stderr 警告 |
+| daemon-rooted 寫入工具洩漏 | dart MCP（dart fix / dart format）daemon 的 analysis root 在 session 啟動時綁定主 repo，worktree 派發只改 shell cwd，無法切換 daemon root，寫入會洩漏到主 repo（W3-008 根因 2） | worktree 實作 agent **禁用 dart MCP 寫入工具，改用 Bash `dart fix` / `dart format`（尊重 agent cwd）或 Edit** |
+| ticket CLI auto-commit 洩漏 | `paths.py:get_project_root()` 原優先讀 `CLAUDE_PROJECT_DIR`（恆指向主 repo），使 ticket md 寫入與 auto-commit 落在主 repo（W3-008 根因 1） | 已修：`get_project_root()` 加 worktree 感知，git root != CLAUDE_PROJECT_DIR 時優先用 git root |
+
+**Why**：worktree 隔離只改變 agent 的 shell cwd，對「session 啟動時靜態綁定主 repo 根目錄」的寫入工具（dart MCP daemon、CLAUDE_PROJECT_DIR-rooted ticket CLI）不生效，這類工具的寫入會繞過隔離邊界洩漏到主 repo。
+
 ### 殭屍問題
 
 cc runtime 在 agent 結束或 process 異常死亡時**不會自動 remove** agent worktree。後果：
@@ -389,14 +399,16 @@ git branch -d feat/1.0.0-W9-002.1
 
 ---
 
-## 修改 source 後必須重新安裝
+## 修改 source 後無需重新安裝（shim 化）
 
-> **重要**：本 skill 透過 `uv tool install` 安裝為獨立 CLI，source（本目錄）與 installed（`~/.local/share/uv/tools/<package>/`）是兩份獨立 Python package。修改 source 後若未 reinstall，CLI 仍使用 stale installed 版本，新增的函式會 AttributeError 或被 hasattr 包裝靜默吞掉（W11-037 根因）。
+> **重要**：本 skill 已改用 cwd-resolving shim（ARCH-APP-002 / framework issue #12），不再走 `uv tool install`。shim 每次執行都 `uv run --directory .claude/skills/worktree` 當前專案源碼，修改 source 後改動即時生效，無 stale installed 問題（取代舊 `uv-tool-staleness-check-hook` 機制）。
 
-**修復指令**：
+**檢查 / 安裝指令**：
 
 ```bash
-cd .claude/skills/<本 skill 目錄> && uv tool install . --force --reinstall
-```
+# 安裝 / 更新 shim（一次安裝 ticket / doc / worktree）
+python3 .claude/scripts/install-skill-clis.py
 
-**自動偵測**：每次 SessionStart 由 `uv-tool-staleness-check-hook` 比對 source vs installed SHA256，偵測 stale 時提示修復指令。對應 ticket-skill 本身另有 `ticket-reinstall-hook` 自動 reinstall。
+# 檢查是否已 shim 化（exit 0/1）
+python3 .claude/scripts/install-skill-clis.py --check
+```

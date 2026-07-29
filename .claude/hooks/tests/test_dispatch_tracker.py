@@ -1,7 +1,7 @@
 """
 Active Dispatch Tracker 單元測試
 
-測試 .claude/hooks/lib/dispatch_tracker.py 的所有公開 API。
+測試 .claude/lib/dispatch_tracker.py 的所有公開 API。
 """
 
 import json
@@ -14,8 +14,9 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 # 設定 import 路徑
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
-from dispatch_tracker import (
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from lib.dispatch_tracker import (
     get_state_file_path,
     record_dispatch,
     clear_dispatch,
@@ -201,7 +202,7 @@ class TestDetectOrphanBranches:
         mock_result.returncode = 0
         mock_result.stdout = porcelain_output
 
-        with patch("dispatch_tracker.subprocess.run", return_value=mock_result):
+        with patch("lib.dispatch_tracker.subprocess.run", return_value=mock_result):
             # 無 dispatch 記錄，agent- 分支應為 orphan
             orphans = detect_orphan_branches(project_root)
 
@@ -223,7 +224,7 @@ class TestDetectOrphanBranches:
         mock_result.returncode = 0
         mock_result.stdout = porcelain_output
 
-        with patch("dispatch_tracker.subprocess.run", return_value=mock_result):
+        with patch("lib.dispatch_tracker.subprocess.run", return_value=mock_result):
             orphans = detect_orphan_branches(project_root)
 
         assert len(orphans) == 0
@@ -242,7 +243,7 @@ class TestDetectOrphanBranches:
         mock_result.returncode = 0
         mock_result.stdout = porcelain_output
 
-        with patch("dispatch_tracker.subprocess.run", return_value=mock_result):
+        with patch("lib.dispatch_tracker.subprocess.run", return_value=mock_result):
             orphans = detect_orphan_branches(project_root)
 
         # 無 branch_name 的 dispatch 不會匹配任何 worktree
@@ -264,7 +265,7 @@ class TestDetectOrphanBranches:
         mock_result.returncode = 0
         mock_result.stdout = porcelain_output
 
-        with patch("dispatch_tracker.subprocess.run", return_value=mock_result):
+        with patch("lib.dispatch_tracker.subprocess.run", return_value=mock_result):
             orphans = detect_orphan_branches(project_root)
 
         # agent-fix != agent-fix-parser，精確比對不會誤判

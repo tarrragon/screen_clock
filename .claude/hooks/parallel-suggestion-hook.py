@@ -45,9 +45,10 @@ from typing import Dict, Any, Optional, List, Tuple, Set
 
 # 設置 sys.path
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from hook_utils import (
+    from lib import (
         setup_hook_logging,
         parse_ticket_frontmatter,
         read_json_from_stdin,

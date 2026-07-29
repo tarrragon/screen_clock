@@ -29,9 +29,10 @@ from typing import Any
 
 # 添加 lib 目錄到路徑（M-003 標準化）
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from hook_utils import setup_hook_logging
+    from lib import setup_hook_logging
     from lib.common_functions import hook_output
 except ImportError as e:
     print(json.dumps({"result": "continue"}))

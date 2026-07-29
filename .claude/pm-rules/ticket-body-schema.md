@@ -9,6 +9,8 @@
 
 ## Schema 對照表
 
+> **type 正典**：4 型 IMP / ADJ / ANA / DOC（SSOT：`ticket_system/constants.py` 的 `TICKET_TYPES`，CLI 以 argparse choices 強制）。TST / RES / INV 為歷史化石（讀取容忍、寫入拒絕）。ADJ 未定義專屬章節要求，Hook 驗證回退通用檢查。
+
 | Section | ANA | IMP | DOC |
 |---------|-----|-----|-----|
 | Task Summary | 必填 | 必填 | 必填 |
@@ -16,6 +18,10 @@
 | 重現實驗結果（三子節） | 必填（PC-063） | 免填 | 免填 |
 | Solution | 必填 | 選填 | 免填 |
 | Test Results | 選填（若有實驗） | 必填 | 免填 |
+| Context Bundle | 選填（auto-extracted，非人工填寫） | 選填（auto-extracted，非人工填寫） | 選填（auto-extracted，非人工填寫） |
+| NeedsContext | 選填（僅資料缺口時填寫） | 選填（僅資料缺口時填寫） | 選填（僅資料缺口時填寫） |
+| Exit Status | 選填（W17-010 協議，代理人自報） | 選填（W17-010 協議，代理人自報） | 選填（W17-010 協議，代理人自報） |
+| Spawn Requests | 選填（發現應開新 ticket 議題時填寫） | 選填（發現應開新 ticket 議題時填寫） | 選填（發現應開新 ticket 議題時填寫） |
 | Completion Info | 必填 | 必填 | 必填（附變更摘要） |
 
 **狀態定義**：
@@ -60,9 +66,21 @@ ANA Solution 章節若含 IMP/DOC/ANA spawn 規劃表格，必須在 complete �
 | 部分未建 | complete 前先補建（PM 接手 ticket create 職責） |
 | 評估後不需建 | 勾選第二項，標註「無需建 ticket：[理由]」 |
 
+**Spawn 規劃表建議格式**（W1-004 擴充）：
+
+```markdown
+| 項目 | 形態 | 優先級 | Source FR | 說明 |
+|------|------|--------|-----------|------|
+| 骨架實作 | IMP | P0 | FR-01, FR-06 | 六個公開 API + Timestamp |
+| Buffer+Flush | IMP | P0 | FR-02 | 攢批送出 |
+```
+
+`Source FR` 欄追溯每個 spawn 項目對應的 spec FR，使覆蓋盲區在拆分階段即可識別。無 spec 來源時可省略此欄。
+
 **交叉引用**：
 
 - 規則層：`.claude/rules/core/quality-baseline.md` 規則 5「ANA Solution 內 spawn 規劃」
+- Lifecycle 層：`.claude/pm-rules/ticket-lifecycle.md`「ANA 衍生 Ticket 溯源驗證」Step 0（FR↔Ticket 覆蓋矩陣）
 - Lifecycle 層：`.claude/pm-rules/ticket-lifecycle.md`「ANA Solution Spawn 規劃落地（強制）」
 - 強制層：acceptance-gate-hook Step 2.5.2（W17-168 落地）
 
@@ -158,6 +176,29 @@ IMP ticket 修改 `src/` 字串輸出字面時，acceptance 必須補上 `npm te
 
 - `.claude/rules/core/test-assertion-design-rules.md`「延伸路由：src 字串輸出變更 acceptance 設計」章節
 
+#### 含 UI 的 IMP 額外 acceptance：集中化（1.2.0-W1-015 防護）
+
+含 UI 產出的 IMP ticket，acceptance 必須補上集中化驗收條目。
+
+**觸發條件**（任一成立即須補強）：
+
+- ticket `what` / `how` 含新增/修改畫面、widget、樣式、user-facing 文字
+- ticket `where.files` 含 UI 層檔案（screen / widget / theme / renderer 等）
+
+**必填 acceptance**（觸發後必須勾選）：
+
+| # | 驗證條件 | 說明 |
+|---|---------|------|
+| 1 | 本功能 user-facing 文字→i18n key、顏色→theme token、魔術數字→具名常數，無新增裸 `Color()` / 字面字串 / 字面尺寸 | grep 變更碼確認 |
+
+**Why**：1.2.0-W1-015 根因——既有 hook（l10n-sync / dart-style-guardian）對「應有設施缺席」失明，只在設施已存在時生效。升為 per-feature acceptance gate，不依賴 greenfield 是否 bootstrap。
+**Consequence**：未補此維度的 UI IMP 可在無 i18n/theme 的專案通過驗收，硬編碼暢行至 1.0（v1.0 實證：app 21 文字 / 19 數字 / 18 顏色全程未攔）。
+**Action**：IMP claim 後若觸發，acceptance 補列集中化條目；純後端/CLI（Go server log）依語言慣例可標註豁免理由。
+
+**交叉引用**：
+
+- `.claude/methodologies/acceptance-criteria-methodology.md`「強制驗收維度：集中化」章節
+
 ### DOC（Documentation）
 
 **核心價值**：變更摘要 + 引用的檔案清單。
@@ -240,14 +281,28 @@ acceptance:
 
 ---
 
+## Frontmatter protocol_version 契約
+
+自 W5-005.4 起，新建票 frontmatter 自動 emit `protocol_version` 欄位（值取自 `constants.py` 的 `PROTOCOL_VERSION_CURRENT`，當前 `"2.0"`）。
+
+| 契約 | 說明 |
+|------|------|
+| 凍結豁免 | 歷史 2285 票不回填 `protocol_version`（缺欄位視為 `"1.0"` 隱含預設） |
+| Lazy-migration | 工具讀取票時以 `frontmatter.get("protocol_version", PROTOCOL_VERSION_DEFAULT)` 取值；不主動寫回舊票 |
+| 升版觸發 | `PROTOCOL_VERSION_CURRENT` 遞增時，新票自動拿新值；舊票凍結不動 |
+| 消費者契約 | Hook/CLI 消費 protocol_version 時以 `PROTOCOL_VERSIONS_SUPPORTED` 白名單判斷是否支援 |
+
+---
+
 ## 變更紀錄
 
 | 版本 | 日期 | 變更 |
 |------|------|------|
+| 1.4.0 | 2026-07-05 | 新增「Frontmatter protocol_version 契約」段落：emit 機制 + 凍結豁免 + lazy-migration 契約（W5-005.4） |
 | 1.3.0 | 2026-06-04 | IMP 區塊新增「src 字串輸出變更額外 acceptance」段落；反模式表補充 build-only 驗收反模式（W1-005.2 / W1-040） |
 | 1.2.0 | 2026-05-13 | 新增「Solution 章節：H3 子標題與表格使用慣例」+「Type-aware Quality Gate」兩段（W10-123 / W10-124 / W10-125 規則收斂；W10-126 落地） |
 | 1.1.0 | 2026-05-08 | ANA Solution 章節新增「Spawn 落地確認」子節 checklist（W17-167 L3 落地，配合 W17-168 hook + W17-169 quality-baseline / ticket-lifecycle 同步修訂） |
 | 1.0.0 | 2026-04-20 | 初版（W17-016.2 落地 W17-016.1 盤點結論） |
 
-**Last Updated**: 2026-06-04
-**Version**: 1.3.0 — IMP 新增 src 字串輸出變更 acceptance 規則（必含 npm test，禁止只驗 build:dev）+ 反模式表補充（W1-005.2 / 0.19.1-W1-040）
+**Last Updated**: 2026-07-05
+**Version**: 1.4.0 — 新增 protocol_version 契約段落（emit + 凍結豁免 + lazy-migration，W5-005.4）

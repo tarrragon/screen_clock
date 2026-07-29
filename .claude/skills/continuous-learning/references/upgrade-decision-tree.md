@@ -1,71 +1,54 @@
-# Memory 升級評估決策樹
+# 知識捕獲三分流決策樹
 
-本文件定義 memory 寫入後的升級評估流程。memory 寫入**不是終點**，而是判斷此原則是否需要升級到框架共用層的起點。
+本文件定義知識捕獲的分流決策流程。分流判斷在**寫入前**執行——「先記下來、事後再評估去向」的閉環經量化證明不執行（130 檔 feedback memory 標註率 4%），故決策時點前移到捕獲當下。
+
+> **memory 不是目的地**：Claude Code 原生 memory 存於使用者 home 目錄的專案層級儲存（`~/.claude/projects/<project>/memory/`），不納入專案 git、不隨 `.claude/` sync 到其他專案，與「經驗須跨專案複用」的框架目標根本衝突。本框架因跨專案需求自建 `.claude/error-patterns/` 取代 memory 作為跨專案錯誤學習的載體；memory 機制本身不受影響，只是本決策樹不再把它列為候選目的地。
 
 ---
 
 ## 使用時機
 
-寫入 `feedback_*.md` 到 auto-memory（`~/.claude/projects/<project>/memory/`）後**必須**執行本決策樹。
+| 時點 | 執行內容 |
+|------|---------|
+| 準備記錄經驗教訓時（**唯一路徑**） | 走 Q0 三分流，判定完當下即落筆到目的地或不記錄 |
 
-`project_*.md` 類型的 memory 屬於專案內部 context 索引，不需執行升級評估，但需檢查命名前綴是否正確（規則 7 第一問）。
+`project_*.md` 類型的專案文件屬於專案內部 context 索引，不需執行本決策樹，但需檢查是否確實僅在本專案成立。
 
 ---
 
 ## 決策樹
 
 ```
-memory 寫入後
+記錄經驗教訓前（捕獲時）
     |
     v
-Q1: 此原則對其他專案也適用嗎？
+Q0: 另一個專案的 session 讀到這段，能用嗎？
     |
-    +-- 否 → 加 project_ 前綴，保留為專案特定 context；流程結束
+    +-- 能用（框架相關） → 是否為錯誤學習類？
+    |    |
+    |    +-- 是 → 根因已過 Two-Phase Reflection（5+ 假設、2 層深因、WRAP 檢驗）？
+    |    |    |
+    |    |    +-- 是 → 直接 /error-pattern add（allocator 來源前綴編號，隨 sync 跨專案傳播）；流程結束
+    |    |    |
+    |    |    +-- 否 → 根因未熟（單一事件、假設未驗證），暫不記錄，續觀察同主題是否再現；
+    |    |             明顯跨專案者可另以 framework-issue create --label candidate 建 inbox 錨點
+    |    |
+    |    +-- 否（非錯誤學習類） → Q1（選對應框架層目的地）
     |
-    +-- 是 → Q2（必須升級）
-         |
-         v
-         Q2: 屬於哪類原則？升級到對應目的地
-              |
-              +-- 通用品質基線        → rules/core/quality-baseline.md 或新 rules/core/*.md
-              +-- PM 行為規範         → rules/core/pm-role.md 或 pm-rules/
-              +-- 單一代理人身份/偏好 → agents/<name>.md（邊界見 knowledge-carrier-allocation 代理人定義內容規範）
-              +-- 語言/工具品質       → references/quality-<lang>.md
-              +-- 錯誤學習           → error-patterns/{category}/
-              +-- 流程方法論         → methodologies/
-              +-- Skill 引導         → skills/<skill>/
+    +-- 不能用，但本專案未來會用（專案相關） → 落 docs/ 或 CLAUDE.md；流程結束
+    |
+    +-- 兩者皆非（僅當前 session 成立） → 不記錄，ticket md 已承載執行脈絡；流程結束
 ```
+
+> Q0「根因未熟不寫」的理由：表層根因經 sync 傳播到所有 consumer 後，已 pull 的舊版不會自動撤回——錯知識跨專案傳播的回收成本高於暫緩記錄。Two-Phase Reflection 見 `.claude/methodologies/three-phase-reflection-methodology.md`。
 
 > 目的地拿不準時，先查 `.claude/methodologies/knowledge-carrier-allocation-methodology.md`（受眾 x 形態頂層地圖）。
 
----
-
-## Q1：跨專案適用性判斷
-
-### 判斷標準
-
-| 提問 | 若答「是」 |
-|------|-----------|
-| 此原則是否與當前專案的特定技術選型綁定？ | 否，加 `project_` 前綴 |
-| 換到 Flutter / Python / Go 等其他專案，這個原則還會成立嗎？ | 是，必須升級 |
-| 是否屬於 PM 行為、文件規範、品質基線等跨語言通用議題？ | 是，必須升級 |
-| 是否來自 PM 或代理人協作流程的反饋？ | 是，多半必須升級 |
-
-### 專案特定的典型範例
-
-- 「本專案的 ESLint 規則設定」
-- 「目標站點 DOM 選擇器多層 fallback 策略」
-- 「特定平台 API 限制（例如 Manifest V3、iOS 沙箱）」
-
-### 跨專案通用的典型範例
-
-- 「PM 派發後立刻切換工作而非空等」
-- 「框架文件禁止引用專案 ticket ID」
-- 「破壞性操作預設保留而非刪除」
+**沒有第四個選項**：三個分支已窮盡所有情境，不存在「先記到某處、之後再決定」的中間態。
 
 ---
 
-## Q2：六類目的地分支
+## Q1：框架相關內容的目的地分支
 
 ### 分支 1：通用品質基線 → `rules/core/`
 
@@ -75,7 +58,7 @@ Q1: 此原則對其他專案也適用嗎？
 |------|------|
 | 屬於跨語言、跨角色都需遵守的品質底線 | 「測試通過率必須維持 100%」 |
 | 影響所有開發流程的決策原則 | 「Phase 4 重構評估不可跳過」 |
-| 屬於 commit/版本/文件等基礎規範 | 「Memory 寫入必須評估跨專案升級」 |
+| 屬於 commit/版本/文件等基礎規範 | 「錯誤學習知識捕獲時分流」 |
 
 **目的地**：
 
@@ -149,7 +132,7 @@ Q1: 此原則對其他專案也適用嗎？
 
 | 特徵 | 範例 |
 |------|------|
-| 屬於某個 skill 的內部流程改進 | 「continuous-learning 升級評估步驟」 |
+| 屬於某個 skill 的內部流程改進 | 「continuous-learning 捕獲時分流步驟」 |
 | 需要在 skill 觸發時自動套用的指引 | 「ticket 命名規範」 |
 | 屬於工具型操作而非品質規範 | 「sync-push 推送流程」 |
 
@@ -160,52 +143,31 @@ Q1: 此原則對其他專案也適用嗎？
 
 ---
 
-## 升級後處理
-
-完成升級後，對原 memory 檔案執行以下三步：
-
-### 步驟 1：在原 memory 檔案頂部加註「已升級」標註
-
-```markdown
-> **Status**: Upgraded — 已升級至框架共用層
-> **Upgraded To**: `.claude/rules/core/quality-baseline.md` 規則 X
-> **Upgraded Date**: YYYY-MM-DD
-```
-
-### 步驟 2：列出升級目的地路徑
-
-完整路徑（從 `.claude/` 開始），方便日後追溯。若同一原則升級到多個位置，全部列出。
-
-### 步驟 3：保留 memory 作為本專案 context 索引
-
-不要刪除原 memory 檔案。它仍作為本專案的 context 索引，記錄此原則在本專案的觸發歷史與討論脈絡。
-
----
-
 ## 模糊情境處理
 
 ### 情境 A：跨類別
 
 若原則同時屬於多類（例如「PM 行為」也是「品質基線」），優先選擇**最具體**的目的地。例如「PM 寫產品程式碼禁止」屬於 PM 行為規範（rules/core/pm-role.md），而非通用品質基線。
 
-### 情境 B：升級後仍不確定具體位置
+### 情境 B：選定框架層後仍不確定具體位置
 
-先升級到較通用的位置（如 `rules/core/quality-baseline.md`），日後若有更多同類原則出現，再評估是否抽出獨立檔案。
+先落到較通用的位置（如 `rules/core/quality-baseline.md`），本次決策即告完成（狀態確定，非延後）。抽出獨立檔案屬「未來新原則出現」時的新決策，屆時依 `rules/README.md` 自動載入預算原則另行評估，與本次落地無未結事項。
 
-### 情境 C：原則尚未成熟
+### 情境 C：原則尚未成熟（僅限錯誤學習類）
 
-若反饋來自單一事件、缺乏跨案例驗證，可暫時保留為 `feedback_*.md`，註記「待累積案例後升級」。但需在後續 1-2 個月內回顧。
+若反饋來自單一事件、缺乏跨案例驗證（Q0 的「根因未熟」分支），暫不記錄，續觀察同主題是否再現；明顯跨專案者可另以 framework-issue `create --label candidate` 建 inbox 錨點。**不建立任何暫存記錄**——沒有暫存記錄就沒有積壓，同主題再現時憑印象或既有 ticket 紀錄重新評估即可。
 
 ---
 
 ## 關聯
 
-- `.claude/pm-rules/pm-quality-baseline.md` 規則 7 — Memory 寫入必須評估跨專案升級
-- `.claude/error-patterns/process-compliance/PC-061-memory-upgrade-blindness.md` — Memory upgrade blindness 錯誤模式
+- `.claude/pm-rules/pm-quality-baseline.md` 規則 7 — 知識捕獲時分流（分流判準權威來源）
+- `.claude/error-patterns/process-compliance/PC-061-memory-upgrade-blindness.md` — Memory upgrade blindness 錯誤模式（memory 排除前的歷史問題記錄）
 - `.claude/references/reference-stability-rules.md` 規則 8 — 框架文件禁止引用專案層級識別符
-- `references/memory-capture-guide.md` — Memory Capture 標準結構與品質檢查
 
 ---
 
-**Last Updated**: 2026-04-13
+**Last Updated**: 2026-07-27
+**Version**: 3.0.0 — 全檔改寫為三分流決策樹：Q0 由「錯誤學習跨專案適用性」擴充為「框架相關／專案相關／兩者皆非」三分流頂層判斷，memory 不再是任何分支的目的地；原 Q1（跨專案適用性）併入新 Q0；原 Q2 六類分支保留、改稱 Q1；「升級後處理」三步（含 MEMORY.md 索引移除）整章廢除——三分流下沒有「先寫暫存再升級」的中間態；情境 C 由「deferred frontmatter 標註」改為「不建立任何暫存記錄，續觀察」（0.2.1-W3-083，承接 0.2.1-W3-082 用戶裁示）
+**Version**: 2.0.0 — 決策時點由「寫入後」前移為「捕獲時」：新增 Q0 分流（Two-Phase Reflection 成熟度門檻 + deferred 顯式標註 + framework-issue candidate 可選 inbox）；情境 C 改綁發版稽核收割（消除無 trigger 的「待回顧」積壓）；Q1/Q2 保留供 deferred 收割與積壓 promote
 **Version**: 1.0.0 — 初始建立

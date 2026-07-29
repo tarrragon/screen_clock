@@ -14,6 +14,7 @@ ticket 狀態（純前置檢查）。
 
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -53,7 +54,23 @@ RESULT_DENY = "deny"
 
 def _resolve_identity_log_path() -> Path:
     """解析 identity-guard usage.log 路徑；HOOK_LOGS_DIR 優先（測試隔離用）。"""
-    base = Path(os.environ.get(_HOOK_LOGS_DIR_ENV, _DEFAULT_HOOK_LOGS_DIR))
+    env_val = os.environ.get(_HOOK_LOGS_DIR_ENV)
+    if env_val:
+        base = Path(env_val)
+    else:
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                base = Path(result.stdout.strip()) / _DEFAULT_HOOK_LOGS_DIR
+            else:
+                base = Path(_DEFAULT_HOOK_LOGS_DIR)
+        except (OSError, subprocess.TimeoutExpired):
+            base = Path(_DEFAULT_HOOK_LOGS_DIR)
     return base / _IDENTITY_LOG_SUBDIR / _IDENTITY_LOG_FILENAME
 
 
@@ -63,12 +80,14 @@ def _write_telemetry(
     ticket_id: str,
     as_value: Optional[str],
     result: str,
+    caller_type: str,
 ) -> None:
     """Append 一行結構化記錄；失敗不阻斷主流程，但寫 stderr（observability 規則 4）。
 
-    欄位：timestamp / command / ticket_id / has_as（--as 有無）/ result。
+    欄位：timestamp / command / ticket_id / has_as（--as 有無）/ result / caller_type。
     result 為四值列舉（warn / exempt / pass / deny），覆蓋 check_identity 全部
     判定路徑，使「--as 使用率」分子分母皆可從 log 計算。
+    caller_type 為三值列舉（pm / agent / unknown），標註呼叫者角色類型。
     不記錄 as_value 原文，僅記其有無，避免將 agent 名稱寫入長期觀測檔。
     """
     record = {
@@ -77,6 +96,7 @@ def _write_telemetry(
         "ticket_id": ticket_id,
         "has_as": bool(isinstance(as_value, str) and as_value.strip()),
         "result": result,
+        "caller_type": caller_type,
     }
     line = json.dumps(record, ensure_ascii=False) + "\n"
 
@@ -151,6 +171,7 @@ def check_identity(
             ticket_id=ticket_id,
             as_value=as_value,
             result=RESULT_WARN,
+            caller_type="unknown",
         )
         return None
 
@@ -161,6 +182,7 @@ def check_identity(
             ticket_id=ticket_id,
             as_value=as_value,
             result=RESULT_EXEMPT,
+            caller_type="pm",
         )
         return None
 
@@ -173,6 +195,7 @@ def check_identity(
             ticket_id=ticket_id,
             as_value=as_value,
             result=RESULT_PASS,
+            caller_type="agent",
         )
         return None
 
@@ -187,5 +210,6 @@ def check_identity(
         ticket_id=ticket_id,
         as_value=as_value,
         result=RESULT_DENY,
+        caller_type="agent",
     )
     return IDENTITY_DENY_EXIT

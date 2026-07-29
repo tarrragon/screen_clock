@@ -45,8 +45,14 @@ def hook_module():
 
 
 @pytest.fixture
-def reset_config_cache(hook_module):
-    """確保配置從檔案載入（清除快取）"""
+def reset_config_cache(hook_module, monkeypatch):
+    """確保配置從檔案載入（清除快取）
+
+    設定 CLAUDE_PROJECT_DIR 確保 config_loader 能找到 quality_rules.yaml
+    （config_loader.get_config_dir() 無此環境變數時 fallback 至 os.getcwd()，
+    測試若非從專案根目錄執行會誤讀空的預設配置）。
+    """
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(_hooks_dir.parent.parent))
     import config_loader
     config_loader.clear_config_cache()
     hook_module._quality_config = None

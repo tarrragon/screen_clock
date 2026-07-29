@@ -203,6 +203,13 @@ class LifecycleMessages:
     # Cascade save 失敗（§6.7 non-fail-fast）
     CASCADE_SAVE_FAILED = "cascade 解鎖 {ticket_id} 儲存失敗：{error}"
 
+    # blockedBy 反向掃描解鎖訊息（W1-082：complete cascade 補 blockedBy 引用者解鎖，
+    # 涵蓋未登記為 children 的兄弟 Ticket）
+    BLOCKEDBY_UNBLOCKED_HEADER = (
+        "[Cascade] 以下 blockedBy 引用者已自動解鎖（blocked → pending）："
+    )
+    BLOCKEDBY_UNBLOCKED_ITEM = "   - {id}: {title}"
+
 
 class ResumeMessages:
     """resume.py 相關訊息"""
@@ -373,6 +380,23 @@ class CreateMessages:
         "[WARNING] 驗收條件涉及多個模組（{modules}），疑似包含多個職責\n"
         "          Atomic Ticket 原則：所有驗收條件應指向同一目標\n"
         "          建議：確認是否需要拆分為多個獨立 Ticket"
+    )
+
+    # SPEC 引用未登錄警告（0.4.1-W2-001，F1：SPEC-008 誤植跨票傳染防護）
+    UNREGISTERED_SPEC_REFERENCE_WARNING = (
+        "[WARNING] 引用了未登錄於 SPEC 登錄簿"
+        "（docs/traceability.yaml 或 docs/proposals-tracking.yaml）的 SPEC 編號："
+        "{spec_ids}\n"
+        "          請確認編號是否誤植，或先在其中一份登錄簿補登該 SPEC"
+    )
+
+    # SPEC 登錄簿皆未初始化警告（0.38.1-W1-107：兩簿皆缺時不逐號誤報）
+    SPEC_REGISTRY_UNINITIALIZED_WARNING = (
+        "[WARNING] SPEC 登錄簿尚未初始化"
+        "（docs/traceability.yaml 與 docs/proposals-tracking.yaml 皆不存在），"
+        "已略過 SPEC 引用檢查\n"
+        "          請執行 doc skill batch-init 產生 traceability.yaml，"
+        "或建立 proposals-tracking.yaml 登錄 SPEC 編號"
     )
 
     # blockedBy 驗證錯誤訊息（Bug 1 修正）

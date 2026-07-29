@@ -1,11 +1,11 @@
 ---
 name: continuous-learning
-description: "Extracts reusable patterns from Claude Code sessions and captures knowledge as atomic memory units, then evaluates whether each memory should be upgraded to framework-shared rules, methodologies, or error-patterns. Use when session ends (Stop hook), when recording technical decisions, implementation insights, or lessons learned. Handles automatic pattern detection, structured memory capture with interconnected knowledge links, and post-write upgrade decision flow to prevent cross-project principles being trapped in single-project memory."
+description: "Extracts reusable patterns from Claude Code sessions and captures knowledge with capture-time triage: framework-relevant learnings (still true after swapping project names/paths) go straight to the canonical framework layer (error-patterns/rules/methodologies/references), project-relevant learnings go to docs/CLAUDE.md, and session-only findings are not recorded. Claude Code's native memory is excluded as a destination — this framework's error-patterns layer replaces it for cross-project reuse. Use when session ends (Stop hook), when recording technical decisions, implementation insights, or lessons learned. Handles automatic pattern detection and structured knowledge capture with interconnected links, preventing cross-project principles from being trapped in single-project storage."
 ---
 
 # Continuous Learning
 
-從 Claude Code 工作過程中自動提取可復用模式，並將洞察、決策和經驗記錄為結構化的原子記憶單位。
+從 Claude Code 工作過程中自動提取可復用模式，並將洞察、決策和經驗依三分流正規化為結構化的原子知識記錄。
 
 ---
 
@@ -19,19 +19,18 @@ description: "Extracts reusable patterns from Claude Code sessions and captures 
 2. **模式偵測**：識別可提取的可復用模式
 3. **Skill 產出**：將有用模式儲存到 `.claude/skills/learned/`
 
-### 2. Memory Capture（按需）
+### 2. Knowledge Capture（按需）
 
-將重要技術決策、實作方案和經驗教訓記錄為原子化記憶：
+將重要技術決策、實作方案和經驗教訓正規化為文件：
 
 1. **提取核心結論**：從工作過程中識別值得記錄的結論
-2. **分類和結構化**：判斷記憶類型，設計結論式標題
-3. **建立連結**：識別與既有知識的關聯
-4. **儲存到 memory/**：按標準結構建立記憶檔案
-5. **升級評估**：判斷此原則是否需升級到框架共用層
+2. **捕獲時三分流**（記錄前必答；判別問句「另一個專案的 session 讀到這段，能用嗎」）：框架相關（能用）+ 錯誤學習類 + 根因已過 Two-Phase Reflection → **直接 `/error-pattern add`**（canonical 層，隨 sync 跨專案傳播），流程結束；框架相關 + 錯誤學習類 + 根因未熟 → 暫不記錄，續觀察同主題是否再現；框架相關 + 非錯誤學習類 → 依升級路徑表選 `rules/` `methodologies/` `references/` `pm-rules/` `agents/` `skills/` 之一；專案相關（不能用但本專案未來會用）→ `docs/` 或 `CLAUDE.md`；兩者皆非（僅本次 session 成立）→ 不記錄
+3. **分類和結構化**：依目的地的既有格式規範撰寫（error-pattern 用 PC/IMP/ARCH 範本、規則用 rules/core 速查 stub 或 references 全文、方法論用 methodology 範本）
+4. **建立連結**：識別與既有知識的關聯，補上交叉引用
 
-> **重要**：memory 寫入**不是終點**，而是升級評估的起點。寫入 `feedback_*.md` 後必須執行升級評估，否則跨專案通用原則會被困在單一專案的 memory 中（PC-061）。
+> **重要**：分流判斷在**寫入前**執行，不是寫入後補救。「寫入後補評估」的事後閉環經量化證明不執行（130 檔 feedback memory 標註率 4%，PC-061 模式的規模化實證）。memory 不是任何分支的目的地。
 >
-> - 升級評估規則：`.claude/pm-rules/pm-quality-baseline.md` 規則 7
+> - 分流判準權威來源：`.claude/pm-rules/pm-quality-baseline.md` 規則 7
 > - 錯誤模式參考：`.claude/error-patterns/process-compliance/PC-061-memory-upgrade-blindness.md`
 > - 完整決策樹：`references/upgrade-decision-tree.md`
 
@@ -45,9 +44,9 @@ description: "Extracts reusable patterns from Claude Code sessions and captures 
 | Phase 4 完成 | 重構後進行知識沉澱 |
 | 版本發布前 | 總結主要決策和經驗 |
 
-### 根因型 memory 特殊處理（Two-Phase Reflection）
+### 根因型知識記錄特殊處理（Two-Phase Reflection）
 
-當記錄的 memory 核心是**根因分析**（error-pattern、代理人失敗歸因、用戶質疑「分析太表層」），必須套用兩階段深度反思：
+當記錄的核心是**根因分析**（error-pattern、代理人失敗歸因、用戶質疑「分析太表層」），必須套用兩階段深度反思：
 
 1. **Phase 1 多假設 Reality Test**：列 5+ 候選動機、逐個自我觀察驗證、至少挖 2 層深因
 2. **Phase 2 WRAP 檢驗**：結論產出後過 WRAP（Widen/Reality/Attain/Premortem）避免第一直覺陷阱
@@ -118,30 +117,25 @@ Add to `.claude/settings.json`:
 
 ---
 
-## Memory Capture 詳細指引
+## 知識記錄撰寫指引
 
-記憶建立的完整規範（類型定義、結論式標題設計、標準結構、連結策略、原子性原則）：
+依三分流判定的目的地選用對應撰寫規範，不再有單一共用的記憶檔案格式：
 
-**參考**: `references/memory-capture-guide.md`
+| 目的地 | 撰寫規範 |
+|--------|---------|
+| `.claude/error-patterns/` | `/error-pattern add` 內建範本（PC/IMP/ARCH 分類、Why/Consequence/Action 三明示） |
+| `.claude/rules/` `.claude/methodologies/` `.claude/references/` `.claude/pm-rules/` `.claude/agents/` `.claude/skills/` | `.claude/rules/core/document-writing-style.md` 三明示規範；方法論另依 `.claude/skills/methodology-writing/SKILL.md` |
+| `docs/` `CLAUDE.md` | 專案既有文件格式慣例 |
 
-### Step 5：升級評估（強制）
+> 原子性（一則記錄一個結論）等**跨載體通用**的撰寫原則見 `.claude/skills/compositional-writing/SKILL.md`，不綁定任何特定儲存格式。標題應表達具體結論而非主題，此原則綁定「原子記憶檔案」這個已排除的形態，未跨載體抽取；各目的地已有自己的標題慣例（error-pattern 用現象 slug、ticket 用 what 欄位、規則用「規則 N：主題」）。
 
-完成 Step 4「儲存到 memory/」後，**禁止直接結束**。必須對寫入的 memory 執行升級評估：
+**為什麼分流在寫入前**：
 
-| 步驟 | 動作 | 工具/參考 |
-|------|------|----------|
-| 5.1 | 對每個新建的 `feedback_*.md` 檔案執行四問檢查 | `.claude/pm-rules/pm-quality-baseline.md` 規則 7 |
-| 5.2 | 判斷升級目的地（六類分支） | `references/upgrade-decision-tree.md` |
-| 5.3 | 執行升級寫入（rules / pm-rules / error-patterns / methodologies / references / skills） | 對應目錄 |
-| 5.4 | 在原 memory 檔案頂部加註「已升級」標註 | 標註格式見決策樹 |
-
-**為什麼必須執行**：
-
-memory 寫入**不是終點**，而是升級評估的起點。若略過此步驟，跨專案通用的原則會被困在單一專案的 auto-memory 中，無法 sync 到其他專案，也不會被其他 session 自動載入（PC-061「Memory upgrade blindness」）。
+捕獲時三分流讓每筆知識寫入時態即確定去向（canonical 層 / docs 或 CLAUDE.md / 不記錄），不會產生「已記下待評估」這種不可觀測、無限積壓的中間態（PC-061「Memory upgrade blindness」的結構性解——量化證據為 130 檔事後標註率僅 4%）。
 
 **參考資源**：
 
-- 強制規則：`.claude/pm-rules/pm-quality-baseline.md` 規則 7「Memory 寫入必須評估跨專案升級」
+- 強制規則：`.claude/pm-rules/pm-quality-baseline.md` 規則 7「知識捕獲時分流」
 - 錯誤模式：`.claude/error-patterns/process-compliance/PC-061-memory-upgrade-blindness.md`
 - 完整決策樹：`references/upgrade-decision-tree.md`
 
@@ -154,5 +148,8 @@ memory 寫入**不是終點**，而是升級評估的起點。若略過此步驟
 
 ---
 
-**Last Updated**: 2026-04-13
+**Last Updated**: 2026-07-27
+**Version**: 4.1.0 - `references/memory-capture-guide.md` 已刪除（該檔 7 章中原子性已由 compositional-writing 覆蓋，結論式標題經驗證未被覆蓋、判定綁定「原子記憶檔案」已排除形態不需跨載體抽取）；修正「知識記錄撰寫指引」章節內對 compositional-writing 覆蓋範圍的錯誤宣稱（原稱結論式標題已跨載體通用化，實測不成立）（0.2.1-W3-090，承接 0.2.1-W3-083 用戶裁示）
+**Version**: 4.0.0 - 「Memory Capture」全面改稱「Knowledge Capture」，memory 不再列為任何分流的合法目的地：description、Step 2-6、根因型記錄小節、詳細指引小節皆改寫為框架相關／專案相關／兩者皆非三分流；deferred frontmatter 標註與「升級後處理」步驟隨之廢除。撰寫指引改指向 `compositional-writing`，`references/memory-capture-guide.md` 不再被本 skill 引用（該檔移除由後續 ticket 承接）（0.2.1-W3-083，承接 0.2.1-W3-082 用戶裁示）
+**Version**: 3.0.0 - Memory Capture 由「寫入後升級評估」改為「捕獲時分流」：新增步驟 2 分流判準（成熟錯誤學習直寫 error-pattern + deferred 顯式標註），原 Step 5 升級評估改為「分流落地與 deferred 收割」；依據 130 檔標註率 4% 實證事後閉環失效
 **Version**: 2.1.0 - 新增 Step 5 升級評估，將 memory 寫入串接到 framework 升級流程（防範 PC-061）

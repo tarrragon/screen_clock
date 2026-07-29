@@ -12,6 +12,11 @@
        - audience="pm_only" + PM 主線程 → 照常輸出
     2. 10 gap hook 遷移 wiring（靜態檢查 audience 標記存在）
     3. 代表性 hook 端到端（input_data 確實接線到統一出口）
+
+註記（0.0.1-W1-005）：skill-cli-error-feedback-hook.py 已刪除（合併入
+cli-error-feedback-hook.py），故 GAP_HOOK_PATHS 現存 9 項；後繼者採不同過濾
+機制（is_subagent_environment 早期跳過，非 emit_hook_output audience 標記），
+不計入本層 wiring 檢查範圍。
 """
 
 from __future__ import annotations
@@ -28,7 +33,7 @@ import pytest
 HOOKS_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HOOKS_DIR))
 
-from hook_utils import hook_io  # noqa: E402
+from lib import hook_io  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -144,28 +149,29 @@ class TestEmitHookOutputAudience:
 # 2. 10 gap hook 遷移 wiring（靜態檢查，對應 acceptance 2 的 grep 驗證）
 # ---------------------------------------------------------------------------
 
-GAP_HOOK_FILES = [
-    "active-dispatch-tracker-hook.py",
-    "cli-failure-help-reminder-hook.py",
-    "comment-qa-hook.py",
-    "dispatch-count-guard-hook.py",
-    "file-ownership-guard-hook.py",
-    "pre-test-hook.py",
-    "session-context-guard-hook.py",
-    "skill-cli-error-feedback-hook.py",
-    "utf8-integrity-check-hook.py",
-    "worklog-format-check.py",
-]
+SKILLS_DIR = HOOKS_DIR.parent / "skills"
+
+GAP_HOOK_PATHS = {
+    "active-dispatch-tracker-hook.py": HOOKS_DIR / "active-dispatch-tracker-hook.py",
+    "cli-failure-help-reminder-hook.py": HOOKS_DIR / "cli-failure-help-reminder-hook.py",
+    "comment-qa-hook.py": SKILLS_DIR / "compositional-writing" / "hooks" / "comment-qa-hook.py",
+    "dispatch-count-guard-hook.py": HOOKS_DIR / "dispatch-count-guard-hook.py",
+    "file-ownership-guard-hook.py": HOOKS_DIR / "file-ownership-guard-hook.py",
+    "pre-test-hook.py": HOOKS_DIR / "pre-test-hook.py",
+    "session-context-guard-hook.py": HOOKS_DIR / "session-context-guard-hook.py",
+    "utf8-integrity-check-hook.py": HOOKS_DIR / "utf8-integrity-check-hook.py",
+    "worklog-format-check.py": SKILLS_DIR / "compositional-writing" / "hooks" / "worklog-format-check.py",
+}
 
 
-@pytest.mark.parametrize("hook_file", GAP_HOOK_FILES)
+@pytest.mark.parametrize("hook_file", GAP_HOOK_PATHS.keys())
 def test_gap_hook_migrated_to_unified_exit(hook_file):
     """每個 gap hook 的訊息路徑必須經 emit_hook_output 且標 audience="pm_only"。
 
     過濾邏輯禁止在 hook 內複製（ARCH-020）：hook 只標受眾，
     判斷由 hook_io.emit_hook_output 單點執行。
     """
-    source = (HOOKS_DIR / hook_file).read_text(encoding="utf-8")
+    source = GAP_HOOK_PATHS[hook_file].read_text(encoding="utf-8")
     assert "emit_hook_output(" in source, \
         f"{hook_file} 未遷移至 emit_hook_output 統一出口"
     assert 'audience="pm_only"' in source, \
@@ -276,7 +282,7 @@ class TestWorklogFormatCheckHook:
 
     @pytest.fixture(scope="class")
     def hook(self):
-        return _load_module("worklog_format", HOOKS_DIR / "worklog-format-check.py")
+        return _load_module("worklog_format", HOOKS_DIR.parent / "skills" / "compositional-writing" / "hooks" / "worklog-format-check.py")
 
     @pytest.fixture
     def worklog_with_emoji(self, tmp_path):

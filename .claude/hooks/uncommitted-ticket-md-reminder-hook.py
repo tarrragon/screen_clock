@@ -33,16 +33,16 @@ import re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 # git_utils 位於 .claude/lib/（專案級共用程式庫）
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 
 try:
-    from hook_utils import (
+    from lib import (
         setup_hook_logging,
         run_hook_safely,
         read_json_from_stdin,
     )
-    from git_utils import get_uncommitted_files
+    from lib.git_utils import get_uncommitted_files
 except ImportError as e:
     # ImportError 不應 exit(1) 阻斷流程；降級為 no-op（fail-open）
     print(f"[Hook Import Warning] {Path(__file__).name}: {e}", file=sys.stderr)
@@ -127,7 +127,7 @@ def build_warning_message(ticket_md_paths: list[str]) -> str:
     lines = [
         "[未 commit ticket md 提醒]",
         "偵測到以下 ticket md 已修改但尚未納入此次 commit，",
-        "若手動 Edit 後未一併提交，body 內容可能在後續 git 還原時遺失（PC-178）：",
+        "若手動 Edit 後未一併提交，body 內容可能在後續 git 還原時遺失（PC-185）：",
     ]
     for path in ticket_md_paths:
         lines.append(f"  - {path}")

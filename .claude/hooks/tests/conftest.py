@@ -38,7 +38,7 @@ def isolate_hook_logs(tmp_path, monkeypatch):
     解析結果非 production repo，本 fixture 不介入，既有日誌路徑斷言以測試設定
     為準。
     """
-    import hook_utils.hook_logging as _hl
+    import lib.hook_logging as _hl
 
     log_root = tmp_path / "hook_log_isolation"
     log_root.mkdir(parents=True, exist_ok=True)
@@ -76,9 +76,15 @@ def tmp_project_root():
 
 @pytest.fixture
 def env_with_project_root(tmp_project_root):
-    """設定環境變數指向臨時專案根目錄"""
-    with patch.dict("os.environ", {"CLAUDE_PROJECT_DIR": str(tmp_project_root)}):
-        yield tmp_project_root
+    """設定環境變數指向臨時專案根目錄
+
+    同時停用 hook_base.get_project_root() 的 worktree 偵測（0.38.1-W2-020）：
+    偵測優先於 CLAUDE_PROJECT_DIR，若不停用，在 git linked worktree 環境下
+    執行測試時會忽略此處設定的 tmp_project_root，一律回傳真實 worktree 根目錄。
+    """
+    with patch("lib.hook_base._linked_worktree_root", return_value=None):
+        with patch.dict("os.environ", {"CLAUDE_PROJECT_DIR": str(tmp_project_root)}):
+            yield tmp_project_root
 
 
 @pytest.fixture
@@ -107,3 +113,39 @@ def sample_session_state():
         "locked_ticket_id": "0.31.0-W15-001",
         "locked_at": "2026-02-10T10:30:00"
     }
+
+
+@pytest.fixture
+def hook_project_env(tmp_path):
+    """cwd 無關 + 自動清理的假專案根，供以 subprocess 執行 hook 的測試使用（0.2.1-W3-027）。
+
+    Why：部分 hook（creation-acceptance-gate-hook 等）透過 get_project_root()
+    （優先序：worktree 偵測 > CLAUDE_PROJECT_DIR > git rev-parse > cwd 向上搜尋）
+    解析專案根，再以「project_root 相對路徑」尋找 ticket 檔（見
+    lib.hook_ticket.find_ticket_file）。過去測試直接在真實 repo 下
+    mkdir(parents=True) 建 fixture ticket 目錄，且 finally 只 unlink 檔案不刪
+    目錄，會在 repo 留下空目錄殘留（PM 於 W3-025、W3-026 驗收時各手動清除一次）。
+
+    機制：回傳 (project_root, env) — project_root 為 tmp_path（pytest 自動清理，
+    無殘留風險）；env 為可直接傳入 _run_hook(..., env=env) 的字典，內含
+    CLAUDE_PROJECT_DIR 指向 project_root。由於本機執行環境不是 git linked
+    worktree（worktree 偵測回傳 None），CLAUDE_PROJECT_DIR 為第二優先，subprocess
+    可正確解析到假專案根，不受實際執行 cwd 影響（呼應本票驗收「任意 cwd 結果一致」）。
+
+    使用範例：
+        def test_x(self, hook_project_env):
+            project_root, env = hook_project_env
+            ticket_dir = project_root / "docs/work-logs/v0.2.1/tickets"
+            ticket_dir.mkdir(parents=True)
+            (ticket_dir / "x.md").write_text("---\nid: x\n---\n")
+            rc, out, err = _run_hook(HOOK, payload, env=env)
+
+    何時改用真實路徑而非本 fixture：僅當測試目的就是驗證「hook 依實際專案根
+    （非 CLAUDE_PROJECT_DIR override）解析路徑」的行為本身時，才使用真實路徑，
+    且該情況下 finally 必須以 shutil.rmtree 移除整棵建立的目錄樹（而非只
+    unlink 葉節點檔案），避免重蹈殘留覆轍。
+    """
+    project_root = tmp_path / "fake_project_root"
+    project_root.mkdir(parents=True, exist_ok=True)
+    env = {"CLAUDE_PROJECT_DIR": str(project_root)}
+    return project_root, env

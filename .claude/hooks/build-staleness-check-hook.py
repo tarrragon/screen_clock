@@ -29,9 +29,10 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from hook_utils import setup_hook_logging, run_hook_safely
+    from lib import setup_hook_logging, run_hook_safely
 except ImportError as e:
     print(f"[Hook Import Warning] build-staleness-check-hook: {e}", file=sys.stderr)
 

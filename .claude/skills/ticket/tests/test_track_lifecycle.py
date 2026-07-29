@@ -240,6 +240,139 @@ class TestComplete:
                 assert result != 0
 
 
+class TestCompleteSelfCheckGate:
+    """0.4.1-W2-010：Layer 1 自檢子章節（### 自檢結果）warning 升 gate 整合測試。"""
+
+    def _mock_ticket(self, ticket_type: str, body: str) -> Dict[str, Any]:
+        return {
+            "id": "0.31.0-W4-001",
+            "type": ticket_type,
+            "status": "in_progress",
+            "title": "Test Ticket",
+            "_body": body,
+            "_path": "/test/path",
+        }
+
+    def test_imp_missing_self_check_blocks_complete(self, capsys):
+        """IMP 缺 ### 自檢結果 子章節 → complete 被阻擋（exit 1）。"""
+        args = Mock()
+        args.ticket_id = "0.31.0-W4-001"
+        args.skip_body_check = False
+        args.yes_spawned = False
+        args.force = False
+
+        body = """## Problem Analysis
+問題根因說明。
+
+## Solution
+方案內容，無自檢子章節。
+
+## Test Results
+測試結果內容。
+"""
+        with patch('ticket_system.commands.lifecycle.load_and_validate_ticket') as mock_load:
+            mock_load.return_value = (self._mock_ticket("IMP", body), None)
+            with patch('ticket_system.commands.lifecycle.save_ticket') as mock_save:
+                with patch('ticket_system.commands.lifecycle.validate_completable_status') as mock_status:
+                    with patch('ticket_system.commands.lifecycle.validate_acceptance_criteria') as mock_criteria:
+                        mock_status.return_value = (True, "", False)
+                        mock_criteria.return_value = (True, [])
+                        result = execute_complete(args, "0.31.0")
+
+        out = capsys.readouterr().out
+        assert result == 1
+        assert "自檢結果" in out
+        assert "--skip-body-check" in out
+        mock_save.assert_not_called()
+
+    def test_ana_with_self_check_completes(self, capsys):
+        """ANA 含 ### 自檢結果 子章節 → 正常完成（exit 0）。"""
+        args = Mock()
+        args.ticket_id = "0.31.0-W4-001"
+        args.skip_body_check = False
+        args.yes_spawned = False
+        args.force = False
+
+        body = """## Problem Analysis
+問題根因說明。
+
+## Solution
+結論內容。
+
+### 自檢結果
+
+- [x] acceptance 已驗證
+
+## Test Results
+無實驗，決策票。
+"""
+        with patch('ticket_system.commands.lifecycle.load_and_validate_ticket') as mock_load:
+            mock_load.return_value = (self._mock_ticket("ANA", body), None)
+            with patch('ticket_system.commands.lifecycle.save_ticket') as mock_save:
+                with patch('ticket_system.commands.lifecycle.validate_completable_status') as mock_status:
+                    with patch('ticket_system.commands.lifecycle.validate_acceptance_criteria') as mock_criteria:
+                        mock_status.return_value = (True, "", False)
+                        mock_criteria.return_value = (True, [])
+                        result = execute_complete(args, "0.31.0")
+
+        assert result == 0
+        mock_save.assert_called()
+
+    def test_doc_missing_self_check_not_blocked(self, capsys):
+        """DOC 沿用免填規則，缺 ### 自檢結果 子章節不受阻擋（exit 0）。"""
+        args = Mock()
+        args.ticket_id = "0.31.0-W4-001"
+        args.skip_body_check = False
+        args.yes_spawned = False
+        args.force = False
+
+        body = """## Solution
+文件變更說明，無自檢子章節。
+"""
+        with patch('ticket_system.commands.lifecycle.load_and_validate_ticket') as mock_load:
+            mock_load.return_value = (self._mock_ticket("DOC", body), None)
+            with patch('ticket_system.commands.lifecycle.save_ticket') as mock_save:
+                with patch('ticket_system.commands.lifecycle.validate_completable_status') as mock_status:
+                    with patch('ticket_system.commands.lifecycle.validate_acceptance_criteria') as mock_criteria:
+                        mock_status.return_value = (True, "", False)
+                        mock_criteria.return_value = (True, [])
+                        result = execute_complete(args, "0.31.0")
+
+        assert result == 0
+        mock_save.assert_called()
+
+    def test_imp_missing_self_check_skip_body_check_escapes_but_warns(self, capsys):
+        """IMP 缺 ### 自檢結果 子章節 + --skip-body-check → 不阻擋，但輸出警告提示。"""
+        args = Mock()
+        args.ticket_id = "0.31.0-W4-001"
+        args.skip_body_check = True
+        args.yes_spawned = False
+        args.force = False
+
+        body = """## Problem Analysis
+問題根因說明。
+
+## Solution
+方案內容，無自檢子章節。
+
+## Test Results
+測試結果內容。
+"""
+        with patch('ticket_system.commands.lifecycle.load_and_validate_ticket') as mock_load:
+            mock_load.return_value = (self._mock_ticket("IMP", body), None)
+            with patch('ticket_system.commands.lifecycle.save_ticket') as mock_save:
+                with patch('ticket_system.commands.lifecycle.validate_completable_status') as mock_status:
+                    with patch('ticket_system.commands.lifecycle.validate_acceptance_criteria') as mock_criteria:
+                        mock_status.return_value = (True, "", False)
+                        mock_criteria.return_value = (True, [])
+                        result = execute_complete(args, "0.31.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert "Solution > ### 自檢結果" in out
+        mock_save.assert_called()
+
+
 class TestRelease:
     """釋放 Ticket 相關的測試"""
 
@@ -591,10 +724,16 @@ class TestCompleteCascadeChildren:
         assert _saved_statuses_for(complete_env.save_ticket, "GC1") == []
         assert "GC1" not in out
 
-    def test_orphan_parent_id_not_scanned(
+    def test_orphan_parent_id_not_cascaded_via_children_path(
         self, make_parent_child_tickets, complete_env, capsys
     ):
-        """TC-B2：parent_id 單向權威，不反向掃描（§6.2）。"""
+        """TC-B2：parent_id 單向權威，children 路徑不反向掃描（§6.2）。
+
+        W1-082 補充：C_orphan 雖非 P0 的 children，但 blockedBy 含 P0，
+        會被獨立的 blockedBy 反向掃描機制解鎖（見 TestCompleteBlockedByReverseScan）。
+        本測試改為聚焦 children-based cascade 路徑本身不觸發（不列入 children
+        cascade 的 unblock 統計/訊息），而非「完全不會被任何機制解鎖」。
+        """
         c_orphan = {
             "id": "C_orphan",
             "status": "blocked",
@@ -613,9 +752,11 @@ class TestCompleteCascadeChildren:
 
         out = capsys.readouterr().out
         assert result == 0
-        assert _saved_statuses_for(complete_env.save_ticket, "C_orphan") == []
-        assert "[Cascade]" not in out
+        # children cascade 路徑本身無 children，不產生 children 專屬警告
         assert "[Warning] 父 Ticket 完成時尚有未完成的子 Ticket" not in out
+        # blockedBy 反向掃描機制解鎖 C_orphan（W1-082 新行為）
+        assert "pending" in _saved_statuses_for(complete_env.save_ticket, "C_orphan")
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖" in out
 
     def test_empty_children(
         self, make_parent_child_tickets, complete_env, capsys
@@ -811,6 +952,161 @@ class TestCompleteCascadeChildren:
         assert "   - C1 [pending]: 子任務 C1" in out
         assert "   - C2 [in_progress]: 子任務 C2" in out
         assert "父 complete 不阻止" in out
+
+
+# ============================================================================
+# TestCompleteBlockedByReverseScan：complete cascade 反向掃描 blockedBy 引用者
+# （W1-082：修復 W1-081 根因——children 路徑遺漏未登記為 children 的兄弟票）
+# ============================================================================
+
+
+class TestCompleteBlockedByReverseScan:
+    """blockedBy 反向掃描解鎖機制測試（W1-082）。"""
+
+    def test_unlocks_sibling_referencing_blockedby_without_children_relation(
+        self, make_parent_child_tickets, complete_env, capsys
+    ):
+        """非 children 關係、僅靠 blockedBy 引用已完成 Ticket 的兄弟票會被解鎖。"""
+        sibling = {
+            "id": "S1",
+            "status": "blocked",
+            "blockedBy": ["P0"],
+            "title": "兄弟票 S1",
+        }
+        parent, children, all_tickets = make_parent_child_tickets(
+            "P0", [], extras=[sibling]
+        )
+        complete_env.set_tickets(parent, all_tickets)
+
+        args = Mock()
+        args.ticket_id = "P0"
+        result = execute_complete(args, "0.18.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert "pending" in _saved_statuses_for(complete_env.save_ticket, "S1")
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖（blocked → pending）：" in out
+        assert "   - S1: 兄弟票 S1" in out
+
+    def test_and_semantics_preserved_for_multiple_blockers(
+        self, make_parent_child_tickets, complete_env, capsys
+    ):
+        """兄弟票有其他未完成 blocker 時，AND 語義下仍保留 blocked。"""
+        other = {
+            "id": "X",
+            "status": "in_progress",
+            "blockedBy": [],
+            "title": "外部 X",
+        }
+        sibling = {
+            "id": "S1",
+            "status": "blocked",
+            "blockedBy": ["P0", "X"],
+            "title": "兄弟票 S1",
+        }
+        parent, children, all_tickets = make_parent_child_tickets(
+            "P0", [], extras=[other, sibling]
+        )
+        complete_env.set_tickets(parent, all_tickets)
+
+        args = Mock()
+        args.ticket_id = "P0"
+        result = execute_complete(args, "0.18.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert _saved_statuses_for(complete_env.save_ticket, "S1") == []
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖" not in out
+
+    def test_closed_blocker_treated_as_resolved(
+        self, make_parent_child_tickets, complete_env, capsys
+    ):
+        """include_closed_as_resolved=True：其他 blocker 為 closed 也視為解除。"""
+        other = {
+            "id": "X",
+            "status": "closed",
+            "blockedBy": [],
+            "title": "外部 X",
+        }
+        sibling = {
+            "id": "S1",
+            "status": "blocked",
+            "blockedBy": ["P0", "X"],
+            "title": "兄弟票 S1",
+        }
+        parent, children, all_tickets = make_parent_child_tickets(
+            "P0", [], extras=[other, sibling]
+        )
+        complete_env.set_tickets(parent, all_tickets)
+
+        args = Mock()
+        args.ticket_id = "P0"
+        result = execute_complete(args, "0.18.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert "pending" in _saved_statuses_for(complete_env.save_ticket, "S1")
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖" in out
+
+    def test_non_blocked_status_not_touched(
+        self, make_parent_child_tickets, complete_env, capsys
+    ):
+        """status 非 blocked（如 pending）的 blockedBy 引用者不被本機制觸碰。"""
+        sibling = {
+            "id": "S1",
+            "status": "pending",
+            "blockedBy": ["P0"],
+            "title": "兄弟票 S1",
+        }
+        parent, children, all_tickets = make_parent_child_tickets(
+            "P0", [], extras=[sibling]
+        )
+        complete_env.set_tickets(parent, all_tickets)
+
+        args = Mock()
+        args.ticket_id = "P0"
+        result = execute_complete(args, "0.18.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert _saved_statuses_for(complete_env.save_ticket, "S1") == []
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖" not in out
+
+    def test_no_duplicate_save_for_ticket_unblocked_via_children_path(
+        self, make_parent_child_tickets, complete_env, capsys
+    ):
+        """C1 同時是 children 也在 blockedBy 引用 P0：僅透過 children 路徑解鎖一次，
+        反向掃描不重複 save（ticket_map 原地 mutate 後 status 已非 blocked）。"""
+        parent, children, all_tickets = make_parent_child_tickets(
+            "P0", [("C1", "blocked", ["P0"])]
+        )
+        complete_env.set_tickets(parent, all_tickets)
+
+        args = Mock()
+        args.ticket_id = "P0"
+        result = execute_complete(args, "0.18.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        c1_statuses = _saved_statuses_for(complete_env.save_ticket, "C1")
+        assert c1_statuses == ["pending"], f"C1 應僅被 save 一次，實際: {c1_statuses}"
+        assert "[Cascade] 以下子 Ticket 已自動解鎖（blocked → pending）：" in out
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖" not in out
+
+    def test_empty_ticket_map_no_error(
+        self, make_parent_child_tickets, complete_env, capsys
+    ):
+        """無任何其他 Ticket 引用 blockedBy 時，反向掃描不產生訊息也不報錯。"""
+        parent, children, all_tickets = make_parent_child_tickets("P0", [])
+        complete_env.set_tickets(parent, all_tickets)
+
+        args = Mock()
+        args.ticket_id = "P0"
+        result = execute_complete(args, "0.18.0")
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert "[Cascade] 以下 blockedBy 引用者已自動解鎖" not in out
 
 
 # ============================================================================
@@ -1453,19 +1749,21 @@ class TestCloseReasonEnum:
         When: 執行 close 操作
         Then: 每一種都應通過枚舉驗證並成功關閉
         """
-        legal_codes = [
-            "goal_achieved",
-            "requirement_vanished",
-            "superseded_by",
-            "not_executable_knowledge_captured",
-            "duplicate",
-            "cancelled_by_user",
-        ]
-        for code in legal_codes:
-            args = self._make_args(reason=code)
+        # requirement_vanished / cancelled_by_user 需 reason_note 必填（0.3.6-W1-006/007）
+        legal_codes_with_note = {
+            "goal_achieved": "",
+            "requirement_vanished": "需求已消失",
+            "superseded_by": "",
+            "not_executable_knowledge_captured": "",
+            "duplicate": "",
+            "cancelled_by_user": "用戶明示取消",
+        }
+        for code, note in legal_codes_with_note.items():
+            args = self._make_args(reason=code, reason_note=note)
             with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
                  patch("ticket_system.commands.lifecycle.save_ticket") as mock_save, \
-                 patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"):
+                 patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"), \
+                 patch("ticket_system.commands.lifecycle.load_ticket", return_value=self._mock_load_ticket()):
                 mock_load.return_value = (self._mock_load_ticket(), None)
                 result = execute_close(args, "0.18.0")
 
@@ -1549,7 +1847,8 @@ class TestCloseReasonEnum:
         )
         with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
              patch("ticket_system.commands.lifecycle.save_ticket") as mock_save, \
-             patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"):
+             patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"), \
+             patch("ticket_system.commands.lifecycle.load_ticket", return_value=self._mock_load_ticket()):
             mock_load.return_value = (self._mock_load_ticket(), None)
             result = execute_close(args, "0.18.0")
 
@@ -1596,6 +1895,166 @@ class TestCloseReasonEnum:
 
 
 # ============================================================================
+# 0.3.6-W1-006/007: close resolved_by 驗證強化（PC-MON-002）
+# ============================================================================
+
+
+class TestCloseResolvedByValidation:
+    """close command resolved_by 依 reason_code 分歧驗證（0.3.6-W1-006 正規化規則）"""
+
+    def _make_args(self, **overrides):
+        args = Mock()
+        args.ticket_id = "0.18.0-W15-999"
+        args.version = "0.18.0"
+        args.resolved_by = overrides.get("resolved_by", "0.18.0-W15-998")
+        args.reason = overrides.get("reason", "goal_achieved")
+        args.reason_note = overrides.get("reason_note", "")
+        args.retrospective = overrides.get("retrospective", False)
+        return args
+
+    def _mock_load_ticket(self, status="in_progress"):
+        return {
+            "id": "0.18.0-W15-999",
+            "status": status,
+            "title": "Test Ticket",
+            "_path": "/test/path",
+        }
+
+    def test_superseded_by_rejects_free_text_resolved_by(self):
+        """
+        Given: reason=superseded_by，resolved_by 為非法 Ticket ID 格式的自由文字
+        When: 執行 close
+        Then: 應拒絕（不通過格式驗證），不儲存
+        """
+        args = self._make_args(reason="superseded_by", resolved_by="設計決策")
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save:
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 1
+            mock_save.assert_not_called()
+
+    def test_superseded_by_rejects_nonexistent_ticket_id(self):
+        """
+        Given: reason=superseded_by，resolved_by 格式合法但對應檔案不存在
+        When: 執行 close
+        Then: 應拒絕（存在性驗證失敗），不儲存
+        """
+        args = self._make_args(reason="superseded_by", resolved_by="0.99.9-W1-001")
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save, \
+             patch("ticket_system.commands.lifecycle.load_ticket", return_value=None):
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 1
+            mock_save.assert_not_called()
+
+    def test_duplicate_accepts_valid_existing_ticket_id(self):
+        """
+        Given: reason=duplicate，resolved_by 為合法格式且對應檔案存在
+        When: 執行 close
+        Then: 應通過驗證並成功關閉
+        """
+        args = self._make_args(reason="duplicate", resolved_by="0.18.0-W15-998")
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save, \
+             patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"), \
+             patch("ticket_system.commands.lifecycle.load_ticket", return_value=self._mock_load_ticket()):
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 0
+            mock_save.assert_called_once()
+
+    def test_requirement_vanished_allows_none_with_reason_note(self):
+        """
+        Given: reason=requirement_vanished，resolved_by=none，reason_note 已填
+        When: 執行 close
+        Then: 應通過驗證（none 通道）並成功關閉
+        """
+        args = self._make_args(
+            reason="requirement_vanished",
+            resolved_by="none",
+            reason_note="環境變更使需求消失",
+        )
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save, \
+             patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"):
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 0
+            saved = mock_save.call_args[0][0]
+            assert saved["closed_by"] == "none"
+
+    def test_cancelled_by_user_rejects_missing_reason_note(self):
+        """
+        Given: reason=cancelled_by_user，resolved_by=none，reason_note 為空
+        When: 執行 close
+        Then: 應拒絕（none 通道要求 reason_note 必填），不儲存
+        """
+        args = self._make_args(
+            reason="cancelled_by_user", resolved_by="none", reason_note=""
+        )
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save:
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 1
+            mock_save.assert_not_called()
+
+    def test_defer_semantic_in_reason_note_rejected(self):
+        """
+        Given: reason_note 含延後語意（"延後到下版本"）
+        When: 執行 close
+        Then: 應拒絕並引導改用 ticket migrate，不儲存
+        """
+        args = self._make_args(
+            reason="goal_achieved", reason_note="延後到下個版本處理"
+        )
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save:
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 1
+            mock_save.assert_not_called()
+
+    def test_defer_semantic_in_resolved_by_rejected(self):
+        """
+        Given: resolved_by 含延後語意（"移到後續處理"）
+        When: 執行 close
+        Then: 應拒絕並引導改用 ticket migrate，不儲存
+        """
+        args = self._make_args(reason="goal_achieved", resolved_by="移到後續處理")
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save:
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 1
+            mock_save.assert_not_called()
+
+    def test_goal_achieved_unaffected_by_new_validation(self):
+        """
+        Given: reason=goal_achieved（不在需 ID/none 驗證的分歧表內），resolved_by 為自由格式
+        When: 執行 close
+        Then: 不受新驗證分歧規則限制，仍可正常關閉（僅受延後語意檢查約束）
+        """
+        args = self._make_args(reason="goal_achieved", resolved_by="0.18.0-W15-998")
+        with patch("ticket_system.commands.lifecycle.load_and_validate_ticket") as mock_load, \
+             patch("ticket_system.commands.lifecycle.save_ticket") as mock_save, \
+             patch("ticket_system.commands.lifecycle.resolve_ticket_path", return_value="/p"):
+            mock_load.return_value = (self._mock_load_ticket(), None)
+            result = execute_close(args, "0.18.0")
+
+            assert result == 0
+
+
+# ============================================================================
 # TestCompletePendingChildrenBlocking：父 complete 時未完成 children 阻擋 + --force
 # （W11-003.2）
 # ============================================================================
@@ -1612,7 +2071,11 @@ def _make_parent_ticket(children_ids, ticket_id="0.18.0-W99-100"):
         "children": list(children_ids),
         "spawned_tickets": [],
         "_path": "/test/path",
-        "_body": "## Problem Analysis\n內容\n## Solution\n內容\n## Test Results\n內容",
+        "_body": (
+            "## Problem Analysis\n內容\n"
+            "## Solution\n內容\n\n### 自檢結果\n\n- [x] 已檢視\n\n"
+            "## Test Results\n內容"
+        ),
     }
 
 

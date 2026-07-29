@@ -1,6 +1,6 @@
 ---
 name: ticket
-description: 'Use this skill whenever the user wants to create, track, query, or manage tickets. Triggers include: creating new tickets, claiming or releasing tickets, checking ticket status or progress, completing tickets, handing off work between agents, resuming interrupted tasks, migrating tickets between versions, converting plans to tickets, or any mention of /ticket, task tracking, or ticket lifecycle operations.'
+description: 'Use this skill whenever the user wants to create, track, query, or manage tickets. Triggers include: creating new tickets, claiming or releasing tickets, checking ticket status or progress, completing tickets, handing off work between agents, resuming interrupted tasks, migrating tickets between versions, converting plans to tickets, splitting tickets into subtasks, evaluating ticket granularity, or any mention of /ticket, task tracking, ticket lifecycle operations, or ticket splitting. 拆分相關：當用戶問「ticket 怎麼拆」「拆分粒度」時，建立/拆分 ticket 用本 skill，拆分邊界判讀（測試變綠驗收點）見 /tdd skill 的 task-granularity-rules。'
 argument-hint: '<subcommand> [args]'
 allowed-tools: Bash(ticket *), Read, Write, Edit, Grep, Glob
 ---
@@ -11,27 +11,54 @@ allowed-tools: Bash(ticket *), Read, Write, Edit, Grep, Glob
 
 ---
 
+## 系統模型（設計自我描述）
+
+本系統的參照模型是 **issue tracker + CI runner**（batch job queue 為輔助類比），不是 OS process：
+
+| 對應 | 參照 | 含義 |
+|------|------|------|
+| ticket = issue | issue tracker（Jira/Linear/GitHub 類） | 狀態機轉移經 CLI 驗證、stale 需 triage 儀式、ID 為全域引用錨點 |
+| agent = CI runner | ephemeral runner | 身份在派發/認領時綁定（`claim --as`）、工作區以隔離 checkout 為優先、逾時由 watchdog 回收 |
+| wave = batch cohort | job queue 批次 | blockedBy DAG 之外的隱式排序層 |
+
+**兩個與 OS process 直覺相反的預設**（設計回顧確認：誤用 process 直覺是共享樹競態與身份回填缺口兩類歷史事故的共同根因）：
+
+1. **身份晚綁定**：ticket 建立時不知道執行者（submit 與 assign 分離）；身份在 claim 時以 `--as` 綁定，不是 fork 即繼承。
+2. **共享工作區**：agent 預設共享 working tree（thread 語意）而非 process 隔離；檔案變更型派發應優先採 feat branch / worktree 隔離。
+
+> scheduler 層類比（runqueue/dashboard 對應 Linux schedule()/top）仍然準確，保留使用。
+
+**named agent 生命週期三態**（v2.9.0 擴展，W1-008 ANA 落地）：`agent = CI runner` 類比原僅二態（running → stopped），named agent（Agent tool 帶 name 參數 spawn）完工後不自動終止，實際存在第三態：
+
+| 狀態 | 含義 | 觸發 | 對應 CI runner 語意 |
+|------|------|------|---------------------|
+| running | agent 正在執行 ticket 工作 | Agent tool spawn / SendMessage 派發新任務 | job 執行中 |
+| idle | agent 完工無新任務，process 保持存活且可定址 | agent 完成回報後 CC runtime 發送 `idle_notification` | warm runner（跑完不銷，省下次冷啟動成本） |
+| stopped | agent process 終止 | SubagentStop（自然結束）/ `shutdown_request` approve / session 結束 | job 完成後 runner 回收 |
+
+idle 態不改變 agent = runner 的核心類比（身份仍在 claim 綁定、工作區仍隔離），只是擴展 runner 生命週期從「單 job 即銷」到「可選續用多 job」。PM 對 idle agent 的續用/放生判準與回收 SOP 見 `.claude/pm-rules/parallel-dispatch.md`「idle agent 回收 SOP」章節。
+
+---
+
 ## 執行方式
 
 > **禁止直接執行 Python 檔案！** `ticket_system` 是 Python 套件，必須透過 `pyproject.toml` 定義的入口點執行。
 
 ### 全局安裝（推薦）
 
+`ticket` CLI 透過 cwd-resolving shim 安裝（非 `uv tool install`，ARCH-APP-002 / framework issue #12）。shim 依當前 cwd 所在專案的 git toplevel 解析 `.claude/skills/ticket` 源碼並 `uv run`，故源碼即時生效、不需 reinstall、多專案共用同名 skill 不碰撞。
+
 ```bash
-# 首次安裝
-(cd .claude/skills/ticket && uv tool install .)
+# 首次安裝（一次安裝 ticket / doc / worktree 三個 shim）
+python3 .claude/scripts/install-skill-clis.py
 
 # 之後在任何目錄執行
 ticket track summary
 ticket track claim 1.0.0-W4-001
 ```
 
-**修改原始碼後必須重新安裝**（IMP-023）：
-
-```bash
-# 必須用 --reinstall（--force 不會更新套件程式碼）
-uv tool install .claude/skills/ticket --reinstall
-```
+**修改原始碼後無需重新安裝**：shim 每次執行都 `uv run` 當前專案源碼，改動即時生效。
+（檢查是否已 shim 化：`python3 .claude/scripts/install-skill-clis.py --check`）
 
 ### 本地執行
 
@@ -53,9 +80,11 @@ ticket create --version 0.31.0 --wave 4 --action "實作" --target "XXX"  # 建�
 
 ### subagent 派發時 claim 推薦用法
 
-被派發的 subagent 認領自身 ticket 時，**推薦使用裸 `ticket track claim <id>`（不加任何旗標）**。
+被派發的 subagent 認領自身 ticket 時，**推薦使用 `ticket track claim <id> --as <self-agent-name>`**（申報自身身份；不加 `--verify`）。
 
-**Why**：裸 `claim` 走預設路徑，不執行 AC 驗證、不讀 stdin、不偵測 TTY，metadata 寫入在 `file_lock` 保護下為單一原子操作（load → modify → save），不存在「部分寫入」的中間狀態。subagent 無 TTY 的互動環境受限對裸 `claim` 完全無影響。
+**Why**：`claim --as <agent>` 在認領時把 `who.current` 寫成執行者身份，使後續 `complete --as <self>` 與 identity-guard 對稱通過，無需 `set-who` 繞過（W2-018）。`--as` 在 `file_lock` 內與 status 寫入同一原子操作（load → modify → save），不執行 AC 驗證、不讀 stdin、不偵測 TTY，subagent 無 TTY 的互動環境受限完全無影響。`--as` 與 `--verify` 正交：`--as` 只設身份，不觸發任何驗證副作用。
+
+> **為何需要 `--as`**：建立 ticket 未指定 `--who` 時 `who.current` 預設為字面 `"pending"`。裸 `claim`（不帶 `--as`）不寫 `who.current`，後續 `complete --as <agent>` 因 `"pending" != <agent>` 被 identity-guard deny（情境 4），agent 須先 `set-who` 繞過。`--as` 從源頭消除此縫隙。裸 `claim`（不帶 `--as`）維持向後相容，仍可用，但收尾時須自行 `set-who`。
 
 **Consequence**：若 subagent 改用 `--verify`（明示啟用 AC 自動驗證，僅供除錯場景），在無 TTY 環境下會觸發 fail-closed：未加 `--yes` 時直接 return 1 並印出「非互動環境且未指定 --yes，已取消」，subagent 可能誤判 ticket 未 claim 而重試或放棄。`--verify` 還會在 claim 時跑 AC 對應的驗證指令（如 npm test 全套件），造成同 wave 並行 claim 衝突（PC-078）。
 
@@ -63,7 +92,8 @@ ticket create --version 0.31.0 --wave 4 --action "實作" --target "XXX"  # 建�
 
 | 場景 | 推薦命令 | 說明 |
 |------|---------|------|
-| subagent 認領被派發的 ticket（常態） | `ticket track claim <id>` | 預設不驗證，原子寫入，無半成功風險 |
+| subagent 認領被派發的 ticket（常態） | `ticket track claim <id> --as <self-agent-name>` | 設 who.current，後續 complete --as 對稱通過 identity-guard，免 set-who（W2-018） |
+| 不申報身份的裸認領（向後相容） | `ticket track claim <id>` | 不碰 who.current；收尾若需 complete --as 須自行 set-who |
 | 除錯時想 claim 並同時跑 AC 驗證 | `ticket track claim <id> --verify --yes` | `--yes` 在非互動環境短路驗證 prompt 為 y，避免 fail-closed |
 | 只想看 AC 驗證結果不 claim | `ticket track verify <id>` | 與 claim 解耦（W4-019 後 `--skip-verify` 已移除，改用此子命令） |
 
@@ -90,7 +120,7 @@ ticket create --version 0.31.0 --wave 4 --action "實作" --target "XXX"  # 建�
      - 流程結束
    - **dashboard 無 in_progress 也無 ready** → 進入步驟 2 fallback
 
-2. **Fallback：完整 pending/in_progress 清單**（僅當步驟 1 dashboard 無結果時觸發） — 執行 `ticket track list --status pending,in_progress`
+2. **Fallback：完整 pending/in_progress 清單**（僅當步驟 1 dashboard 無結果時觸發） — 執行 `ticket track list --status pending in_progress`
 
    - **有待辦任務** → 使用 AskUserQuestion 列出選項：
      - 各待辦任務作為選項（label: `{ticket_id} - {title}`, description: `狀態: {status}`）
@@ -143,6 +173,8 @@ ticket create --version 0.31.0 --wave 4 --action "實作" --target "XXX"  # 建�
 ### create - 建立新 Ticket
 
 建立 Atomic Ticket，支援 5W1H 引導式建立、子 Ticket 建立、版本目錄初始化（init）。
+
+> **版本歸屬引導**（0.3.3-W1-001）：create 時根據 `--type` 和 `--action` 自動建議目標版本。新功能（IMP + 實作/新增/建立/開發）→ 大版本（0.x+1.0）；修復/改善/分析/文件 → 小版本（最新已完成版本 +1 patch）。未指定 `--version` 時自動套用建議；指定但與建議不符時輸出 WARNING（不阻擋）。
 
 > 決策樹：Read `references/workflow-create.md`
 > 詳細用法：Read `references/create-command.md`
@@ -281,7 +313,7 @@ ticket batch-create --template impl-parsley --targets "a,b" --parent 1.0.0-W28-0
 > ticket track stale-list --wave 17 --format ids    # 僅輸出 ID（適合 pipe）
 > ```
 >
-> 閾值複用 `lib/staleness.py`：info ≥ 7 天 / warning ≥ 14 天 / critical ≥ 30 天。輸出依 days 降序。詳見 `references/track-command.md`「track stale-list 子命令」章節。
+> 閾值複用 `lib/staleness.py`：info ≥ 7 天 / warning ≥ 14 天 / critical ≥ 30 天。輸出依 days 降序。table 格式另附 stale in-progress 章節（>= 24h，依 frontmatter `started_at` 單平面判定，附 `ticket track release <id>` 釋放提示）；`ids`/`yaml` 維持 pending-only 向後相容（1.5.0-W5-005.7）。詳見 `references/track-command.md`「track stale-list 子命令」章節。
 
 > **TD 清單校準 — `td-status`**（W10-083 / PC-094）：掃描指定 ticket 的 body 與 git commit 訊息，將 TD 編號分類為「已處理 / 無需處理 / 仍待處理」三狀態。用於 Phase 3a/3b/4 結束時即時校準 TD 清單，防止 Phase 4 評估時誤判已完成項（PC-094 根因）。
 >
@@ -294,9 +326,9 @@ ticket batch-create --template impl-parsley --targets "a,b" --parent 1.0.0-W28-0
 
 > **注意**：`complete` 在父 ticket 含未完成 children（非 terminal：pending / in_progress / blocked）時會以 exit 1 阻擋（W11-003.2）。提供 `--force` 旁路強制完成，會在 stderr 列出未完成 children 作為警告，cascade 解鎖機制仍會執行。建議優先完成 children 後再 complete 父 ticket。
 >
-> **注意**：5W1H 欄位由 `set-who` ~ `set-how` 6 個命令更新。`blockedBy` 用 `set-blocked-by`、`relatedTo` 用 `set-related-to`（均支援 `--add`/`--remove`）。`priority` 等欄位無 CLI 命令，需手動編輯 frontmatter。完整對照表見 `references/track-command.md`。
+> **注意**：5W1H 欄位由 `set-who` ~ `set-how` 6 個命令更新。`blockedBy` 用 `set-blocked-by`、`relatedTo` 用 `set-related-to`（均支援 `--add`/`--remove`）、`priority` 用 `set-priority`。其餘 frontmatter 欄位無 CLI 命令，需手動編輯 frontmatter。完整對照表見 `references/track-command.md`。
 >
-> **注意**：`append-log` 必須加上 `--section` 必填參數：`ticket track append-log <id> --section "Problem Analysis" "內容"`。有效區段值：`Problem Analysis`、`Context Bundle`、`重現實驗結果`、`Solution`、`Test Results`、`Execution Log`、`NeedsContext`、`Exit Status`。`重現實驗結果` 為 ANA type 必填章節（PC-063 / ticket-body-schema.md）。`Context Bundle` 用於派發前寫入 PCB（PC-040）；`NeedsContext`/`Exit Status` 用於代理人結束狀態協議（W17-010）。
+> **注意**：`append-log` 必須加上 `--section` 必填參數：`ticket track append-log <id> --section "Problem Analysis" "內容"`。有效區段值（SSOT：`ticket_system/constants.py` 的 `CANONICAL_BODY_SECTIONS` + `Execution Log`，共 10 章）：`Task Summary`、`Problem Analysis`、`重現實驗結果`、`Solution`、`Test Results`、`Context Bundle`、`NeedsContext`、`Exit Status`、`Completion Info`、`Execution Log`。body-schema 全必填章節（含 `Completion Info`）皆可經 append-log 寫入，不需 Edit 繞道。`重現實驗結果` 為 ANA type 必填章節（PC-063 / ticket-body-schema.md）。`Context Bundle` 用於派發前寫入 PCB（PC-040）；`NeedsContext`/`Exit Status` 用於代理人結束狀態協議（W17-010）。
 >
 > **Status precondition（W3-044 / W1-058）**：`append-log` 要求 ticket status 為 `in_progress`（`completed` 亦放行，補 review 場景）。**例外（W1-058）**：派發前章節 `Problem Analysis` / `Context Bundle` 允許 `pending` 直寫——PM 依 PC-040 / PC-100 於 create 後立即寫入派發 context 屬合法 bookkeeping，不需 `--force`、不記 audit。其餘章節（`Solution` / `Test Results` / `Execution Log` 等執行產出）於 pending / blocked / closed 仍阻擋（status 失敗 exit 2）；`--force` 逃生閥行為與 hook-logs audit 紀錄不變。
 >
@@ -421,17 +453,19 @@ ticket handoff --from-worklog [--worklog-path PATH] [--dry-run]
 
 ---
 
-**Version**: 2.7.0
-**Last Updated**: 2026-05-27
+**Version**: 2.9.0
+**Last Updated**: 2026-07-08
 **Status**: Completed
 
 **Change Log**:
 
+- v2.9.0 (2026-07-08): 系統模型章節新增「named agent 生命週期三態」——擴展 agent=CI runner 類比從二態（running/stopped）為三態（新增 idle=warm runner），路由 PM 回收 SOP 到 parallel-dispatch.md（W1-008 ANA 落地，W1-010）
+- v2.8.0 (2026-07-04): 新增「系統模型（設計自我描述）」章節——issue tracker + CI runner 為主類比、batch job queue 為輔，明示身份晚綁定與共享工作區兩個與 process 直覺相反的預設（設計回顧落地）；修正 stale 描述「priority 等欄位無 CLI 命令」（`set-priority` 已存在且完整接線，描述與 code 對齊）
 - v2.7.0 (2026-05-27): `/ticket` 裸指令預設行為改為 dashboard-first 流程（W3-013.1 落地，源於 W3-013 ANA 結論方向 a）
   - 步驟 1 從 `ticket track runqueue --context=resume --top 3` 改為 `ticket track dashboard --top 5`
   - AskUserQuestion 選項對齊 dashboard `[1] [2] [N]` 編號 + priority 標籤（用戶可直接說編號選擇）
   - in_progress 任務優先列出（label 加 `[ip]` 前綴），用戶選擇後走 `resume` 而非 `claim`
-  - dashboard 無結果時 fallback 到原 `list --status pending,in_progress` 路徑（向後相容）
+  - dashboard 無結果時 fallback 到原 `list --status pending in_progress` 路徑（向後相容）
   - `ticket resume --list` 與 `ticket track runqueue --context=resume` 子命令保留作除錯/腳本用途
   - 量測收益：W10-113 baseline 7 tool call → dashboard-first 2-3 tool call（改善 57-71%）
 - v2.6.0 (2026-05-13): 補 W10-114 dashboard 命令與 W10-115 list 預設行為文件（W10-116 落地）
@@ -471,14 +505,16 @@ ticket handoff --from-worklog [--worklog-path PATH] [--dry-run]
 
 ---
 
-## 修改 source 後必須重新安裝
+## 修改 source 後無需重新安裝（shim 化）
 
-> **重要**：本 skill 透過 `uv tool install` 安裝為獨立 CLI，source（本目錄）與 installed（`~/.local/share/uv/tools/<package>/`）是兩份獨立 Python package。修改 source 後若未 reinstall，CLI 仍使用 stale installed 版本，新增的函式會 AttributeError 或被 hasattr 包裝靜默吞掉（W11-037 根因）。
+> **重要**：本 skill 已改用 cwd-resolving shim（ARCH-APP-002 / framework issue #12），不再走 `uv tool install`。shim 每次執行都 `uv run --directory .claude/skills/ticket` 當前專案源碼，修改 source 後改動即時生效，無 stale installed 問題（取代舊 `uv-tool-staleness-check-hook` / `ticket-reinstall-hook` 機制）。
 
-**修復指令**：
+**檢查 / 安裝指令**：
 
 ```bash
-cd .claude/skills/<本 skill 目錄> && uv tool install . --force --reinstall
-```
+# 安裝 / 更新 shim（一次安裝 ticket / doc / worktree）
+python3 .claude/scripts/install-skill-clis.py
 
-**自動偵測**：每次 SessionStart 由 `uv-tool-staleness-check-hook` 比對 source vs installed SHA256，偵測 stale 時提示修復指令。對應 ticket-skill 本身另有 `ticket-reinstall-hook` 自動 reinstall。
+# 檢查是否已 shim 化（exit 0/1）
+python3 .claude/scripts/install-skill-clis.py --check
+```

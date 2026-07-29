@@ -25,7 +25,8 @@ from pathlib import Path
 from typing import Dict, Set, List, Tuple, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import setup_hook_logging, run_hook_safely
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import setup_hook_logging, run_hook_safely
 
 
 def extract_skill_dirs(skills_dir: Path) -> Set[str]:

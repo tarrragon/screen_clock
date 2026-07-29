@@ -339,7 +339,7 @@ Phase 4a 多視角分析報告完成後，進入 Phase 4b 前，PM 必須執行 
 |----|----|------|-----------|
 | Phase 0 | Phase 1 | SA 審查通過 | 填寫 Context Bundle（→ Phase 1） |
 | Phase 1 | Phase 1.5 | 功能規格完成 | 填寫 Context Bundle（→ 多視角審查） |
-| Phase 1.5 | Phase 2 | 多視角審查通過 | 填寫 Context Bundle（→ Phase 2） |
+| Phase 1.5 | Phase 2 | 多視角審查通過 + Phase 2 條件式強制判斷（見下方） | 填寫 Context Bundle（→ Phase 2），含 domain map 不變式軸（見下方） |
 | Phase 2 | Phase 3a | 測試案例設計完成 | 填寫 Context Bundle（→ Phase 3a） |
 | Phase 3a | 3b 拆分評估 | 策略文件完成 | 填寫 Context Bundle（→ Phase 3b） |
 | 3b 拆分評估 | Phase 3b | PM 完成拆分評估（見下方） | 各子任務填寫 Context Bundle |
@@ -349,6 +349,29 @@ Phase 4a 多視角分析報告完成後，進入 Phase 4b 前，PM 必須執行 
 | Phase 4c | 完成 | 多視角再審核報告完成 | - |
 
 > **Context Bundle**：PM 在派發下一階段代理人前，必須將該代理人所需的前置資訊寫入 Ticket。詳見 `.claude/pm-rules/context-bundle-spec.md`。
+
+### Phase 2 條件式強制判斷（Phase 1.5 通過後，W1-004）
+
+Phase 1 完成後，依 source spec 有無和 FR 驗收標準規模決定 Phase 2 形態：
+
+| 情境 | Phase 2 需求 |
+|------|-------------|
+| 有 spec 且 FR 驗收標準合計 >= 3 條 | 強制：ANA 必須產出至少一個 Phase 2 測試設計 ticket（派發 sage-test-architect） |
+| 有 spec 但 FR 驗收標準合計 < 3 條 | 建議：可在 IMP ticket 內嵌入測試設計 |
+| 無 spec（純 bug fix / 流程改善） | Phase 2 豁免 |
+
+**Why**：Phase 2 的價值在於「紅燈先行」確保 spec 驗收標準被轉化為可執行測試。小範圍 FR 可在 IMP 內同步處理；大範圍 FR 需 sage 獨立設計以避免 IMP 執行者漏蓋 spec 邊界條件。
+
+### Phase 2 輸入：Domain Map 不變式軸（強制）
+
+PM 填寫 Phase 2 Context Bundle 時，必須將 domain map 的「Bundle 不變式清單」作為 sage 的輸入之一。
+
+| 條件 | PM 動作 |
+|------|--------|
+| `docs/domain-map.md` 存在且含不變式清單 | Context Bundle 加入不變式清單路徑引用，sage 逐條轉 domain unit test |
+| domain map 不存在 | 先建 domain map（`/doc` domain-map 模板），或在 Context Bundle 標註「無 domain map：測試設計僅依 spec FR」 |
+
+**Why**：domain map 不變式是 domain 層測試的權威輸入軸（與 spec FR 正交）。version-bootstrap 已消費此軸（Step 5），但 per-feature TDD 路徑若不內化此輸入，sage 只依 spec FR 設計測試，domain 層的行為不變式（如 carry-forward、DAG 依賴方向）會遺漏。
 
 ### 3b 拆分評估（Phase 3a 完成後，強制）
 
@@ -441,6 +464,7 @@ PM 收到代理人回報後執行：
 - .claude/pm-rules/decision-tree.md - 主線程決策樹
 - .claude/pm-rules/context-bundle-spec.md - Context Bundle 規範（派發前資訊準備）
 - @.claude/rules/core/quality-baseline.md - 品質基線（Phase 4 不可跳過）
+- .claude/pm-rules/worktree-operations.md「多階段串接派發」節 - 跨 agent TDD phase 接力（RED→GREEN 跨多個 worktree agent）時的 feat 分支累積器機制，保 main 全程恆綠
 
 ---
 
@@ -459,7 +483,8 @@ SA 否決不可繞過 — 必須解決否決原因後重新審查。
 
 ---
 
-**Last Updated**: 2026-06-04
+**Last Updated**: 2026-07-27
+**Version**: 2.19.0 — 相關文件補一行路由指向 `worktree-operations.md`「多階段串接派發」節（跨 agent phase 接力的 feat 分支累積器機制，屬 git 分支操作非 TDD phase 語意，不搬機制內容）（0.2.1-W3-095）
 **Version**: 2.18.0 — 新增「ANA 全量 grep/regex 範圍驗證完整性規範」獨立章節：三層強制要求（驗證方法涵蓋完整性聲明、覆蓋完整性聲明格式、AC 設計連動），觸發案例 W1-005 ANA AC-4 二度誤判（0.19.1-W1-039）
 **Version**: 2.17.0 — Phase 4 派發前新增「TD 清單校準（td-status）」預檢步驟（W10-083 / PC-094 落地，防止多視角浪費 token 在已完成 TD 項）
 **Version**: 2.16.0 - Phase 4 新增強制 Checkpoint：重構評估前執行 WRAP Phase 2 檢驗（W15-019，防止重構根因分析太表層）

@@ -21,7 +21,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import setup_hook_logging, run_hook_safely
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import setup_hook_logging, run_hook_safely
 
 # 偵測閾值：old_string 比 new_string 長至少這麼多字元才視為「刪除」
 DELETION_THRESHOLD_CHARS = 50

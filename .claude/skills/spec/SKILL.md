@@ -19,6 +19,16 @@ description: "需求完善度品質閘門。Use for: (1) Phase 1 開始時初始
 
 **/spec 不是流程入口**：lavender 在 Phase 1 內部使用 /spec 產出功能規格。/tdd 不呼叫 /spec，/spec 不呼叫 /tdd。兩者完全解耦。
 
+### 適用範圍限制（防誤用聲明）
+
+`docs/spec/` 下 frontmatter 含 `subdomain: data-contract` 的文件（例：`docs/spec/balance-sheet/SPEC-002-accounts-snapshots-data-contract.md`）**不適用 `/spec validate`**。
+
+| 項目 | /spec validate 假設的 schema | data-contract 文件實際 schema |
+|------|------------------------------|-------------------------------|
+| 章節結構 | Purpose / Scenarios / Acceptance（Lite）或 6 區段（Full） | 概述 + 可攜性邊界原則 + A 區（邏輯契約）/ B 區（實作綁定） |
+
+**Why**：/spec validate 的 Layer 1 結構檢查針對 Purpose/Scenarios/Acceptance（或 Full 6 區段）比對區段標題，data-contract 文件遵循 `data-layer-contract-methodology.md` 的可攜性兩區（A/B）結構，兩套 schema 不相容。**Consequence**：對 data-contract 文件執行 `/spec validate` 會在 Layer 1 誤報「結構失敗」（找不到 Purpose/Scenarios/Acceptance 區段標題），該結果不反映文件真實品質，若被當真會誤導撰寫者修改成不必要的結構。**Action**：data-contract 文件的機械驗證改由 `doc validate` 子命令承接（`.claude/skills/doc/SKILL.md`，0.2.1-W1-008 落地前為人工依 `data-layer-contract-methodology.md` 檢查），禁止對其執行 `/spec validate`；已誤執行者，Layer 1「結構失敗」判定應忽略。
+
 ---
 
 ## 子命令總覽
@@ -139,8 +149,26 @@ description: "需求完善度品質閘門。Use for: (1) Phase 1 開始時初始
 | GWT 格式 | Scenarios 區段至少 1 個 Given-When-Then 完整三元組 |
 | Acceptance 可驗證性 | 每個條件以 `- [ ]` 開頭 |
 | Purpose 簡潔性 | 不超過 200 字（Lite）/ 500 字（Full） |
+| API surface 完整性（Full only） | 每個 `### FR-XX:` 段落若提及 HTTP API 行為（`GET`/`POST`/`PUT`/`DELETE`/`endpoint`/`API 回`/`status code` 類訊號），須有對應 `/v1/...` endpoint 路徑定義；缺者列為提醒 |
+| domain-map 覆蓋（規劃波 domain spec） | spec 每個 `### FR-XX:` 須在對應 domain map 的 FR→bundle 覆蓋表歸屬；domain map 缺失、或有未覆蓋 FR，列為提醒 |
 
 **結構檢查失敗**：輸出缺失清單，不進入 Layer 2。
+
+**API surface 完整性檢查**（0.4.1-W2-005，動機：SPEC-014 FR-04 曾寫「analytics API 回 501」卻無 endpoint 路徑定義，缺口到派發實作才暴露）：以 `scripts/check_api_surface.py` 機械掃描每個 FR 段落，比對「描述 API 行為的訊號」與「同段落內是否已有對應主題的 `/v1/...` 路徑定義」。命令：
+
+```bash
+python3 .claude/skills/spec/scripts/check_api_surface.py {spec-file-path}
+```
+
+輸出缺口清單（`[FR-XX] {行內容}`）或「檢核通過」；exit code 0 = 通過、1 = 有缺口。**性質為啟發式提醒**（依訊號詞比對，非語意理解），可能有少量誤判（如籠統的架構流程敘述），不構成強制阻擋，僅供撰寫者複核。
+
+**domain-map 覆蓋檢核**（0.1.0-W2-016.3，動機：W2-014 domain map 曾停在 FR-24 漏 FR-25/26，靠人工四視角審查才抓出）：驗證 version-bootstrap Step 2.5 產出的 domain map 是否覆蓋 spec 全部 FR。適用於規劃波的 domain spec（`docs/spec/{domain}/`），非 ticket 級 feature-spec。命令：
+
+```bash
+python3 .claude/skills/spec/scripts/check_domain_coverage.py {spec-file-path} [--domain-map {path}]
+```
+
+domain map 定位：省略 `--domain-map` 時自動找 spec 同目錄 `domain-map.md`，退化找 `docs/domain-map.md`。輸出：domain map 缺失（提示先走 Step 2.5 產出）、未覆蓋 FR 清單（`FR-NN`，請於 domain map §7 補歸屬）、或「檢核通過」。exit code 0 = 通過、1 = 缺失或有未覆蓋 FR。FR token 展開支援逗號續列（`FR-01,02,03`）與範圍（`FR-13~17`）。
 
 ### Layer 2：AI 語義推演（深度，需思考）
 
@@ -152,9 +180,24 @@ description: "需求完善度品質閘門。Use for: (1) Phase 1 開始時初始
 |---|------|---------|---------|
 | 1 | 邊界完整性 | 極端值、空值、上限下限的行為定義了嗎？ | Lite + Full |
 | 2 | 錯誤路徑 | 每個操作失敗時，系統如何回應？ | Lite + Full |
-| 3 | 狀態完整性 | 所有狀態和轉換都定義了嗎？有不可達狀態嗎？ | Lite + Full |
+| 3a | 狀態轉換完整性 | 所有狀態和轉換都定義了嗎？有不可達狀態嗎？ | Lite + Full |
+| 3b | 約束條件違反行為 | 每條約束條件的前提被違反時，行為定義了嗎？ | Lite + Full |
+| 4 | 教學一致性 | spec 的設計決策是否與 blog 教學對應模組一致？ | Full only |
 
-**Lite 模式只掃描維度 1-3**，降低小型任務的認知負擔。
+**Lite 模式只掃描維度 1-3**，降低小型任務的認知負擔。**Full 模式額外掃描維度 4**。
+
+#### 維度 4 教學一致性掃描說明（Full 模式）
+
+比對 spec 設計決策與 blog 教學對應模組是否一致：
+
+1. 從 spec 的 domain 定位對應教學模組（CLAUDE.md「教學模組對應表」）
+2. 讀取 blog 對應章節
+3. 逐項比對設計決策面向（API 路徑 / 資料模型 / response format / 行為語意 / 儲存架構）
+4. 產出偏移清單
+
+嚴重度：高（API 路徑/response format，影響 SDK 實作）、中（資料模型欄位）、低（行為策略，不影響介面契約）。教學缺口（spec 有但教學無）不算偏移，標記為缺口建議先在 blog 補完。
+
+**降級條款（無教學模組對應表時）**：步驟 1 依賴專案 CLAUDE.md 存在「教學模組對應表」章節才能定位對應教學模組。**Why**：並非所有專案都維護 blog 教學內容（如本專案 flutter_balance），CLAUDE.md 無此表時維度 4 無源可比。**Consequence**：若強行執行，會因找不到對應章節而卡住或產出誤導性的空比對結果，且不應被計入 validate 失敗。**Action**：執行維度 4 前先確認專案 CLAUDE.md 是否含「教學模組對應表」章節；不存在時跳過維度 4，於 validate 輸出標註「維度 4 skipped：無教學模組對應表」，不得視為失敗（不計入未回答問題數、不阻擋迭代上限判定）。
 
 #### 情境相關提問（Full 模式額外提示）
 
@@ -182,12 +225,37 @@ Full 模式下，validate 完成維度 1-3 掃描後，**額外提示**以下問
 #### 維度 2: 錯誤路徑
 - Q3: {操作} 失敗時，是否需要回滾已完成的步驟？
 
-#### 維度 3: 狀態完整性
+#### 維度 3a: 狀態轉換完整性
 （無未回答問題）
+
+#### 維度 3b: 約束條件違反行為
+對「約束條件」區段每一條，三問法掃描：
+1. 約束的前提是什麼？（例：「init 呼叫一次」→ 前提 = 只能呼叫一次）
+2. 前提被違反時（第二次呼叫 init），行為定義了嗎？
+3. 約束覆蓋部分 API 時，同類別未列舉的 API 是否也需定義？
+
+#### 維度 4: 教學一致性（Full 模式）
+
+CLAUDE.md 有「教學模組對應表」時：
+
+| 偏移面向 | Spec 值 | 教學值 | 嚴重度 |
+|---------|---------|--------|--------|
+| {面向} | {spec 描述} | {教學描述} | 高/中/低 |
+
+教學缺口（spec 有定義但教學未涵蓋）：
+- {設計決策描述} → 建議先在 blog 補完
+
+CLAUDE.md 無「教學模組對應表」時（降級條款，見上）：
+
+```
+維度 4 skipped：無教學模組對應表
+```
 
 ### 建議
 - 必須回答：Q1, Q3（影響 GWT 設計）
 - 建議回答：Q2（影響效能設計）
+- 教學偏移（高）：必須對齊後再進入 Phase 2
+- 教學缺口：建議先補教學再落實 spec
 - 可延後：無
 ```
 
@@ -223,10 +291,12 @@ Phase 1 中 lavender 如何使用 /spec 的完整流程，詳見 lavender 代理
 - .claude/pm-rules/tdd-flow.md - TDD 完整流程定義
 - references/spec-template-lite.md - Lite 模板（3 區段）
 - references/spec-template-full.md - Full 模板（6 區段）
+- .claude/methodologies/data-layer-contract-methodology.md - data-contract 文件的 A/B 兩區結構定義（`/spec validate` 不適用對象）
+- .claude/skills/doc/SKILL.md - data-contract 文件機械驗證的承接者（`doc validate`，0.2.1-W1-008）
 
 ---
 
-**Version**: 1.1.0
-**Last Updated**: 2026-03-25
+**Version**: 1.5.0
+**Last Updated**: 2026-07-26
 **Source**: Phase 3b context 耗盡案例 → 需求完善度品質閘門
-**Changes**: v1.1.0 - 三人組共識簡化：刪除核心抽象/反向提問策略、維度 4-7 降級為提示、精簡迭代機制、init 條件簡化為 2 個
+**Changes**: v1.5.0 - 定位與分工節新增「適用範圍限制（防誤用聲明）」：`subdomain: data-contract` 文件（A/B 兩區結構）不適用 `/spec validate`，機械驗證改由 `doc validate` 承接（0.2.1-W1-008 落地前人工檢查）；維度 4 補降級條款：CLAUDE.md 無「教學模組對應表」時跳過並標註「維度 4 skipped：無教學模組對應表」，不視為失敗（0.2.1-W1-005，動機：/spec validate 對 SPEC-002 誤報結構失敗 + flutter_balance 專案無教學模組對應表）。v1.4.0 - Layer 1 新增 domain-map 覆蓋檢核（`scripts/check_domain_coverage.py` + `tests/test_check_domain_coverage.py`，11 測試綠）：驗證 domain map 覆蓋 spec 全部 FR，FR token 支援逗號續列/範圍展開（0.1.0-W2-016.3，落地 W2-016 ANA domain 規劃整合；動機 W2-014 domain map 曾漏 FR-25/26）。v1.3.0 - Layer 1 新增 API surface 完整性檢查（Full only），`scripts/check_api_surface.py` 機械掃描 FR 段落 API 行為訊號與 endpoint 路徑定義的對應性（0.4.1-W2-005，動機：SPEC-014 FR-04 analytics endpoint 路徑缺口）。v1.2.0 - 新增維度 4 教學一致性（Full 模式），比對 spec 設計決策與教學對應模組（防護教學×實作偏移）。v1.1.0 - 三人組共識簡化：刪除核心抽象/反向提問策略、原維度 4-7 降級為提示、精簡迭代機制、init 條件簡化為 2 個

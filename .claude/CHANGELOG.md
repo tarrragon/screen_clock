@@ -1,3 +1,1623 @@
+## [2.22.1] - 2026-07-29
+
+### Summary
+fix: clean 豁免清單依比對維度拆集合; docs: 收尾 並記錄 clean 豁免比對維度錯置
+
+Changes: 1 fix, 1 docs
+
+- fix: clean 豁免清單依比對維度拆集合
+- docs: 收尾 並記錄 clean 豁免比對維度錯置
+
+---
+
+## [2.22.0] - 2026-07-29
+
+### Summary
+feat: 移除 personal 遮蔽副本並訂定全域覆蓋層正規流程; refactor: 刪除 wrap-decision 孤兒目錄 integration-patterns; fix: 移除 sync-claude-push 已隨 schema 變更失效的漂移檢查 (+9 more)
+
+Changes: 1 feat, 1 refactor, 5 fix, 4 docs, 1 chore
+
+- feat: 移除 personal 遮蔽副本並訂定全域覆蓋層正規流程
+- refactor: 刪除 wrap-decision 孤兒目錄 integration-patterns
+- fix: 移除 sync-claude-push 已隨 schema 變更失效的漂移檢查
+- fix: 改用內容雜湊取代 skill-sync 的版本字串比對
+- fix: 修正 error-pattern severity frontmatter/內文分歧
+- fix: 遷移 README 7 筆模糊碰撞列一級資料至精確列後移除
+- fix: readme_index 支援一 ID 對多檔複合鍵，補列 7 個隱形 pattern
+- docs: 記錄 PC-BAL-014 skill 註冊表 session 快取遮蔽檔案系統變更
+- docs: personal 覆蓋層的收斂方向與已發生損害
+- docs: 校正三項幽靈重編陳述與碰撞登記表脫節
+- docs: 記錄 ARCH-BAL-007 非唯一識別符被當主鍵
+- chore: 補上 test_error_pattern_severity_audit.py 執行權限
+
+---
+
+## [2.21.1] - 2026-07-27
+
+### Summary
+sync .claude configuration
+
+---
+
+## [2.21.0] - 2026-07-27
+
+### Summary
+feat: error-pattern README 索引改保守 upsert 並接線; feat: error-pattern README 索引全量 sync 純函式層 + CLI; feat: memory 寫入攔截改為 PreToolUse deny 加改道指引 (+49 more)
+
+Changes: 9 feat, 11 fix, 28 docs, 2 chore, 2 test
+
+- feat: error-pattern README 索引改保守 upsert 並接線
+- feat: error-pattern README 索引全量 sync 純函式層 + CLI
+- feat: memory 寫入攔截改為 PreToolUse deny 加改道指引
+- feat: 刪除 test-timeout-post.py 死碼 + config 白名單納入
+- feat: 規則 8 守衛實作依賴型 vs 歷史錨點型判別
+- feat: WRAP 觸發綁定至二元處置取捨
+- feat: version-tracking-consistency-guard-hook 新增 todolist.yaml 解析失敗偵測
+- feat: 新增 doc validate-filenames 檔名慣例驗證
+- feat: 擴充 TICKET_EXEMPT_AGENT_TYPES 收錄唯讀常駐審查委員
+- fix: skill-shadowing hook 修復 N1 context 送達與 H1/N5 目錄層級靜默失效
+- fix: skill-shadowing hook 修正 L1 大小寫偵測與 L3 版本正則
+- fix: skill-shadowing hook 改遞迴比對整個目錄
+- fix: 修復 wrap-decision/zellij 全域 skill 遮蔽專案版
+- fix: 修正 ask_user_question_reminders.py 六處失效路徑引用
+- fix: 降級 ticket-quality-gate 失敗出口為 advisory
+- fix: 移除 8 個事實判斷型 hook 的 effort=low 短路 + 同步固化測試
+- fix: acceptance-gate 誤判 create 命令引號文字為 complete 呼叫致死鎖
+- fix: acceptance-gate-hook effort=low 短路不再豁免 complete 命令
+- fix: PEP 723 依賴宣告取代 version-tracking hook 的 python3 探測
+- fix: validate-filenames 豁免框架約定固定命名文件
+- docs: PC-BAL-013 更正 team 訊息路由的事實陳述
+- docs: PC-BAL-013 context 中斷誤判為代理人終止
+- docs: error-patterns README 的 memory 定位改為排除論述
+- docs: 補齊 error-patterns README 索引 148 筆缺漏
+- docs: 修正規則 12 依賴型判準的字面矛盾
+- docs: AGENT_PRELOAD 規則 12 自我稽核，發現規則本身的字面矛盾
+- docs: 多階段分支流落地，memory 目錄清空
+- docs: PC-061 / PC-160 防護章改寫指向現行攔截機制
+- docs: 清理 error-patterns 內指向不存在 memory 檔的引用
+- docs: memory 五檔處置 4/5，餘一檔阻塞於落地位置設計
+- docs: 框架檔案禁依賴型 ticket 引用禁令上移至預設載入層
+- docs: 移除 memory-capture-guide 與死指標，記錄 PC-BAL-012
+- docs: 改寫四處剩餘 memory 目的地表述
+- docs: 改寫規則層分流表述為 memory 排除 policy
+- docs: PC-160 補 v3 案例——框架落地已在飛行仍寫 memory
+- docs: 新增 ARCH-BAL-006 宣告層窄於執行層
+- docs: PC-BAL-002 補案例二與比對維度分流
+- docs: 新增 PC-BAL-011 + 修正 Layer 2 發現 1
+- docs: Recommended 標記適用邊界對稱補述
+- docs: IMP-BAL-001 適用範圍擴充至 PostToolUse
+- docs: 新增 ARCH-BAL-005 自證式豁免 error-pattern
+- docs: 新增 PC-BAL-010 驗證管道對待驗現象不敏感（家族層）
+- docs: 新增 PC-BAL-009 測試套件顏色隨 cwd 翻轉
+- docs: 新增 ARCH-BAL-004 + spawn
+- docs: 修文件範例源頭 + 記錄 診斷修正
+- docs: 修正 AGENT_PRELOAD claim 前提衝突 + PC-V1-002 第三變體固化
+- docs: 新增 ARCH-BAL-003 白名單判準與成員脫節
+- docs: 新增 IMP-BAL-003 稽核器與消費端解析器嚴格度落差
+- chore: test_version_tracking_consistency_guard_hook_yaml_parse.py 權限 644 -> 755
+- chore: 清除 hook-exclude-list 五個殭屍條目與失效 archived 模式
+- test: hook 測試 cwd 無關化 + 防 fixture 殘留污染 repo
+- test: 修復 hook 測試三紅燈 + 一無鑑別力測試（測試側）
+
+---
+
+## [2.20.16] - 2026-07-26
+
+### Summary
+fix: set-exit-status 冪等取代語意; docs: 完成收尾 + PC-BAL-008 並行 index 危害 + spawn; docs: 記錄 ARCH-BAL-002 識別符雙載體工具只讀一側（book 實證）
+
+Changes: 1 fix, 2 docs
+
+- fix: set-exit-status 冪等取代語意
+- docs: 完成收尾 + PC-BAL-008 並行 index 危害 + spawn
+- docs: 記錄 ARCH-BAL-002 識別符雙載體工具只讀一側（book 實證）
+
+---
+
+## [2.20.15] - 2026-07-26
+
+### Summary
+fix: 框架簡體字清理
+
+Changes: 1 fix
+
+- fix: 框架簡體字清理
+
+---
+
+## [2.20.14] - 2026-07-26
+
+### Summary
+docs: 記錄 TEST-BAL-002 測試替身建構路徑分歧（monitor 實證）
+
+Changes: 1 docs
+
+- docs: 記錄 TEST-BAL-002 測試替身建構路徑分歧（monitor 實證）
+
+---
+
+## [2.20.13] - 2026-07-26
+
+### Summary
+fix: doc validate 子命令; fix: doc skill 既有測試紅燈修復; docs: 分冊判準 + domain 清單去專案化
+
+Changes: 2 fix, 1 docs
+
+- fix: doc validate 子命令
+- fix: doc skill 既有測試紅燈修復
+- docs: 分冊判準 + domain 清單去專案化
+
+---
+
+## [2.20.12] - 2026-07-26
+
+### Summary
+fix: TRACEABILITY_SCHEMA 三軸補齊; docs: methodology dormant 豁免 + traceability 判準成文; docs: PC-APP-012 防護收編 canonical
+
+Changes: 1 fix, 2 docs
+
+- fix: TRACEABILITY_SCHEMA 三軸補齊
+- docs: methodology dormant 豁免 + traceability 判準成文
+- docs: PC-APP-012 防護收編 canonical
+
+---
+
+## [2.20.11] - 2026-07-26
+
+### Summary
+fix: doc CLI data-contract 接線 + next-id; docs: spec data-contract 防誤用 + 維度 4 降級; docs: PC-BAL-007 實查約束落地
+
+Changes: 1 fix, 2 docs
+
+- fix: doc CLI data-contract 接線 + next-id
+- docs: spec data-contract 防誤用 + 維度 4 降級
+- docs: PC-BAL-007 實查約束落地
+
+---
+
+## [2.20.10] - 2026-07-25
+
+### Summary
+docs: 記錄 PC-BAL-007 並行文件票未交叉驗證的事實漂移（/006 實證）
+
+Changes: 1 docs
+
+- docs: 記錄 PC-BAL-007 並行文件票未交叉驗證的事實漂移（/006 實證）
+
+---
+
+## [2.20.9] - 2026-07-25
+
+### Summary
+docs: 記錄 PC-BAL-006 chpwd ls 淹沒被誤診為 CLI 故障（ 驗收重現實證）
+
+Changes: 1 docs
+
+- docs: 記錄 PC-BAL-006 chpwd ls 淹沒被誤診為 CLI 故障（ 驗收重現實證）
+
+---
+
+## [2.20.8] - 2026-07-25
+
+### Summary
+docs: 記錄 IMP-BAL-002 sync-pull 未知參數推進 base SHA 缺陷（framework issue #18）
+
+Changes: 1 docs
+
+- docs: 記錄 IMP-BAL-002 sync-pull 未知參數推進 base SHA 缺陷（framework issue #18）
+
+---
+
+## [2.20.7] - 2026-07-25
+
+### Summary
+docs: 記錄 IMP-BAL-001 PreToolUse 提前 emit stdout 被 exit 2 丟棄模式
+
+Changes: 1 docs
+
+- docs: 記錄 IMP-BAL-001 PreToolUse 提前 emit stdout 被 exit 2 丟棄模式
+
+---
+
+## [2.20.6] - 2026-07-25
+
+### Summary
+fix: lag 警告延後 emit 至 PC-019 判定後，四路徑零丟失
+
+Changes: 1 fix
+
+- fix: lag 警告延後 emit 至 PC-019 判定後，四路徑零丟失
+
+---
+
+## [2.20.5] - 2026-07-25
+
+### Summary
+sync .claude configuration
+
+---
+
+## [2.20.4] - 2026-07-25
+
+### Summary
+fix: 警告升 additionalContext + lag 超閾值 deny; docs: version-bootstrap Step 2.6 資料契約產出 + domain-map §3 契約引用連結欄; docs: 建立 data-contract-template 模板 + doc SKILL.md 註冊 (+2 more)
+
+Changes: 1 fix, 4 docs
+
+- fix: 警告升 additionalContext + lag 超閾值 deny
+- docs: version-bootstrap Step 2.6 資料契約產出 + domain-map §3 契約引用連結欄
+- docs: 建立 data-contract-template 模板 + doc SKILL.md 註冊
+- docs: 建立 data-layer-contract-methodology 方法論 + 索引註冊
+- docs: domain-map 補標實作狀態欄 + 修正目標路徑
+
+---
+
+## [2.20.3] - 2026-07-24
+
+### Summary
+fix: doc skill + saffron agent 加 domain-map bundle 存在性驗證（PC-APP-012 防護）
+
+Changes: 1 fix
+
+- fix: doc skill + saffron agent 加 domain-map bundle 存在性驗證（PC-APP-012 防護）
+
+---
+
+## [2.20.2] - 2026-07-24
+
+### Summary
+docs: domain-map 模板和 9 個既有 map 補標 bundle 實作狀態欄; docs: PC-APP-012 domain-map 未實作 bundle 衍生不可執行 ticket; chore: pull .claude 更新（上游 e41fd80）
+
+Changes: 2 docs, 1 chore
+
+- docs: domain-map 模板和 9 個既有 map 補標 bundle 實作狀態欄
+- docs: PC-APP-012 domain-map 未實作 bundle 衍生不可執行 ticket
+- chore: pull .claude 更新（上游 e41fd80）
+
+---
+
+## [2.20.1] - 2026-07-23
+
+### Summary
+chore: skill 庫雙向同步 + 新增 neurodivergent-output skill
+
+Changes: 1 chore
+
+- chore: skill 庫雙向同步 + 新增 neurodivergent-output skill
+
+---
+
+## [2.20.0] - 2026-07-23
+
+### Summary
+feat: domain-layer import 方向 lint hook; feat: /spec validate domain 覆蓋閘門 + 收掛; feat: 測試規劃消費 domain-map 不變式（兩軸測試設計） (+15 more)
+
+Changes: 5 feat, 2 refactor, 4 fix, 4 docs, 3 chore
+
+- feat: domain-layer import 方向 lint hook
+- feat: /spec validate domain 覆蓋閘門 + 收掛
+- feat: 測試規劃消費 domain-map 不變式（兩軸測試設計）
+- feat: version-bootstrap Step 2.5 Domain 規劃 + doc saas 調和
+- feat: domain-map-template.md + doc skill 五種文件類型註冊
+- refactor: 中立化 framework 判準本體的專屬 domain 不變式
+- refactor: domain-map-template 去除專案專屬細節提升可重用性
+- fix: 校準 observability-rules AppLogger → developer.log
+- fix: phase4-hook M1 regex 不再誤傷標準章節名
+- fix: multi-round Round 3 修正 + spawn 延伸票
+- fix: multi-round Round 2 修正（含 gate 假通過致命 bug）
+- docs: 接線 domain map outbound 反向引用
+- docs: TEST-BAL-001 理想化 fixture 遮蔽 validator 假通過
+- docs: domain-bundle-mapping 方法論
+- docs: PC-BAL-005 phase4-hook 觸發詞誤傷標準章節名
+- chore: extend domain-bundle-mapping for multi-aggregate + command-side
+- chore: ARCH-BAL-001 Layer 2 潤飾（定語堆疊拆句）
+- chore: domain map 定案 + 四視角審查 + ARCH-BAL-001 + 防護票
+
+---
+
+## [2.19.4] - 2026-07-21
+
+### Summary
+chore: pull .claude 更新（上游 5ec670b）
+
+Changes: 1 chore
+
+- chore: pull .claude 更新（上游 5ec670b）
+
+---
+
+## [2.19.3] - 2026-07-21
+
+### Summary
+chore: pull .claude 更新（上游 680073cf）
+
+Changes: 1 chore
+
+- chore: pull .claude 更新（上游 680073cf）
+
+---
+
+## [2.19.2] - 2026-07-20
+
+### Summary
+feat: depends_on schema 宣告與 version-bootstrap 權威來源修正
+
+---
+
+## [2.19.1] - 2026-07-20
+
+### Summary
+feat: doc CLI 模板打包修復、CLI 子欄位寫入路徑、schema 一致性檢查與派發 context 品質規範
+
+---
+
+## [2.19.0] - 2026-07-20
+
+### Summary
+feat: 建立 schema 清單一致性檢查與驗證器過期判斷規則; feat: 移植 envelope 抑制邏輯至 cli-error-feedback-hook; feat: 註冊 pre-test-scan hook，刪除 superseded checkpoint hook (+5 more)
+
+Changes: 3 feat, 2 fix, 2 docs, 1 chore
+
+- feat: 建立 schema 清單一致性檢查與驗證器過期判斷規則
+- feat: 移植 envelope 抑制邏輯至 cli-error-feedback-hook
+- feat: 註冊 pre-test-scan hook，刪除 superseded checkpoint hook
+- fix: 補列三份 _SCHEMA_SECTION_NAMES 的 Spawn Requests 成員
+- fix: 改用真實檔案取代失效 mock，4 項紅燈轉綠
+- docs: 記錄越層建票模式並新增載體選擇閘門
+- docs: 記錄合併遺漏子功能但檔頭宣稱完整的錯誤模式
+- chore: 從 skill 庫拉取 compositional-writing →
+
+---
+
+## [2.18.3] - 2026-07-20
+
+### Summary
+docs: 新增 error-pattern 專案代號 BAL 與 PC-BAL-001（驗證端清單過期誤判 canonical 結構）
+
+---
+
+## [2.18.2] - 2026-07-20
+
+### Summary
+sync .claude configuration
+
+---
+
+## [2.18.1] - 2026-07-20
+
+### Summary
+fix: 新增靜默佔位偵測到 version-release 佔位掃描器; fix: 修復 version-release 下一版本候選掃描窗口越界誤傷 tech_debt; fix: 修復 version-release 安裝版 CLI 跨 skill import 斷裂 (+3 more)
+
+Changes: 4 fix, 2 chore
+
+- fix: 新增靜默佔位偵測到 version-release 佔位掃描器
+- fix: 修復 version-release 下一版本候選掃描窗口越界誤傷 tech_debt
+- fix: 修復 version-release 安裝版 CLI 跨 skill import 斷裂
+- fix: skill-sync push 排除清單補 hook-logs 目錄
+- chore: ux-interaction-feedback 升級替換為 ux-design-evaluation（skill-sync pull）
+- chore: skill-sync pull compositional-writing + multi-round-review 1.10.1
+
+---
+
+## [2.18.0] - 2026-07-17
+
+### Summary
+feat: complete 阻擋訊息加入 type-aware 內容引導 note; feat: create placeholder 依 ticket type 差異化引導文字; fix: spec_reference_checker 改讀兩份 SPEC 登錄簿聯集
+
+Changes: 2 feat, 1 fix
+
+- feat: complete 阻擋訊息加入 type-aware 內容引導 note
+- feat: create placeholder 依 ticket type 差異化引導文字
+- fix: spec_reference_checker 改讀兩份 SPEC 登錄簿聯集
+
+---
+
+## [2.17.0] - 2026-07-15
+
+### Summary
+feat: complete cascade 新增 blockedBy 反向掃描解鎖機制; feat: Phase 4 審查證據 WARNING hook + 規則 2 覆蓋修正; feat: 實作 doc uc acceptance-check CLI + dispatch-validate 規則 5 (+18 more)
+
+Changes: 8 feat, 5 fix, 5 docs, 3 chore
+
+- feat: complete cascade 新增 blockedBy 反向掃描解鎖機制
+- feat: Phase 4 審查證據 WARNING hook + 規則 2 覆蓋修正
+- feat: 實作 doc uc acceptance-check CLI + dispatch-validate 規則 5
+- feat: 實作 UC fingerprint 漂移偵測 CLI + PostToolUse hook
+- feat: context_bundle_extractor UC 自動注入
+- feat: uc CLI trace 截斷分組 + 錯誤訊息 actionable + except 觀測性
+- feat: 實作 uc-reference-validation-hook.py（PreToolUse UC 引用驗證，WARNING-only）
+- feat: 實作 doc skill uc list/verify/trace/context 子命令群組
+- fix: get_uc_summary 非標準 UC 結構容錯
+- fix: test_stop_hook 5 測試 project_root 隔離修復
+- fix: UC 掃描 token 變體/豁免路徑/常數治理 hardening
+- fix: uc hook 補 MultiEdit 提取分支 + settings 註冊
+- fix: uc verify 壞路徑/空白名單 fail-fast exit 2
+- docs: quality-baseline 規則 2 補充非 TDD 流程覆蓋
+- docs: UC 規範實作對齊 + 框架碼 ticket ID 抽象化
+- docs: 平行審查 UC 治理交付——建 ~072 + IMP-APP-005
+- docs: 補完 doc SKILL.md frontmatter uc 能力宣告
+- docs: 新增 PC-APP-011 驗收 pattern 盲區 + IMP-APP-004 pipeline exit 假守衛
+- chore: pre-dispatch — ticket 分析 + hook 權限修正
+- chore: redirect 派發反模式禁令文件化
+- chore: 為 install-skill-clis.py 補執行位元
+
+---
+
+## [2.16.0] - 2026-07-14
+
+### Summary
+feat: ux-interaction-feedback Skill 補畫面級回饋 + spinner/skeleton 判準 + 去專案化; feat: 新增 ux-interaction-feedback Skill（三層回饋模型 + 按鈕狀態 + 時間門檻）; feat: version-release check 新增佔位掃描（WARNING only） (+5 more)
+
+Changes: 3 feat, 1 fix, 3 docs, 1 chore
+
+- feat: ux-interaction-feedback Skill 補畫面級回饋 + spinner/skeleton 判準 + 去專案化
+- feat: 新增 ux-interaction-feedback Skill（三層回饋模型 + 按鈕狀態 + 時間門檻）
+- feat: version-release check 新增佔位掃描（WARNING only）
+- fix: ux-interaction-feedback Skill 三輪審查修法（9 finding）
+- docs: 新增 PC-APP-010 code 杜撰 UC- 前綴偽需求 ID
+- docs: DI 架構規格化 + 可觀測性規則 5 落地
+- docs: 發版前實機冒煙驗證清單三層結構
+- chore: manifest APP 對照對帳完成 + PC-APP-009 錯誤模式記錄
+
+---
+
+## [2.15.1] - 2026-07-11
+
+### Summary
+chore: 傳播 5 個 dart-prefixed skill 遷移的刪除（清理 17 個遠端孤兒）
+
+---
+
+## [2.15.0] - 2026-07-11
+
+### Summary
+feat: spawn_request_checker 區分三種未處理成因的診斷訊息; feat: 遷移 security-review 為 dart-security-review; feat: 遷移 style-guardian 為 dart-style-guardian（含 hook 配置同步） (+32 more)
+
+Changes: 5 feat, 4 refactor, 6 fix, 15 docs, 5 chore
+
+- feat: spawn_request_checker 區分三種未處理成因的診斷訊息
+- feat: 遷移 security-review 為 dart-security-review
+- feat: 遷移 style-guardian 為 dart-style-guardian（含 hook 配置同步）
+- feat: style-guardian 新增原生元件直用偵測規則（WARNING 模式）
+- feat: 掃描器新增範例佔位偵測與歷史封存排除
+- refactor: 遷移 i18n-checker 為 dart-i18n-checker
+- refactor: 遷移 test-async-guardian 為 dart-test-async-guardian
+- refactor: 補上 provider-architecture 遷移遺漏的引用更新
+- refactor: 遷移 provider-architecture 為 dart-provider-architecture
+- fix: 補回 dart-style-guardian 內容變更（並行 commit race 遺漏）
+- fix: 修正規則檔憑空引用不存在的 IMP-APP-004
+- fix: 移除框架檔案中的專案 ticket ID（reference-stability 規則 8）
+- fix: 落地 worktree gen-l10n 防護，納 lib/l10n/generated/ 入版控
+- fix: 對照實驗定案 worktree 全套件不可信 + 建 3 票 + IMP-APP-003
+- fix: 修復 .claude/ 活文件 25 筆真失效引用
+- docs: 新增 PC-APP-008 外部 API 測資虛構防護 + 規則 D5
+- docs: 建立 dart-domain-modeling skill + parsley 觸發引用
+- docs: 定義不可靠斷言判準 + Dart/Flutter 落地規則 D1-D4
+- docs: 新增 PC-APP-007 spawn request 合併缺陷
+- docs: parallel-dispatch 增補 named agent vs 一般 subagent 選用準則
+- docs: IMP-APP-002 補記第六起同族案例（spec 層格式假設無實證， 修正）
+- docs: 30 秒/1 頁 stale 定位引用全量 sweep（21 檔 29 處）
+- docs: 方法論 元件文字歸屬判準 + README 定位反轉同步
+- docs: 方法論 多輪審查 R3 修正 + outbound 接線收官
+- docs: 方法論 多輪審查 R2 修正 17 項
+- docs: 方法論 多輪審查 R1 修正 15 項
+- docs: 元件庫雙向約束框架執法三落地
+- docs: 方法論 補命名判準與形態因素先決 + saas skill 缺口票
+- docs: 元件庫雙向約束框架執法評估 + 方法論用語修正
+- docs: 元件庫雙向約束方法論 （L1 通用原則）
+- chore: complete ANA — openBD + NDL Search 日本書目 API 整合設計
+- chore: handoff → （openBD + NDL Search 日本書目 API 整合）
+- chore: Worktree 隔離從「強制」改為「風險分級」（ 方案 C 分段採納）
+- chore: 清理 parallel-dispatch.md 2 處依賴型 ticket ID 引用（ 結論落地）
+- chore: 建票修 live 測試 not-found 斷言的 429 鑑別缺陷
+
+---
+
+## [2.14.0] - 2026-07-09
+
+### Summary
+feat: 建立 reference-stability 規則 8 強制 hook; feat: 建立 doc skill tracking_schema.py SSOT + conformance test; fix: test_update.py fixture 改從 SSOT 生成（list 格式） (+7 more)
+
+Changes: 2 feat, 6 fix, 2 chore
+
+- feat: 建立 reference-stability 規則 8 強制 hook
+- feat: 建立 doc skill tracking_schema.py SSOT + conformance test
+- fix: test_update.py fixture 改從 SSOT 生成（list 格式）
+- fix: hook 範例改合成 ID 避免規則8自我違反
+- fix: status.py 改 list iterate 修復對真實檔 crash
+- fix: create.py proposals dict→list + confirmed→confirmed_at + 引用 SSOT
+- fix: create.py 頂層 last_updated 鍵與真實 schema 對齊
+- fix: 移除 _sync_tracking_yaml 頂層 last_updated 鍵
+- chore: doc skill 框架碼 ticket ID 最終 sweep（reference-stability 規則 8）
+- chore: batch_init.py traceability 頂層鍵引用 TRACEABILITY_SCHEMA
+
+---
+
+## [2.13.0] - 2026-07-08
+
+### Summary
+feat: 實作提案 confirmed 時 target_version 註冊 todolist 的源頭引導; feat: guard 增補版本目錄缺 main worklog 偵測; feat: guard 增補 confirmed 提案 target_version 與 todolist 註冊對賬 (+14 more)
+
+Changes: 4 feat, 6 fix, 3 docs, 4 chore
+
+- feat: 實作提案 confirmed 時 target_version 註冊 todolist 的源頭引導
+- feat: guard 增補版本目錄缺 main worklog 偵測
+- feat: guard 增補 confirmed 提案 target_version 與 todolist 註冊對賬
+- feat: ticket migrate 新增版本合法性守衛
+- fix: confirmed 欄位名對齊真實 schema confirmed_at
+- fix: _sync_tracking_yaml 相容 proposals-tracking.yaml list 結構
+- fix: list 統計與截斷顯示分離（total_stats 全量統計）
+- fix: 修復 activate_next_planned_version 版本推進選擇防護
+- fix: 阻斷框架 v2.x tags 混入 APP repo
+- fix: 修復 version-tracking-consistency-guard 幽靈版本誤報
+- docs: shutdown_request 驗證狀態升級為單層已驗證（實機 8/8）
+- docs: 落地 idle agent 三態模型與回收 SOP（ ANA 三處落地）
+- docs: 新增 IMP-APP-002 regex 解析多條目檔案未以條目邊界為先
+- chore: shutdown 8/8 直接驗證 + SR-1 轉 （IMP-APP-002 第五起）
+- chore: 驗收收尾——SR-2 轉 + IMP-APP-002 補第四起案例
+- chore: / 驗收收尾——SR-1 轉 + IMP-APP-002 補第三起案例
+- chore: pull .claude 更新（上游 6b4450666ed6）
+
+---
+
+## [2.12.0] - 2026-07-05
+
+### Summary
+feat: ticket CLI mutation self-verify 輸出; feat: Stop hook confabulation 事後審計; feat: batch annotate 130 memory backlog (+42 more)
+
+Changes: 16 feat, 1 refactor, 5 fix, 18 docs, 5 chore
+
+- feat: ticket CLI mutation self-verify 輸出
+- feat: Stop hook confabulation 事後審計
+- feat: batch annotate 130 memory backlog
+- feat: version-release memory 升級稽核 check
+- feat: dashboard 自動歸檔 stale pending handoff
+- feat: emit protocol_version 至新建票 frontmatter
+- feat: 新增 create --parent 時 children 數 warning
+- feat: 實作 runqueue/list type 權重排序與 type 標籤顯示
+- feat: rename Exit Status body key status → exit_status
+- feat: enum-gate 切換 deny 模式
+- feat: memory promote/scan 升級工具核心
+- feat: stale-list 追加 stale in-progress 章節與 release 提示
+- feat: 派發身份前移——dispatch hook 條件式綁定 + 模板 claim --as 強制
+- feat: lifecycle 狀態轉移矩陣接入驗證閘
+- feat: save_ticket 落盤前枚舉驗證閘
+- feat: 枚舉 SSOT 收斂 + argparse choices 封口
+- refactor: import _CATEGORY_DIRS from allocator (T1 SSOT)
+- fix: frontmatter YAML 解析 graceful 處理 malformed 資料
+- fix: main-thread-edit-restriction-hook 改用 lib import 取代已刪除的 hook_utils
+- fix: 測試套件 todolist 環境依賴隔離
+- fix: create --parent 無條件繼承父票版本
+- fix: 移除 Write matcher 內 style-guardian-hook 重複註冊
+- docs: 規則 6 補 error-pattern 記錄授權——判斷值得即做，不需請求用戶確認
+- docs: 補 .3 confabulation 案例 + 防護 F + 建 enforcement 升級評估票
+- docs: basil 審查修正——hook docstring/路徑表副本化 + 載體地圖版本行/受眾欄
+- docs: 分流語意引用點同步——載體地圖（含補 user-level 條目）+ pm-role 路由 + reminder hook 文案
+- docs: IMP-V1-006 大小寫不敏感 fs Edit 成功 vs git pathspec 失敗（捕獲時分流直寫 canonical）+ 檔名慣例追蹤票
+- docs: basil 審查修正——升級後處理對齊規則 7 升級即搬家 + 情境 B 消除延後語意
+- docs: 錯誤學習知識捕獲時分流——規則 7 語意前移 + 鏡像/skill/決策樹四檔同步
+- docs: PC-092 補 v3 案例（PM 裸 commit 掃入 subagent 暫存檔）
+- docs: 套用 Layer 2 審查修正（2 Warning）
+- docs: context 充足度閘門三機制分工邊界
+- docs: P 階段新增早期警訊條款
+- docs: 新增關鍵禁令附最小正反例手法條款
+- docs: 新增過度設計四反模式條目
+- docs: 新增依賴引入紀律
+- docs: 新增最小變更紀律（Surgical Changes）
+- docs: When 提及 vs blockedBy 誤判率量測定案——零機制慣例落 field-semantics
+- docs: SKILL.md 有效區段值對齊 10 章正典 + spawn
+- docs: ticket 系統自我描述模型修正
+- chore: 記錄 gate bypass 語意載體替換錯誤模式
+- chore: HookCheck 自動修正 test_dispatch_record_identity_binding.py 執行權限 (IMP-054)
+- chore: metadata sync post-completion
+- chore: pull .claude 更新（上游 f6b5d50bcc2d）
+- chore: 測試檔加執行權限（HookCheck 自動修正 IMP-054）
+
+---
+
+## [2.11.1] - 2026-07-03
+
+### Summary
+chore: multi-round-review 1.3.0 -> 1.4.1（skill 庫拉取，新增 minimum-three-rounds 原則文件）
+
+Changes: 1 chore
+
+- chore: multi-round-review 1.3.0 -> 1.4.1（skill 庫拉取，新增 minimum-three-rounds 原則文件）
+
+---
+
+## [2.11.0] - 2026-07-03
+
+### Summary
+feat: claim --as 自動推導 tdd_phase + phase 手動覆蓋保護（F4 接線）; feat: 自檢結果子章節升 CLI 層 gate 阻擋（IMP/ANA，判定邏輯與 warning 共用單一來源，F7 執法升級）; feat: version-bootstrap 跨提案依賴檢查 + 移版硬耦合盤點 SOP（ 模式固化） (+20 more)
+
+Changes: 10 feat, 4 fix, 6 docs, 3 test
+
+- feat: claim --as 自動推導 tdd_phase + phase 手動覆蓋保護（F4 接線）
+- feat: 自檢結果子章節升 CLI 層 gate 阻擋（IMP/ANA，判定邏輯與 warning 共用單一來源，F7 執法升級）
+- feat: version-bootstrap 跨提案依賴檢查 + 移版硬耦合盤點 SOP（ 模式固化）
+- feat: spec API surface 完整性檢核（啟發式提醒，SPEC-014 v1.1 缺口回歸驗證，F5 防護）
+- feat: spec 版本一致性 SessionStart hook — 抓 8 個既有漂移，spawn （F2 防護）
+- feat: 建票 SPEC 引用驗證 — traceability.yaml 對照警告（F1 防護）
+- feat: version-release check 可觀測性強化 — 配置載入揭露 + 跳過標籤名實對齊
+- feat: version-tracking guard hook 擴充第五、六類偵測
+- feat: close CLI resolved_by 驗證強化 — 依 reason 分歧驗證 + 延後語意攔截
+- feat: 新增版本追蹤一致性守衛 session-start hook
+- fix: dispatch_recommender 死路徑修復 + registry tdd_phases 補齊（fennel/thyme phase3b）+ cinnamon phase4b→phase4 對齊
+- fix: acceptance gate 同命令鏈滯後誤報 — 偵測降級標記 [--]（F6 修復，24 測綠）
+- fix: check_technical_debt_status 依 worklog_path_pattern 解析 nested 票目錄
+- fix: 修復 version-release 版本生命週期推進斷鏈
+- docs: dispatch template 收尾義務標準段（set-acceptance + 自檢子章節，F3/F7 供給側）
+- docs: IMP-V1-005 依 Layer 2 審查修正 — 偵測判據獨立成章 + IMP-046 定位措辭對齊 + 標點
+- docs: PROP-010 移 節點決策 + 建 _flags schema 定形票 + IMP-V1-005 error-pattern
+- docs: agent-dispatch-template 補 worktree 快照過舊防護 SOP
+- docs: PC-MON-002 必填不等於有效 — CLI 欄位缺格式/存在性驗證
+- docs: PC-MON-001 防護落地於可繞過執行點導致復發 + 建 守衛 hook 票
+- test: hooks 測試機械性缺陷修復 — LIB_DIR/patch target 8 檔 + CLAUDE_PROJECT_DIR fixture 補遮蔽紅燈；15f/59e → 0f/0e（3047 passed）
+- test: dispatch validation 測試 fixture mock 化 — 移除上游 ticket ID 依賴（殘留 1 處為說明註解）
+- test: stale 斷言同步現行設計 — 邊界測試改 config.json + staleness 清單移除已遷移 shim（ticket/worktree）
+
+---
+
+## [2.10.1] - 2026-07-02
+
+### Summary
+fix: exec-bit 還原網補 scripts/ 缺口（install-skill-clis Permission denied）; chore: pull .claude 更新（上游 51b471b）
+
+Changes: 1 fix, 1 chore
+
+- fix: exec-bit 還原網補 scripts/ 缺口（install-skill-clis Permission denied）
+- chore: pull .claude 更新（上游 51b471b）
+
+---
+
+## [2.10.0] - 2026-07-02
+
+### Summary
+feat: 完成 CC release 全量評估主票 — .7 採用 respondToBashCommands: false; fix: settings.json Task/Agent matcher 收斂; fix: 修復 2 hook 內部 tool_name 字面守衛失效（Task→Agent 改名） (+4 more)
+
+Changes: 1 feat, 2 fix, 4 docs
+
+- feat: 完成 CC release 全量評估主票 — .7 採用 respondToBashCommands: false
+- fix: settings.json Task/Agent matcher 收斂
+- fix: 修復 2 hook 內部 tool_name 字面守衛失效（Task→Agent 改名）
+- docs: 升級 IMP-V1-004 error-pattern — hook 字面守衛 vs matcher 別名漂移
+- docs: 修正 chrome-extension-mcp-debug skill 工具名漂移
+- docs: WRAP 分析落地 — Tool(param:value) 改知識註記、.7 結論待授權
+- docs: CC release 2.1.173-2.1.198 全量影響評估與落地
+
+---
+
+## [2.9.1] - 2026-07-02
+
+### Summary
+chore: untrack skills/*/uv.lock（已被 *.lock gitignore 涵蓋）
+
+Changes: 1 chore
+
+- chore: untrack skills/*/uv.lock（已被 *.lock gitignore 涵蓋）
+
+---
+
+## [2.9.0] - 2026-07-02
+
+### Summary
+feat: 新增同義詞擴展去重機制（issue #14 選項 A）; docs: 整合 Workflow vs Agent 決策路由到 decision-tree.md; chore: 執行類代理人模型降級 inherit → sonnet (+1 more)
+
+Changes: 1 feat, 1 docs, 2 chore
+
+- feat: 新增同義詞擴展去重機制（issue #14 選項 A）
+- docs: 整合 Workflow vs Agent 決策路由到 decision-tree.md
+- chore: 執行類代理人模型降級 inherit → sonnet
+- chore: pull .claude 更新（上游 4535e3b）
+
+---
+
+## [2.8.5] - 2026-07-01
+
+### Summary
+fix: 移除 .gitignore 對 sample_events.jsonl 的錯誤排除; chore: 新增 PC-APP-006 錯誤模式（.gitignore 排除測試 fixture）
+
+Changes: 1 fix, 1 chore
+
+- fix: 移除 .gitignore 對 sample_events.jsonl 的錯誤排除
+- chore: 新增 PC-APP-006 錯誤模式（.gitignore 排除測試 fixture）
+
+---
+
+## [2.8.4] - 2026-07-01
+
+### Summary
+fix: 同步孤兒檔 sample_events.jsonl 測試 fixture
+
+---
+
+## [2.8.3] - 2026-07-01
+
+### Summary
+feat: 新增 design-system-spec-template.md 範本（W8-002）
+
+---
+
+## [2.8.2] - 2026-06-29
+
+### Summary
+sync .claude configuration
+
+---
+
+## [2.8.1] - 2026-06-26
+
+### Summary
+fix: skill-sync push 排除 __pycache__ 目錄; chore: skill-sync pull 自動版本比對 + 批量拉取 3 個更新 skill; chore: pull .claude 更新（上游 543ce90d）
+
+Changes: 1 fix, 2 chore
+
+- fix: skill-sync push 排除 __pycache__ 目錄
+- chore: skill-sync pull 自動版本比對 + 批量拉取 3 個更新 skill
+- chore: pull .claude 更新（上游 543ce90d）
+
+---
+
+## [2.8.0] - 2026-06-26
+
+### Summary
+feat: project-init 對 ticket/doc/worktree 改走 shim installer
+
+Changes: 1 feat
+
+- feat: project-init 對 ticket/doc/worktree 改走 shim installer
+
+---
+
+## [2.7.2] - 2026-06-25
+
+### Summary
+docs: WINDOWS-NOTES 補 CLI shim Windows 相容章節
+
+Changes: 1 docs
+
+- docs: WINDOWS-NOTES 補 CLI shim Windows 相容章節
+
+---
+
+## [2.7.1] - 2026-06-25
+
+### Summary
+docs: 落地流程教訓 PC-APP-004/005 + ARCH-007 觸發時機
+
+Changes: 1 docs
+
+- docs: 落地流程教訓 PC-APP-004/005 + ARCH-007 觸發時機
+
+---
+
+## [2.7.0] - 2026-06-25
+
+### Summary
+feat: guard hook 偵測 cwd-resolving shim 即略過; feat: 新增 cwd-resolving CLI shim installer（取代 uv tool install）; docs: 新增 ARCH-APP-002 uv tool install 全域 namespace 碰撞 (+1 more)
+
+Changes: 2 feat, 1 docs, 1 chore
+
+- feat: guard hook 偵測 cwd-resolving shim 即略過
+- feat: 新增 cwd-resolving CLI shim installer（取代 uv tool install）
+- docs: 新增 ARCH-APP-002 uv tool install 全域 namespace 碰撞
+- chore: pull .claude 更新（上游 62c2ee388051）
+
+---
+
+## [2.6.0] - 2026-06-25
+
+### Summary
+feat: push 版本比對提示 + IMP-MON-003 error-pattern; feat: pull 不帶名稱時批次更新已安裝 skill（）; fix: SKILL.md 引導更新為前綴號格式和通用類別
+
+Changes: 2 feat, 1 fix
+
+- feat: push 版本比對提示 + IMP-MON-003 error-pattern
+- feat: pull 不帶名稱時批次更新已安裝 skill（）
+- fix: SKILL.md 引導更新為前綴號格式和通用類別
+
+---
+
+## [2.5.0] - 2026-06-25
+
+### Summary
+feat: sync-push 自動檢查 skill 庫版本 drift（）; feat: basil 升級為 universal_lens 全情境常駐; feat: create 加自動 ID 分配 + domain 推導（） (+19 more)
+
+Changes: 7 feat, 5 refactor, 8 fix, 2 chore
+
+- feat: sync-push 自動檢查 skill 庫版本 drift（）
+- feat: basil 升級為 universal_lens 全情境常駐
+- feat: create 加自動 ID 分配 + domain 推導（）
+- feat: checklist enforcement 加建議值引導（）
+- feat: full overlay 加 confirm 阻擋機制（）
+- feat: clean_stale_files 加三方比對防護（）
+- feat: rmtree 全量替換改為 overlay + diff preview（）
+- refactor: public API 去除 _ prefix（）
+- refactor: 提取 create_reporter.py 從 create.py（）
+- refactor: 提取 duplicate_detector.py 從 create.py（）
+- refactor: ana_spawn_consistency_checker typing 統一為內建泛型（）
+- refactor: 提取 _should_skip_clean_file 共用 helper（）
+- fix: 移除常駐委員加入情境的冗餘列舉（A-G）
+- fix: 移除 basil opt-out 機制（）
+- fix: 並行審查修正 — dead import 清除 + 用字修正（W4 Phase 3）
+- fix: 情境表 Agent 數更新為 3+2（含常駐 linux + basil）
+- fix: 禁止自創不行動/排除類別（）
+- fix: 並行審查修復 — 安全 bug + dead code + 簡化
+- fix: acceptance-gate spawn 計數加行級豁免（）
+- fix: 恢復被 sync-pull 誤刪的 compositional-writing hooks（1037 行）
+- chore: bump SKILL.md to
+- chore: W3 批量完成 — known-limitation 標記 + 語意差異文件化
+
+---
+
+## [2.4.3] - 2026-06-25
+
+### Summary
+chore: basil-writing-critic 對齊 compositional-writing
+
+Changes: 1 chore
+
+- chore: basil-writing-critic 對齊 compositional-writing
+
+---
+
+## [2.4.2] - 2026-06-25
+
+### Summary
+sync .claude configuration
+
+---
+
+## [2.4.1] - 2026-06-25
+
+### Summary
+chore: pull multi-round-review 版本號更新（1.0.0）; chore: pull 寫作 skill 更新（compositional-writing + multi-round-review）; chore: pull .claude 更新（上游 cb11e8a3）
+
+Changes: 3 chore
+
+- chore: pull multi-round-review 版本號更新（1.0.0）
+- chore: pull 寫作 skill 更新（compositional-writing + multi-round-review）
+- chore: pull .claude 更新（上游 cb11e8a3）
+
+---
+
+## [2.4.0] - 2026-06-25
+
+### Summary
+feat: sync-pull post-sync 自動登記 Hook（hook-registry.yaml）; fix: project-init onboard 三項 false positive 修正; docs: 新增 error-pattern PC-V1-013（lenient build 驗證遮蔽 prod gate） (+3 more)
+
+Changes: 1 feat, 1 fix, 2 docs, 2 chore
+
+- feat: sync-pull post-sync 自動登記 Hook（hook-registry.yaml）
+- fix: project-init onboard 三項 false positive 修正
+- docs: 新增 error-pattern PC-V1-013（lenient build 驗證遮蔽 prod gate）
+- docs: agent-dispatch-template 補 append-log 收尾持久化驗證準則
+- chore: 登記 7 個通用 Hook + 排除 3 個語言專屬 Hook
+- chore: pull .claude 更新（upstream ）
+
+---
+
+## [2.3.0] - 2026-06-25
+
+### Summary
+feat: lib/ 吸收 hook_utils 獨有函式成為單一 SSOT; refactor: 全 consumer import hook_utils→lib 並移除 hook_utils/; fix: 清理 bare git_utils import 殘留 + lib script-mode sys.path (+2 more)
+
+Changes: 1 feat, 1 refactor, 2 fix, 1 docs
+
+- feat: lib/ 吸收 hook_utils 獨有函式成為單一 SSOT
+- refactor: 全 consumer import hook_utils→lib 並移除 hook_utils/
+- fix: 清理 bare git_utils import 殘留 + lib script-mode sys.path
+- fix: 修復 hook-health-monitor.py SessionStart str/Path 型別錯誤
+- docs: 新增 IMP-APP-001 get_project_root 雙實作型別分歧
+
+---
+
+## [2.2.0] - 2026-06-24
+
+### Summary
+feat: 新增 skill-sync 至 uv tool staleness 監控; chore: pull .claude 更新（上游 7df1b31）
+
+Changes: 1 feat, 1 chore
+
+- feat: 新增 skill-sync 至 uv tool staleness 監控
+- chore: pull .claude 更新（上游 7df1b31）
+
+---
+
+## [2.1.4] - 2026-06-24
+
+### Summary
+fix(tests): 追蹤 dispatch stats 測試 fixture sample_events.jsonl（修正 *.jsonl 規則誤殺）
+
+---
+
+## [2.1.3] - 2026-06-24
+
+### Summary
+fix(hooks): main hook sys.path 對齊 W2010 正規化範本 + 落地 Phase 2 條件式判斷/FR↔Ticket 覆蓋矩陣/spec 維度 3a3b 框架增強
+
+---
+
+## [2.1.2] - 2026-06-24
+
+### Summary
+fix: 修復 version.py 衝突解決遺漏的 docstring 和 import; chore: pull .claude 更新（上游 3c0445ab77b4）
+
+Changes: 1 fix, 1 chore
+
+- fix: 修復 version.py 衝突解決遺漏的 docstring 和 import
+- chore: pull .claude 更新（上游 3c0445ab77b4）
+
+---
+
+## [2.1.1] - 2026-06-24
+
+### Summary
+sync .claude configuration
+
+---
+
+## [2.1.0] - 2026-06-24
+
+### Summary
+feat: sync-pull post-sync 告警 settings.local.json 含 hook; feat: hook-completeness --fix opt-in prune 幽靈 local hook; feat: sync-pull post-sync hook import 驗證 (+15 more)
+
+Changes: 4 feat, 2 refactor, 7 fix, 5 docs
+
+- feat: sync-pull post-sync 告警 settings.local.json 含 hook
+- feat: hook-completeness --fix opt-in prune 幽靈 local hook
+- feat: sync-pull post-sync hook import 驗證
+- feat: test-hook-imports.sh 一鍵 hook import 煙霧測試
+- refactor: lib/ 內 from hook_utils import 正規化
+- refactor: 清理 hooks/lib 文字殘留 + 刪殘留目錄
+- fix: dashboard 重用已載入 tickets 消除冗餘 subprocess
+- fix: staleness 警告排除 trigger_bound ticket
+- fix: 修 lib/tests 16 個 stale patch 目標
+- fix: 修 scripts/tests 2 個 stale 測試
+- fix: 修 test_dispatch_stats.py 38 errors（雙根因）
+- fix: .gitignore 補齊 sync-skills.yaml + git rm --cached untrack
+- fix: skill-sync SKILL.md 補齊 YAML frontmatter + 建立 issue #10 追蹤 tickets
+- docs: cbm MCP namespace 已曝光於 ToolSearch，更新工具參考
+- docs: 固化框架 hook 單一註冊來源原則於 PC-148
+- docs: 新增 PC-V1-012 防護置於便利攔截介面而非變異源頭
+- docs: hook sys.path 標準模板文件
+- docs: sync-pull breaking change consumer checklist
+
+---
+
+## [2.0.1] - 2026-06-23
+
+### Summary
+chore: VERSION bump to 2.0.0 (align with framework breaking change)
+
+Changes: 1 chore
+
+- chore: VERSION bump to 2.0.0 (align with framework breaking change)
+
+---
+
+## [1.62.0] - 2026-06-23
+
+### Summary
+feat: sync-push/pull 新增 skill 版本 diff 摘要
+
+Changes: 1 feat
+
+- feat: sync-push/pull 新增 skill 版本 diff 摘要
+
+---
+
+## [1.61.2] - 2026-06-23
+
+### Summary
+chore: 補齊 8 個 skill 版本號
+
+Changes: 1 chore
+
+- chore: 補齊 8 個 skill 版本號
+
+---
+
+## [1.61.1] - 2026-06-23
+
+### Summary
+docs: IMP-V1-003 補充 復發案例——scripts/ 遺漏 + 擴充預防措施
+
+Changes: 1 docs
+
+- docs: IMP-V1-003 補充 復發案例——scripts/ 遺漏 + 擴充預防措施
+
+---
+
+## [1.61.0] - 2026-06-23
+
+### Summary
+feat: ticket CLI 全完成版本偵測 warning; feat: TDD 紅綠燈計數改用結構化 JSON 輸出; feat: identity-guard telemetry 新增 caller_type 欄位 (+11 more)
+
+Changes: 3 feat, 2 refactor, 5 fix, 3 docs, 1 chore
+
+- feat: ticket CLI 全完成版本偵測 warning
+- feat: TDD 紅綠燈計數改用結構化 JSON 輸出
+- feat: identity-guard telemetry 新增 caller_type 欄位
+- refactor: merge hooks/lib/ into lib/
+- refactor: migrate 8 hooks to skill directories
+- fix: sync scripts import 路徑對齊 lib 合併（ 遺漏）
+- fix: update_todolist 支援不帶引號的 YAML status 格式
+- fix: 修正搬移回歸——test import 路徑 sync_exclude_manifest → lib.sync_exclude_manifest
+- fix: 修正 version-release-guard-hook sys.path（搬移後 hook_io import 失敗）
+- fix: update sys.path and test imports for migrated hooks
+- docs: --as 轉強制重評裁決——維持 warn-only（使用率 49.3% 未達 80%）
+- docs: IMP-V1-003 hook 搬移後 sys.path 指向錯誤 lib 目錄
+- docs: 更新 sync-exclusion-guide — 新增類型 E + sync-skills.yaml 說明
+- chore: pull .claude 更新（上游 36b86cc）
+
+---
+
+## [1.60.2] - 2026-06-23
+
+### Summary
+fix: 恢復 sync-pull 覆蓋的 TDD/Doc/Ticket Skill 更新; chore: pull .claude 更新（上游框架 skill 庫分離）
+
+Changes: 1 fix, 1 chore
+
+- fix: 恢復 sync-pull 覆蓋的 TDD/Doc/Ticket Skill 更新
+- chore: pull .claude 更新（上游框架 skill 庫分離）
+
+---
+
+## [1.60.1] - 2026-06-23
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.60.0] - 2026-06-23
+
+### Summary
+feat: 建立 UC↔測試追溯矩陣 + 邊界回補流程; refactor: TDD Skill Round 2 冷讀審查修正; refactor: TDD Skill 跨專案適用性審查（移除專案特定引用） (+6 more)
+
+Changes: 1 feat, 2 refactor, 1 fix, 5 docs
+
+- feat: 建立 UC↔測試追溯矩陣 + 邊界回補流程
+- refactor: TDD Skill Round 2 冷讀審查修正
+- refactor: TDD Skill 跨專案適用性審查（移除專案特定引用）
+- fix: sync-push --clean 日誌措辭修正（檔案→項目）
+- docs: 更新 TDD/Ticket/Doc Skill 觸發關鍵字
+- docs: TDD Skill 新增拆分邊界判讀規則（測試變綠驗收點）
+- docs: TDD Skill 實證回饋（5 項調整）
+- docs: 補充防護驗證結果（ 單一 worktree 驗證通過）
+- docs: 記錄並行 worktree commit 交叉混入錯誤模式
+
+---
+
+## [1.59.1] - 2026-06-23
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.59.0] - 2026-06-23
+
+### Summary
+feat: 整合 blog 測試知識至 TDD skill（4 新 reference + 路由更新）; feat: 建立 doc→TDD 銜接機制（WRAP 評估：銜接放 TDD 端）; refactor: doc→TDD 銜接文件多輪審查修正（3 輪 33 項） (+3 more)
+
+Changes: 2 feat, 1 refactor, 1 fix, 2 chore
+
+- feat: 整合 blog 測試知識至 TDD skill（4 新 reference + 路由更新）
+- feat: 建立 doc→TDD 銜接機制（WRAP 評估：銜接放 TDD 端）
+- refactor: doc→TDD 銜接文件多輪審查修正（3 輪 33 項）
+- fix: app_tunnel 測試教訓回饋至 TDD skill（畫面狀態機 + 操作覆蓋深度）
+- chore: 移除已 DEPRECATED 的 tdd-phase1-split skill
+- chore: pull .claude 更新（上游 36ab0f7）
+
+---
+
+## [1.58.1] - 2026-06-22
+
+### Summary
+chore: add PC-V1-011 error pattern + complete ANA; chore: pull .claude 更新（上游 b3aadb8ff140）
+
+Changes: 2 chore
+
+- chore: add PC-V1-011 error pattern + complete ANA
+- chore: pull .claude 更新（上游 b3aadb8ff140）
+
+---
+
+## [1.58.0] - 2026-06-22
+
+### Summary
+feat: SaaS skill state-storage 維度補 ID/主鍵選型訪談; chore: pull .claude 更新（上游 4012a25）
+
+Changes: 1 feat, 1 chore
+
+- feat: SaaS skill state-storage 維度補 ID/主鍵選型訪談
+- chore: pull .claude 更新（上游 4012a25）
+
+---
+
+## [1.57.1] - 2026-06-22
+
+### Summary
+fix: detect_version reads todolist active + decouple activate from git (/004); chore: add ARCH-APP-001 version detection desync error pattern; chore: pull .claude 更新（上游 627ed412d54b）
+
+Changes: 1 fix, 2 chore
+
+- fix: detect_version reads todolist active + decouple activate from git (/004)
+- chore: add ARCH-APP-001 version detection desync error pattern
+- chore: pull .claude 更新（上游 627ed412d54b）
+
+---
+
+## [1.57.0] - 2026-06-22
+
+### Summary
+feat: teaching-sync skill v2.0 + CLAUDE.md 教學互補流程; docs: Spec/UC review — 對齊教學設計 + SaaS skill 推導標記機制; chore: pull .claude 更新（上游 7f24696）
+
+Changes: 1 feat, 1 docs, 1 chore
+
+- feat: teaching-sync skill v2.0 + CLAUDE.md 教學互補流程
+- docs: Spec/UC review — 對齊教學設計 + SaaS skill 推導標記機制
+- chore: pull .claude 更新（上游 7f24696）
+
+---
+
+## [1.56.7] - 2026-06-20
+
+### Summary
+fix: 新增反向孤兒偵測（上游有本地無）; chore: pull 補齊上游 IMP-V1-002 error-pattern + 清理本地 build artifacts
+
+Changes: 1 fix, 1 chore
+
+- fix: 新增反向孤兒偵測（上游有本地無）
+- chore: pull 補齊上游 IMP-V1-002 error-pattern + 清理本地 build artifacts
+
+---
+
+## [1.56.6] - 2026-06-20
+
+### Summary
+fix: release 後自動推進下一個 planned 版本為 active
+
+Changes: 1 fix
+
+- fix: release 後自動推進下一個 planned 版本為 active
+
+---
+
+## [1.56.5] - 2026-06-19
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.56.4] - 2026-06-19
+
+### Summary
+chore: CC 2.1.173-2.1.183 release impact review; chore: pull .claude 更新（上游 ac320f3501e3）
+
+Changes: 2 chore
+
+- chore: CC 2.1.173-2.1.183 release impact review
+- chore: pull .claude 更新（上游 ac320f3501e3）
+
+---
+
+## [1.56.3] - 2026-06-19
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.56.2] - 2026-06-19
+
+### Summary
+chore: pull .claude 更新（上游 73a76fb4866a）
+
+Changes: 1 chore
+
+- chore: pull .claude 更新（上游 73a76fb4866a）
+
+---
+
+## [1.56.1] - 2026-06-19
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.56.0] - 2026-06-19
+
+### Summary
+feat: renumber native intruder PC-177/178→184/185 + lineage-aware 孤兒守衛; feat: sync-push 補撞號對稱（鏡像 pull）+ 首跑對帳辨識上游 mess; fix: 修正 +build 後綴崩潰與 monorepo in-dev 版本偵測 (+1 more)
+
+Changes: 2 feat, 2 fix
+
+- feat: renumber native intruder PC-177/178→184/185 + lineage-aware 孤兒守衛
+- feat: sync-push 補撞號對稱（鏡像 pull）+ 首跑對帳辨識上游 mess
+- fix: 修正 +build 後綴崩潰與 monorepo in-dev 版本偵測
+- fix: PC-183 lineage typo PC-18→PC-018 + H1 對齊 183（修 038 parser 誤判隱因）
+
+---
+
+## [1.55.0] - 2026-06-18
+
+### Summary
+feat: 泛化 presence-detection hook 為 language-pluggable; feat: worktree 守護 hook + 規則（固化兩起事故）; feat: presence-detection hook（偵測應有設施缺席） (+7 more)
+
+Changes: 5 feat, 1 fix, 4 docs
+
+- feat: 泛化 presence-detection hook 為 language-pluggable
+- feat: worktree 守護 hook + 規則（固化兩起事故）
+- feat: presence-detection hook（偵測應有設施缺席）
+- feat: 落地集中化 acceptance 維度（prevention gate）
+- feat: 落地決策閘門預算+退場 meta 規則 + 並行層搬遷 pilot
+- fix: presence hook skip 對齊 sink 命名 + 排除 dev 訊息
+- docs: 補 see-also（linux 審查 should-fix）— 釐清 D 軸對帳與並行 session 層職責分工
+- docs: 落地 F+D 認知接地雙層 + 軸登錄協議（）
+- docs: 方法論修 basil 兩 Warning（G 軸語意化 + F 子軸可重跑邊界）
+- docs: 實證決策軸發現方法論
+
+---
+
+## [1.54.9] - 2026-06-18
+
+### Summary
+docs: 回饋 report #169 — 新增「原子筆記要有議題入口」principle（）; docs: 補「冷讀/零脈絡單卡落地」frame（）
+
+Changes: 2 docs
+
+- docs: 回饋 report #169 — 新增「原子筆記要有議題入口」principle（）
+- docs: 補「冷讀/零脈絡單卡落地」frame（）
+
+---
+
+## [1.54.8] - 2026-06-18
+
+### Summary
+chore: pull .claude 更新（上游 c389f9a，含 PR #7 merge）
+
+Changes: 1 chore
+
+- chore: pull .claude 更新（上游 c389f9a，含 PR #7 merge）
+
+---
+
+## [1.54.7] - 2026-06-18
+
+### Summary
+docs: 固化 SA 前置審查提醒的假陽性邊界（）
+
+Changes: 1 docs
+
+- docs: 固化 SA 前置審查提醒的假陽性邊界（）
+
+---
+
+## [1.54.6] - 2026-06-18
+
+### Summary
+chore: pull .claude 更新（上游 9e734b9，含 PR #5/#6 merge）
+
+Changes: 1 chore
+
+- chore: pull .claude 更新（上游 9e734b9，含 PR #5/#6 merge）
+
+---
+
+## [1.54.5] - 2026-06-18
+
+### Summary
+docs: 補 push 側孤兒過刪變體
+
+Changes: 1 docs
+
+- docs: 補 push 側孤兒過刪變體
+
+---
+
+## [1.54.4] - 2026-06-18
+
+### Summary
+docs: 持久化 monorepo 版本取捨判斷 + 開 version-release 設計缺口 issue; docs: 固化「monorepo 子端未進 CI 守門」流程缺口; chore: version-release CLI 在地適配 monorepo (+1 more)
+
+Changes: 2 docs, 2 chore
+
+- docs: 持久化 monorepo 版本取捨判斷 + 開 version-release 設計缺口 issue
+- docs: 固化「monorepo 子端未進 CI 守門」流程缺口
+- chore: version-release CLI 在地適配 monorepo
+- chore: pull .claude 更新（上游 70c4576）
+
+---
+
+## [1.54.3] - 2026-06-18
+
+### Summary
+fix: dashboard 漏報 NO-CB pending ticket + list --status 逗號語法錯誤
+
+Changes: 1 fix
+
+- fix: dashboard 漏報 NO-CB pending ticket + list --status 逗號語法錯誤
+
+---
+
+## [1.54.2] - 2026-06-17
+
+### Summary
+docs: 新增變體 B（PM append-log 觸發）及預防方案; docs: 新增 ARCH-TUNL-001 local settings hook 註冊幽靈模式; chore: pull .claude 更新（上游 beaca2e2ec36）
+
+Changes: 2 docs, 1 chore
+
+- docs: 新增變體 B（PM append-log 觸發）及預防方案
+- docs: 新增 ARCH-TUNL-001 local settings hook 註冊幽靈模式
+- chore: pull .claude 更新（上游 beaca2e2ec36）
+
+---
+
+## [1.54.1] - 2026-06-17
+
+### Summary
+chore: 傳播刪除 test_monorepo_version_sync.py 孤兒
+
+---
+
+## [1.54.0] - 2026-06-17
+
+### Summary
+feat: cmd_start_version 多專案類型整合（）; feat: schema 擴展 + 專案偵測 + yaml/toml bump（/100/101）; feat: 擴展版本源候選 + resolve_version_source（） (+1 more)
+
+Changes: 3 feat, 1 docs
+
+- feat: cmd_start_version 多專案類型整合（）
+- feat: schema 擴展 + 專案偵測 + yaml/toml bump（/100/101）
+- feat: 擴展版本源候選 + resolve_version_source（）
+- docs: SKILL.md 多專案類型文件更新（）
+
+---
+
+## [1.53.2] - 2026-06-17
+
+### Summary
+fix: 移除 repo 常數 .git 後綴致 gh --repo 解析失敗
+
+Changes: 1 fix
+
+- fix: 移除 repo 常數 .git 後綴致 gh --repo 解析失敗
+
+---
+
+## [1.53.1] - 2026-06-17
+
+### Summary
+docs: 新增 Behavioral Core Principle 行為核心準則; chore: pull .claude 更新（上游 aa4f0038）
+
+Changes: 1 docs, 1 chore
+
+- docs: 新增 Behavioral Core Principle 行為核心準則
+- chore: pull .claude 更新（上游 aa4f0038）
+
+---
+
+## [1.53.0] - 2026-06-17
+
+### Summary
+refactor: REQUIRED 清單 derive 自 manifest GITIGNORE_EXPECTED
+
+Changes: 1 refactor
+
+- refactor: REQUIRED 清單 derive 自 manifest GITIGNORE_EXPECTED
+
+---
+
+## [1.52.6] - 2026-06-17
+
+### Summary
+fix: 補 TASK_AVOIDANCE_FIX_MODE 入 sync 排除清單
+
+Changes: 1 fix
+
+- fix: 補 TASK_AVOIDANCE_FIX_MODE 入 sync 排除清單
+
+---
+
+## [1.52.5] - 2026-06-17
+
+### Summary
+docs: 新增 ARCH-TUNL-001 local settings hook 註冊幽靈 + 登錄 TUNL 專案代號
+
+Changes: 1 docs
+
+- docs: 新增 ARCH-TUNL-001 local settings hook 註冊幽靈 + 登錄 TUNL 專案代號
+
+---
+
+## [1.52.4] - 2026-06-17
+
+### Summary
+fix: 固化 hook 註冊單一來源原則 + 偵測 local 層 latent ghost; chore: pull .claude 更新（上游 d2424984）
+
+Changes: 1 fix, 1 chore
+
+- fix: 固化 hook 註冊單一來源原則 + 偵測 local 層 latent ghost
+- chore: pull .claude 更新（上游 d2424984）
+
+---
+
+## [1.52.3] - 2026-06-17
+
+### Summary
+chore: pull .claude 更新（上游 d2424984）
+
+Changes: 1 chore
+
+- chore: pull .claude 更新（上游 d2424984）
+
+---
+
+## [1.52.2] - 2026-06-17
+
+### Summary
+fix: 允許 PM 編輯任意層級 README.md
+
+Changes: 1 fix
+
+- fix: 允許 PM 編輯任意層級 README.md
+
+---
+
+## [1.52.1] - 2026-06-17
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.52.0] - 2026-06-17
+
+### Summary
+feat: saas↔doc 雙向銜接 + CLAUDE.md 瘦身（決策記錄移交為代謝機制）
+
+Changes: 1 feat
+
+- feat: saas↔doc 雙向銜接 + CLAUDE.md 瘦身（決策記錄移交為代謝機制）
+
+---
+
+## [1.51.3] - 2026-06-16
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.51.2] - 2026-06-16
+
+### Summary
+fix: _is_placeholder 補行尾空殼偵測修 行首語意回歸; chore: pull .claude 更新（上游 2c3d77f7）; chore: .claude 框架同步 + 還原至 docs/analyses
+
+Changes: 1 fix, 2 chore
+
+- fix: _is_placeholder 補行尾空殼偵測修 行首語意回歸
+- chore: pull .claude 更新（上游 2c3d77f7）
+- chore: .claude 框架同步 + 還原至 docs/analyses
+
+---
+
+## [1.51.1] - 2026-06-16
+
+### Summary
+chore: 整理 settings.json 共用層權限; chore: 移除原作者專案產物殘留並補齊 sync/gitignore 排除
+
+Changes: 2 chore
+
+- chore: 整理 settings.json 共用層權限
+- chore: 移除原作者專案產物殘留並補齊 sync/gitignore 排除
+
+---
+
+## [1.51.0] - 2026-06-16
+
+### Summary
+feat: 導入 saas-tech-selection 選型訪談 skill（上游來源 blog repo）
+
+Changes: 1 feat
+
+- feat: 導入 saas-tech-selection 選型訪談 skill（上游來源 blog repo）
+
+---
+
+## [1.50.0] - 2026-06-16
+
+### Summary
+feat: ticket create --where 驗證並拒絕非路徑 token 防 where.files 髒值
+
+Changes: 1 feat
+
+- feat: ticket create --where 驗證並拒絕非路徑 token 防 where.files 髒值
+
+---
+
+## [1.49.1] - 2026-06-16
+
+### Summary
+docs: 修正 README stale PC-018 引用為 PC-183
+
+Changes: 1 docs
+
+- docs: 修正 README stale PC-018 引用為 PC-183
+
+---
+
+## [1.49.0] - 2026-06-16
+
+### Summary
+feat: sync-push 前框架 import smoke test 閘門（C1 生產閘）; feat: sync tagged-release + pin-aware pull; feat: framework-issue fix-status 跨 consumer 修復矩陣（軸 C） (+8 more)
+
+Changes: 5 feat, 2 fix, 3 docs, 1 chore
+
+- feat: sync-push 前框架 import smoke test 閘門（C1 生產閘）
+- feat: sync tagged-release + pin-aware pull
+- feat: framework-issue fix-status 跨 consumer 修復矩陣（軸 C）
+- feat: framework-issue link 命令 + canonical_issue stamp
+- feat: 建立 /framework-issue SKILL（create/list + scaffold）
+- fix: sync-pull preserve fallback parser fail-loud on malformed YAML
+- fix: 去重 file_lock.py 重複函式定義（死碼 shadow 活碼）
+- docs: 新增 PC-V1-010 + 補 PC-V1-009/ARCH-V1-002 索引缺漏
+- docs: 規則 8 補框架 code 註解識別符衛生 + frontmatter/trailer 溯源慣例
+- docs: 框架治理 ANA 評估產物 — 2 error-pattern + 4 spawn ticket
+- chore: pull .claude 更新（上游 a883d6e321b9）
+
+---
+
+## [1.48.8] - 2026-06-16
+
+### Summary
+sync .claude configuration
+
+---
+
+## [1.48.7] - 2026-06-16
+
+### Summary
+fix: 移除 v1.48.6 誤推的專案特化檔（PC-177/178 + wrap-decision project-integration 7 檔）
+
+v1.48.6 由 consumer 專案 sync-push 全樹 overlay 誤推上來的 project-specific 內容。
+push 端 preserve-aware 排除已落地（防未來復發），本次外科手術移除已推副本。
+保留 PC-APP-001/002（staging error-pattern，跨專案適用）。
+
+Changes: 1 fix
+
+- fix: 移除 9 個誤推的專案特化檔（preserve-listed），framework 回歸通用內容
+
+---
+
+## [1.48.6] - 2026-06-16
+
+### Summary
+--help
+
+---
+
+## [1.48.5] - 2026-06-16
+
+### Summary
+fix: check_gitignore_completeness 改 git check-ignore 混合語意消除 false positive; fix: dispatch-active missing 建議字面改 .claude/dispatch-active*; fix: 同步 project-init gitignore/check 測試斷言並修 _create_missing_gitignore_result 漏列 dispatch-active (+1 more)
+
+Changes: 3 fix, 1 chore
+
+- fix: check_gitignore_completeness 改 git check-ignore 混合語意消除 false positive
+- fix: dispatch-active missing 建議字面改 .claude/dispatch-active*
+- fix: 同步 project-init gitignore/check 測試斷言並修 _create_missing_gitignore_result 漏列 dispatch-active
+- chore: test_hook_completeness_reverse_check.py 執行權限對齊 100755
+
+---
+
 ## [1.48.4] - 2026-06-16
 
 ### Summary

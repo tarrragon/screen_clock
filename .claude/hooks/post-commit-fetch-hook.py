@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_utils import setup_hook_logging, read_json_from_stdin
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import setup_hook_logging, read_json_from_stdin
 
 
 def main() -> None:

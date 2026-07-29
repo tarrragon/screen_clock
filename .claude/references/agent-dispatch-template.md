@@ -44,6 +44,8 @@ Ticket: {ticket_id}
 
 > **用途**：PM 派發前最常用的中文對話式骨架。把 context 寫入 ticket 後，直接複製以下骨架填三個空格即可派發。prompt 控制在 **10-15 行**，穩過 Hook 30 行上限。
 
+> **機制選擇前置（0.38.0-W2-002 ANA 落地）**：呼叫 `Agent(...)` 時**預設不帶 `name` 參數**（一般 subagent）。僅當任務符合「平行派發且 Agent A 的發現會改變 Agent B 正在進行的工作」（改用 Agent Teams）或「同 Wave 有 3+ 張同類型 ticket 且預期逐一派發」（named agent 可選續用）時才加 `name`。循序一次性任務、獨立分析/實作任務一律不帶 `name`。完整選用準則決策表見 `.claude/pm-rules/parallel-dispatch.md`「派發機制選用準則」章節。
+
 ### 骨架（3 段）
 
 ```markdown
@@ -54,8 +56,11 @@ Ticket: {ticket_id}
 {一句話動作描述，≤ 40 字}
 
 讀取 ticket：`ticket track full {ticket_id}`
+認領：`ticket track claim {ticket_id} --as {agent_name}`
 依 Context Bundle 執行流程。遇阻立即停下回報，禁繞過 Hook。
 ```
+
+> **claim 行必帶 `--as {agent_name}`**（派發身份前移，W5-005 F1a）：dispatch hook 已在派發時對無主票綁定 who.current，此行是 agent 端對稱綁定與 hook 失效 fallback；缺 `--as` 的裸 claim 不寫 who.current，收尾 `complete --as` 會因身份不符需 set-who 繞道。
 
 ### IMP 實戰範例（實作派發）
 
@@ -67,6 +72,7 @@ Ticket: 0.18.0-W17-046.1
 擴充 TICKET_EXEMPT_AGENT_TYPES 白名單 + 補充 Hook 判別準則註解 + 新增測試。
 
 讀取 ticket：`ticket track full 0.18.0-W17-046.1`
+認領：`ticket track claim 0.18.0-W17-046.1 --as thyme-python-developer`
 依 Problem Analysis 的 Context Bundle 規格實作 + commit + complete。
 遇阻立即停下回報，禁繞過 Hook。
 ```
@@ -81,6 +87,7 @@ Ticket: 0.18.0-W17-043
 分析 scenario-17 AskUserQuestion 提醒在 append-log 誤觸發根因。
 
 讀取 ticket：`ticket track full 0.18.0-W17-043`
+認領：`ticket track claim 0.18.0-W17-043 --as saffron-system-analyst`
 依 acceptance 產出分析報告寫入 Solution，衍生修復 ticket 後 complete。
 遇阻即停回報，禁繞過 Hook。
 ```
@@ -95,8 +102,22 @@ Ticket: 0.18.0-W17-048.3
 新增 agent-dispatch-template.md「短 prompt 三段式骨架」範例區。
 
 讀取 ticket：`ticket track full 0.18.0-W17-048.3`
+認領：`ticket track claim 0.18.0-W17-048.3 --as thyme-documentation-integrator`
 依 Context Bundle 設計文件結構，append Solution + commit + complete。
 遇阻即停回報。
+```
+
+### 文件票實查約束句（PC-BAL-007）
+
+**觸發條件**：文件票（DOC ticket）的產出涉及持久化型態、schema 結構、或元件接線現況的陳述（如 domain-map §3 資料契約引用欄、SPEC 資料契約文件、任何描述「某表/某元件是否已實作/已接線」的段落）。
+
+**Why/Consequence**：並行文件票各自涉及同一底層事實時，未實查的一方會轉述舊文件或憑推論下斷言，且各自 acceptance 不驗證對方涵蓋的事實範圍，誤述只在 PM 合併期交叉比對才暴露（實證：PC-BAL-007，W10-006 誤述 loan domain 為「無獨立持久化」，同時段 W10-003 實查確認為實表）。
+
+**Action**：prompt 必須含以下句子（可併入任務段或獨立一行）：
+
+```
+陳述持久化/schema/接線現況前必須實查（讀 DDL / grep CREATE TABLE / ls migration），
+禁止轉述既有描述或推論；無法實查則標註「待 {來源票 id} 定案」（PC-BAL-007）。
 ```
 
 ### 填空檢查清單
@@ -105,9 +126,13 @@ Ticket: 0.18.0-W17-048.3
 
 - [ ] 第一行為 `Ticket: {id}`（Hook 強制驗證）
 - [ ] 含「讀取 ticket」指引（W17-048.2 軟提示檢查）
+- [ ] 含 `claim {id} --as {agent_name}` 認領行（派發身份前移；agent 端對稱綁定，見骨架下方說明）
 - [ ] context 已在 ticket 的 Problem Analysis / Context Bundle（不塞 prompt）
 - [ ] prompt 總行數 ≤ 15 行（遠低於 30 行硬上限）
 - [ ] 動作描述一句話可理解（不堆疊多個動詞）
+- [ ] 交付通道已確認（L3/L2: append-log+commit / L1: append-log+/tmp / L0: final message 後 PM 立即落檔）
+- [ ] 文件票涉及持久化/schema/接線現況陳述時，已含實查約束句（PC-BAL-007，見上節）
+- [ ] 派發對象為 `.claude/` 框架檔案修改時，代理人受 AGENT_PRELOAD 規則 12 約束（禁依賴型 ticket 引用），無需 prompt 額外重複
 
 ---
 
@@ -152,6 +177,33 @@ Do not implement child scope or batch-dispatch agents.
 Record blockers, deps, and next runnable ticket IDs.
 ```
 
+### L0 唯讀型（Plan type）
+
+```markdown
+Ticket: {id}
+
+{agent-name}: Read ticket md and produce your analysis as your final message.
+Do NOT attempt to write files, use Bash redirects, or call ticket CLI.
+Your final message IS the deliverable — PM will archive it immediately.
+```
+
+> PM 收到 final message 後立即落檔（`ticket track append-log {id} --section "Solution" "..."`），不假設下次能取回同樣內容（W2-011 hook 劫持風險）。
+
+---
+
+## 交付通道速查（W5-005.12）
+
+| Agent 能力 | 交付通道 | PM 動作 |
+|-----------|---------|--------|
+| L3/L2（有 Edit/Write） | ticket append-log + commit 產出檔 | 標準驗收（讀 ticket + git log + 測試） |
+| L1（有 Bash 無 Edit/Write） | ticket append-log + Bash heredoc 寫 /tmp 檔 | 標準驗收 + Read /tmp 檔 |
+| L0（Plan type 唯讀） | final message（唯一通道） | 立即落檔保全（見上方 snippet） |
+
+**L0 Fallback SOP**：
+1. 派發前：prompt 明示「報告全文以最終訊息回傳，不嘗試寫檔」
+2. 收到 final message 後：PM 立即寫入 ticket Solution 或 /tmp
+3. 不等待：不假設下次還能取回（hook 劫持風險，W2-011）
+
 ---
 
 ## 唯讀探針派發 SOP（PC-V1-002 防護）
@@ -168,6 +220,8 @@ Record blockers, deps, and next runnable ticket IDs.
 |--------|------|------|
 | 1（首選） | 用 `TICKET_EXEMPT_AGENT_TYPES` 白名單型派發（Explore / general-purpose / Plan 等唯讀型） | 免 Ticket ID 強制，從源頭消除觸發；白名單見 `.claude/skills/ticket/hooks/agent-ticket-validation-hook.py` |
 | 2（必須用非豁免 type 時） | prompt 必附三禁約束 | 見下方範本 |
+
+**parallel-evaluation 常駐審查委員免 Ticket ID 派發**：`basil-writing-critic` 與 `linux` 已列入 `TICKET_EXEMPT_AGENT_TYPES`（0.2.1-W3-010 落地）。派發這兩者做 Layer 2 / 常駐審查（無 ticket 寫入義務的獨立審查任務）時，直接依優先序 1 免 Ticket ID 派發，prompt 不需借用他人 ticket ID 湊格式要求——借用他人 pending ticket ID 會使該票 `who.current` 被 claim 回填、造成指派欄位污染（見 PC-V1-002 案例變體二）。
 
 **三禁約束範本**（必須引用 Ticket ID 時逐字附上）：
 
@@ -257,6 +311,7 @@ Ticket: {child_ticket_id}
 {一句話動作描述，<= 40 字}
 
 讀取 ticket：`ticket track full {child_ticket_id}`
+認領：`ticket track claim {child_ticket_id} --as {agent_name}`
 依 Problem Analysis 的 Context Bundle 執行；claim 後依 AGENT_PRELOAD 規則 9.2 執行五步自檢。
 完成後 append-log Solution + complete；遇阻寫 NeedsContext + Exit Status 即停。
 final message 僅指向 ticket ID，不承載結論本體。
@@ -274,6 +329,20 @@ final message 僅指向 ticket ID，不承載結論本體。
 | `{agent-description 引文}` | 從 `.claude/agents/{agent}.md` frontmatter `description` 直接引用 |
 | 允許的產出 | 對照代理人可編輯路徑表 + 本 Ticket `where.files` 交集 |
 | 禁止的產出 | 並行 Ticket 範圍、代理人定義外的檔案類型、跨 Ticket 動作 |
+
+---
+
+## append-log 收尾持久化驗證
+
+被派發 agent 在 prompt 收尾段須附此驗證準則，避免 malformed heredoc 使 `ticket track append-log` 未真正執行卻被誤判為「CLI bug」。
+
+**Why/Consequence**：append-log 內容若以 heredoc 傳入而指令 malformed（delimiter 不符、未正確 pipe 到 `ticket`），shell 會把 heredoc 內容自己 echo 出來、ticket CLI 根本未執行，ticket md 無變更。agent 若把這段 shell echo 誤讀為 CLI 回應，會誤歸因為「append-log 失效」並放棄收尾章節（如 Exit Status），造成可觀測性資訊靜默遺失（實證：W1-008 ANA，subagent Exit Status 殘留 placeholder；PM 同 section 重現逐字持久化）。
+
+**Action**（收尾自律）：
+
+- 唯有 CLI 回 `[OK] 已追加日誌到 '<section>'` 才算寫入成功；輸出僅見 heredoc 內容被 echo 出來代表指令 malformed、CLI 未執行，須修正 Bash 指令重發。
+- 收尾關鍵 section（Test Results / Exit Status）後以 `grep -c "<唯一片語>" <ticket-md-path>` 確認實際持久化（固定值驗證，不信 CLI 旁白）。
+- 引用既有規則不重複定義：heredoc 傳長文字見 `bash-tool-usage-rules` 規則 5；「只信 raw stdout、帶旁白視為自身雜訊」見 `tool-output-trust-rules` 規則 2；CLI args 跳脫見 PC-079。
 
 ---
 
@@ -428,6 +497,8 @@ commit 前快速掃描禁用字（數據/代碼/默認/文檔/軟件/硬件/信�
 > **用途**：派發 `isolation: "worktree"` agent 時，在 prompt 加入 base 同步指引，使 agent 開始工作前先將 worktree merge 至最新 main。
 >
 > **設計依據**：W1-035 ANA — cc runtime `isolation:worktree` 以派發瞬間 main HEAD 為快照、不後續同步；worktree 共享 git object store，可在 worktree 內直接 merge main 取得最新內容。
+>
+> **前提**：本指引假設 agent 在 auto-worktree 內完成所有工作（file ops + ticket CLI）。禁止 `isolation: worktree` + prompt 導向另一個外部 worktree 的組合派發——該模式導致 ticket CLI 寫入與 code changes 分裂到不同分支（ghost commits）。替代方案見 `.claude/pm-rules/parallel-dispatch.md`「Redirect 派發反模式禁令（W1-016）」。
 
 ### cc runtime worktree base 選擇邏輯（實證歸納）
 
@@ -481,6 +552,12 @@ object store，可直接 merge），確認本地檔案為最新 main 後再開�
 ### 與派發前 commit gate 的關係
 
 A1（PM 派發前 commit gate，見 `.claude/pm-rules/behavior-loop-details.md`「派發前檢查：worktree base 同步」）與本指引（B1）為互補防護：A1 在派發前縮小 base 初始落差，B1 在 agent 端補平派發後新增的落差。A1 是一次 `git status`、B1 是 prompt 內一行 `git merge` 指引，相對於 base 落差累積後的手動整合成本，兩者投入都小；並用可覆蓋派發前與執行中兩個時間窗。
+
+### 派發前 origin 同步驗證（PC-154 前置 1 延伸）
+
+> **Why**：A1 只檢查本機有無 uncommitted 變更，未驗證本機 main 是否已 push 到 origin。PC-154 前置 1 已記錄 worktree base 在部分觀測中反映「較早的 checkpoint 或 origin/main」而非本機 main HEAD；PM 本 session 新建/修改的 ticket commit 若尚未 push，origin 落後，agent 進入 worktree 讀到舊票況會誠實回報「Ticket 不存在」——此訊息易誤診為打錯票號，實為 record-plane（agent 所見 origin 舊態）與 world-plane（本機 HEAD 有票）漂移（`tool-output-trust-rules` 規則 5）。
+>
+> **Action**：派發任何 `isolation: "worktree"` 實作 agent 前，除 A1 `git status --porcelain` 外，再執行 `git push origin main`（確認 `git rev-list --left-right --count origin/main...main` 為 `0 0`）。收到 agent 回報「Ticket 不存在」時，先查 `git log origin/main..main` 是否有未 push 的票 commit，而非直接懷疑票號打錯。完整前置條件表見 `.claude/error-patterns/process-compliance/PC-154-worktree-dispatch-prerequisites-not-verified.md`「前置 1：worktree base 含所需檔案」。
 
 ---
 
@@ -537,6 +614,50 @@ PM 試圖直接 Edit tests/unit/scripts/build-version-check.test.js 被 branch-v
 
 ---
 
+## worktree 快照過舊防護（W2-007）
+
+> **用途**：session 中途新建 ticket / 檔案後才派發 `isolation: "worktree"` agent 時，prompt 第 0 步強制驗證與同步，並在阻塞回報後正確判斷是重派新 agent 還是 SendMessage 恢復舊 agent。
+>
+> **與「worktree 派發 base 同步指引（W1-035）」的差異**：W1-035 提供通用的 `git merge main` 指引；本節針對 W2-007 兩次獨立觀測補兩項更精確的防護——(1) merge 後另加 ls/grep 驗證目標檔案確實存在，不只信任 merge 指令本身成功；(2) 阻塞回報後的恢復方式判準（重派 vs SendMessage），W1-035 未涵蓋此決策點。
+
+### 機制定性（W2-007 實證）
+
+isolation worktree 以**session 起始快照**建立，非派發當下的 main HEAD。W2-006 首派與二派兩個 worktree 皆停在 session 起始 commit，落後 main 5 個以上 commit；三派在 prompt 第 0 步加 `git merge main --no-edit` 後成功完成（13/13 測試綠）。快照過舊在該次觀測中 2/2 重現，merge main 防護 2/2 有效（含 W2-005 代理人自主採用）。
+
+**Why**：session 起始快照機制是 cc runtime 行為，PM 無法從外部改變；session 中途建立的 ticket / 檔案對此後派發的 worktree agent 不可見，agent 會誤判「ticket 不存在」。
+
+**Consequence**：不加防護時，agent 依落後快照工作會回報找不到 ticket（實際 main 已有），造成誤判阻塞並浪費一次派發回合；若 agent 未停手而是憑舊快照猜測繼續，則產出會建立在過時檔案上，需事後整合。
+
+**Action**：
+
+1. session 中有新增 commit（新建票、新檔案）之後才發起的 `isolation: "worktree"` 派發，prompt 第 0 步強制：
+
+```markdown
+第 0 步：執行 git merge main --no-edit（worktree 共享 git object store，可直接取得最新 main）。
+merge 後執行 ls <目標檔案路徑> 或 grep 確認本 ticket 相關檔案已存在，
+確認無誤後再開始執行任務；若檔案仍不存在，停手回報而非猜測繼續。
+```
+
+2. 此步驟疊加在既有「worktree 派發 base 同步指引（W1-035）」的 `git merge main` 指引之上，補的是 merge 之後的**顯性驗證**（ls / grep），不是取代 merge 本身。
+
+### 阻塞回報後：重派新 agent 優先於 SendMessage 恢復
+
+**Why**：無變更的 worktree 在代理人首次結束時會被平台自動回收；此時以 SendMessage 恢復該代理人，worktree 已不存在，cwd 會靜默 fallback 到主 repo，agent 在錯誤的工作目錄繼續執行而無明顯錯誤訊息。
+
+**Consequence**：誤用 SendMessage 恢復已回收 worktree 的 agent，後續操作（Edit / git commit）實際發生在主 repo cwd，可能誤觸 branch-verify-hook 或污染主 repo 工作區，且此偏差不易從 agent 回報文字察覺。
+
+**Action**：
+
+| 情境 | 判準 |
+|------|------|
+| agent 因快照過舊回報阻塞（未產生變更） | 優先重派新 agent（新 worktree 會以較新快照建立），不用 SendMessage 恢復舊 agent |
+| agent 已產生變更後才阻塞（worktree 有 commit） | worktree 未被回收，可用 SendMessage 恢復 |
+| 不確定 worktree 是否仍存在 | 執行 `ls .claude/worktrees/` 或等效指令確認後再決定 |
+
+**Source**：0.3.6-W2-007（ANA，兩次獨立觀測 + W2-006 三次派發自然對照組）。
+
+---
+
 ## 適用範圍
 
 | 場景 | 是否強制引用骨架 |
@@ -560,6 +681,8 @@ PM 試圖直接 Edit tests/unit/scripts/build-version-check.test.js 被 branch-v
 | **Prompt 端職責邊界聲明** | **派發時即明示邊界，代理人執行前有自檢依據** |
 
 三層防護並存，prompt 端聲明是派發時的最後防線。
+
+> **備用第四層：`Tool(param:value)` 權限語法（CC 2.1.178+）**。permission rules 可比對工具輸入參數，如 `Agent(model:opus)` 阻擋特定模型的 subagent 派發。**現況不啟用**：本專案派發 incident 根因均為職責邊界模糊（hook 層已覆蓋），無「模型/參數錯誤派發」案例，無痛點的預防規則是維護負債且無法驗證正確性。**啟用條件（絆腳索）**：出現「代理人以錯誤模型/參數被派發且 hook 層未攔截」的實際 incident 時，以該案例寫出可驗證的規則（評估紀錄見 1.5.0-W5-001.5）。
 
 ---
 
@@ -620,16 +743,104 @@ ticket track complete 0.19.0-W3-032.1 --as <agent-name>
 
 ---
 
+## 收尾義務標準段（W2-003）
+
+> **用途**：派發 prompt 收尾段的標準模板，把「勾選 acceptance」與「填寫 ticket body」兩項收尾義務明文寫入指令，取代僅靠代理人自律（AGENT_PRELOAD 規則 2.4）記得執行。
+>
+> **設計依據**：0.4.1-W1-001 檢討摩擦 F3 — 0.4.0 W2-002 / W2-003 代理人在最終回覆文字中勾選 acceptance 項目，但未實際執行 `ticket track set-acceptance` 寫入 frontmatter，`complete` 因 acceptance 未真正勾選被二度擋下；PM 改在 prompt 明示 `ticket track set-acceptance <id> --all-check --as <agent>` 指令後，四票（W2-002/003 各兩項）全數一次收斂。
+>
+> **範圍擴充（0.4.1-W2-008）**：W17-064 的「Solution 缺 `### 自檢結果`」warning 對 PM 於 complete 時發出，0.4.0 十八票 + 0.4.1-W1-001 皆被忽略——受眾與時點雙錯，warning 送到 PM 手上時代理人工作已結束，PM 補寫是事後貼標籤，不是自檢本身。W2-008 決策：正確供給側是代理人執行期的 template 義務，故本標準段一併納入「### 4. Solution 自檢結果子章節義務」。
+
+**Why**：agent 的最終回覆文字（final message）屬記錄平面，與 ticket frontmatter 的世界平面語意不對稱（見 `tool-output-trust-rules` 規則 5）。回覆裡寫「acceptance 已勾選」不代表 frontmatter 真的被改，acceptance-gate-hook 只讀 frontmatter，兩者不同步時 complete 必被擋；同理，自檢的產出者是執行期的代理人，事後對 PM 的 warning 無法讓已完成的工作補回自檢過程，只能在派發時把自檢寫入代理人的收尾動作才有效。
+
+**Consequence**：prompt 若只寫「完成後 complete」，代理人容易把「口頭確認完成」當作收尾終點，遺漏實際 CLI 呼叫；PM 需二次回頭補派同一 ticket 才能收斂，浪費一個派發回合。同理，若收尾段不明示自檢子章節義務，`### 自檢結果` warning 會持續在 complete 時對 PM 發出且被忽略（實證忽略率：18/18 + 本 ticket 前身），acceptance 與證據的對應關係也無從追溯。
+
+**Action**：收尾段固定納入以下四塊，不可只留其一：
+
+### 1. set-acceptance 指令範例
+
+依驗收項目是否逐項確認分兩型：
+
+```bash
+# 型一：一次勾選全部（agent 已逐項自我確認完成）
+ticket track set-acceptance <ticket-id> --all-check --as <自身 agent 名稱>
+
+# 型二：僅勾選特定 index（部分驗收項尚未達成，只勾已完成者）
+ticket track set-acceptance <ticket-id> --check 1 2 --as <自身 agent 名稱>
+```
+
+型一與型二互斥，依 acceptance 實際完成狀況擇一；未完成的 acceptance 項一律不勾，並在 NeedsContext 記錄缺口（見 AGENT_PRELOAD 規則 2.4 例外情境表）。
+
+### 2. ticket body 填寫義務
+
+`set-acceptance` 只更新 frontmatter 勾選狀態，不等於 body 章節已填寫完整。收尾段須同時要求：
+
+| 章節 | 填寫內容 |
+|------|---------|
+| Solution | 實際變更摘要（新增/修改的方法、檔案） |
+| Test Results | 測試執行結果（通過數/總數，或 DOC 類型免填時明示原因） |
+| Exit Status | W17-010 schema（status/reason/confidence/acceptance_met 等） |
+
+### 4. Solution 自檢結果子章節義務（W2-008）
+
+收尾段須明示：`complete` 前，Solution 章節必須含 `### 自檢結果` 子章節，依 `.claude/references/agent-self-check-template.md` 執行，且**對照 acceptance 逐項附證據**（非泛稱「已自檢」）。
+
+```markdown
+complete 前，Solution 章節須補 `### 自檢結果` 子章節：依
+.claude/references/agent-self-check-template.md 執行 Layer 1 自檢
+（A 文字品質 / B 禁用字 / C Schema 結構），並對照本 ticket 每項
+acceptance 逐一附證據（如「acceptance N：已於 X 檔案 Y 行落實，見 Z」）。
+```
+
+| 適用 | 說明 |
+|------|------|
+| IMP / ANA ticket | 強制 |
+| DOC ticket | 沿用 `agent-self-check-template.md`「自檢無發現可省略子章節」的免填規則，但仍需執行掃描 |
+| 純機械任務（格式修正、路徑替換） | 可省略（同 Layer 1 自檢觸發指引既有豁免條件） |
+
+> **與既有「Layer 1 自檢觸發指引」章節的差異**：該章節是通用的文字品質/禁用字/Schema 掃描指令；本項額外要求自檢結果**逐一對照 acceptance 編號**，讓 PM 與 acceptance-gate-hook 可直接核對「每項 acceptance 有無對應證據」，而非僅有一段籠統的自檢摘要。
+
+### 5. 明示：回覆勾選不算數，frontmatter 才是 SOT
+
+收尾段結尾固定附加一句提醒，防止代理人以為「在回覆文字描述完成」等同「已收尾」：
+
+```markdown
+最終回覆中描述「已完成」不等於收尾完成；只有 set-acceptance 指令
+真正寫入 frontmatter、body 章節確實填寫，acceptance-gate-hook 驗證通過
+後才算收尾完整。
+```
+
+### 適用範圍
+
+| 情境 | 是否插入本標準段 |
+|------|----------------|
+| IMP / DOC / ANA 等需 complete 的實作類派發 | 強制 |
+| 唯讀探針、純諮詢派發（無 ticket 寫入義務） | 不適用（見「唯讀探針派發 SOP」章節） |
+| 嵌套派發 child prompt | 適用，套用「嵌套派發（descend）派發端指引」的 child prompt 骨架收尾段 |
+
+---
+
 ## 相關文件
 
-- `.claude/pm-rules/parallel-dispatch.md` — 引用本模板為強制骨架
+- `.claude/pm-rules/parallel-dispatch.md` — 引用本模板為強制骨架；「派發機制選用準則」章節定義 named agent vs 一般 subagent 選用時機
+- `.claude/skills/agent-team/SKILL.md` — Task subagent vs Agent Teams 快速決策表（上一層判斷）
 - `.claude/pm-rules/decision-tree.md` — 代理人可編輯路徑對照表
 - `.claude/rules/core/quality-baseline.md` — 規則 6 失敗案例學習原則
 
 ---
 
-**Last Updated**: 2026-06-11
+**Last Updated**: 2026-07-27
+**Version**: 1.15.0 — 「與派發前 commit gate 的關係」章節新增「派發前 origin 同步驗證（PC-154 前置 1 延伸）」小節：worktree base 可能反映 origin/main 而非本機 HEAD，補派發前 `git push origin main` 驗證步驟，與 PC-154 前置 1 交叉引用（memory 搬遷落地，0.2.1-W3-085）
+**Version**: 1.14.0 — 「填空檢查清單」新增一項：派發 `.claude/` 框架檔案修改時，代理人已受 AGENT_PRELOAD 規則 12（禁依賴型 ticket 引用）約束，prompt 不需重複交代（0.2.1-W3-093）
+**Version**: 1.13.0 — 「唯讀探針派發 SOP」章節新增「parallel-evaluation 常駐審查委員免 Ticket ID 派發」條目：`basil-writing-critic` / `linux` 已列入 `TICKET_EXEMPT_AGENT_TYPES`（0.2.1-W3-010 落地），派發時直接走優先序 1，禁止借用他人 pending ticket ID 湊格式要求（PC-V1-002 案例變體二防護，0.2.1-W3-011）
+**Version**: 1.12.0 — 「三段式快速填空骨架」章節新增「機制選擇前置」提示：預設呼叫 `Agent(...)` 不帶 `name` 參數，例外情境（Agent Teams / 同 Wave 續用）指向 `parallel-dispatch.md`「派發機制選用準則」章節；相關文件補交叉引用（0.38.0-W2-002 ANA 落地，W4-005）
+
+**Version**: 1.11.0 — 「收尾義務標準段（W2-003）」章節擴充（0.4.1-W2-008）：新增「Solution 自檢結果子章節義務」項，收尾四塊改為含此項；引用 W17-064 warning 忽略率實證（0.4.0 十八票 + 0.4.1-W1-001 全被忽略，受眾/時點雙錯）為擴充依據
+**Version**: 1.10.0 — 新增「收尾義務標準段（W2-003）」章節：set-acceptance 指令範例（--all-check / --check index 兩型）+ ticket body 填寫義務（Solution/Test Results/Exit Status）+「回覆勾選不算數，frontmatter 才是 SOT」明示提醒；引用 0.4.1-W1-001 摩擦 F3（0.4.0 W2-002/003 回覆勾選未動 frontmatter 二度擋 complete，prompt 明示後四票收斂）為 source
+**Version**: 1.9.0 — 新增「worktree 快照過舊防護（W2-007）」章節：session 中途新 commit 後的派發，prompt 第 0 步強制 merge main + ls/grep 驗證目標檔案存在；阻塞回報後重派新 agent 優先於 SendMessage 恢復（無變更 worktree 被平台自動回收，恢復時 cwd 靜默 fallback 主 repo）；引用 0.3.6-W2-007 為 source
 **Version**: 1.8.0 — 新增「收尾 --as 全覆蓋與建票 who 對齊」章節（W1-049 首輪裁決前置）：收尾三命令一律帶 --as、PM 建子票必帶 --who（繼承 parent who 為 false positive deny 誤傷源）、agent deny 時禁繞過須回報；/goal 章節收尾範例同步補 --as
+**Version**: 1.8.0 — 派發身份前移（W5-005 F1a）：三段式骨架與三個實戰範例、嵌套 child prompt 範例均補 `claim {id} --as {agent_name}` 認領行；填空檢查清單新增對應核對項；骨架下方補 Why 說明（dispatch hook 綁定為第一道，claim --as 為 agent 端對稱綁定與 fallback）
+
 **Version**: 1.7.0 — 新增「嵌套派發（descend）派發端指引」章節：descend 條件速查（派發端動作對照）+ dispatch-plan 嵌套欄位（parent / depth-can_descend）+ child prompt 三段式範例；協議 SSOT 引用 AGENT_PRELOAD 規則 9，深度上限數值不在本檔重複定義（嵌套派發協議 S2 落地）
 
 **Version**: 1.6.0 — worktree 派發 base 同步指引（W1-035）章節新增「cc runtime worktree base 選擇邏輯（實證歸納）」與「三方案評估與選定理由」（選定方案 B，0.19.0-W1-053）

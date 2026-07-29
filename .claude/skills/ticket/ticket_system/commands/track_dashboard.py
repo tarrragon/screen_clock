@@ -32,6 +32,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ticket_system.commands.track_runqueue import (
+    READINESS_NO_CB,
+    READINESS_READY,
     _compute_readiness,
     _filter_by_wave,
     _get_pending_handoff_info,
@@ -40,6 +42,11 @@ from ticket_system.commands.track_runqueue import (
 )
 from ticket_system.lib.staleness import compute_stale_minutes
 from ticket_system.lib.ticket_loader import list_tickets
+from ticket_system.lib.version import check_version_all_completed
+from ticket_system.lib.command_tracking_messages import (
+    TrackQueryMessages,
+    format_msg,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -82,17 +89,20 @@ def load_top_ready(
     top: int,
     handoff_info: Optional[Dict[str, Dict]] = None,
 ) -> List[Dict[str, Any]]:
-    """收集 top N ready，按 (priority, trigger_bound, id) 排序。
+    """收集 top N actionable ticket，按 (readiness_rank, priority, trigger_bound, id) 排序。
 
-    僅 readiness == 'READY' 列入；handoff_info 用於 _compute_readiness。
+    READY 排前、NO-CB 排後；其他 readiness（NEEDS-CTX/BLOCKED/FAILED）不列入。
     top <= 0 回傳 []。
 
-    排序鍵語意（W3-096）：
-    - priority 為首要鍵（_priority_rank）；跨 priority 仍按 priority 排序
-    - trigger_bound 為次要鍵（false=0 / true=1）；同 priority 內 trigger-bound
-      排在 normal 之後，避免 trigger-bound ticket 佔 Top N 位置
+    排序鍵語意（W3-096 + dashboard NO-CB 修復）：
+    - readiness_rank 為最高鍵（READY=0, NO-CB=1）；READY 優先於 NO-CB
+    - priority 為次要鍵（_priority_rank）
+    - trigger_bound 為第三鍵（false=0 / true=1）
     - id 為穩定排序鍵
     """
+    _ACTIONABLE = {READINESS_READY, READINESS_NO_CB}
+    _READINESS_RANK = {READINESS_READY: 0, READINESS_NO_CB: 1}
+
     handoff_info = handoff_info or {}
     ticket_map = {t.get("id"): t for t in tickets if t.get("id")}
     candidates = []
@@ -100,10 +110,11 @@ def load_top_ready(
         if not _is_unblocked_pending(t, ticket_map):
             continue
         readiness = _compute_readiness(t, handoff_info)
-        if readiness != "READY":
+        if readiness not in _ACTIONABLE:
             continue
         candidates.append((t, readiness))
     candidates.sort(key=lambda pair: (
+        _READINESS_RANK.get(pair[1], 99),
         _priority_rank(pair[0]),
         1 if pair[0].get("trigger_bound") else 0,
         str(pair[0].get("id") or ""),
@@ -186,7 +197,7 @@ def render_text(
         lines.append("  (none)")
     else:
         for index, item in enumerate(ready, start=1):
-            readiness_label = "ready"
+            readiness_label = item.get("readiness", "ready").lower()
             trigger_tag = " [T]" if item.get("trigger_bound") else ""
             lines.append(
                 f"  [{index}] [{item['priority']}] [{readiness_label}]{trigger_tag} "
@@ -241,7 +252,7 @@ def render_json(
                 "index": i + 1,
                 "id": item["id"],
                 "priority": item["priority"],
-                "readiness": "ready",
+                "readiness": item.get("readiness", "READY").lower(),
                 "title": item["title"],
                 "trigger_bound": bool(item.get("trigger_bound")),
             }
@@ -257,6 +268,29 @@ def render_json(
 # 主入口
 # ---------------------------------------------------------------------------
 
+def _print_all_completed_warning(version: str, tickets: list) -> None:
+    """若版本所有 ticket 皆為終結狀態，印出 warning。
+
+    重用 dashboard_main 已載入的 tickets，避免冗餘 list_tickets 重載
+    （該重載會觸發 get_project_root → subprocess）。
+    """
+    all_completed, next_version = check_version_all_completed(version, tickets=tickets)
+    if not all_completed:
+        return
+
+    print()
+    print(format_msg(
+        TrackQueryMessages.VERSION_ALL_COMPLETED_WARNING,
+        version=version,
+    ))
+    if next_version:
+        print(format_msg(
+            TrackQueryMessages.VERSION_ALL_COMPLETED_NEXT,
+            next_version=next_version,
+        ))
+    print(TrackQueryMessages.VERSION_ALL_COMPLETED_HINT)
+
+
 def dashboard_main(args: argparse.Namespace, version: Optional[str]) -> int:
     """執行 track dashboard 命令。
 
@@ -271,6 +305,9 @@ def dashboard_main(args: argparse.Namespace, version: Optional[str]) -> int:
         # 業務拒絕：查無 active version（資料源無資料），呼叫方應依拒絕原因處理
         sys.stderr.write("No active version detected\n")
         return 2
+
+    # W5-005.14: 自動清理已完成 ticket 的 stale handoff（非靜默，stderr 提示）
+    _auto_gc_stale_handoffs()
 
     try:
         all_tickets = list_tickets(version) or []
@@ -317,7 +354,38 @@ def dashboard_main(args: argparse.Namespace, version: Optional[str]) -> int:
             stale_threshold=stale_threshold,
             stale_disabled=no_stale,
         ))
+
+    _print_all_completed_warning(version, all_tickets)
     return 0
+
+
+def _auto_gc_stale_handoffs() -> None:
+    """自動清理已完成 ticket 的 stale handoff（W5-005.14）。
+
+    在 dashboard 載入前執行；清理結果寫 stderr（非靜默）。
+    失敗時 graceful degrade（不影響 dashboard 正常輸出）。
+    """
+    try:
+        from ticket_system.commands.handoff_gc import _collect_stale_handoffs
+        from ticket_system.lib.constants import HANDOFF_DIR, HANDOFF_ARCHIVE_SUBDIR
+        from ticket_system.lib.paths import get_project_root
+
+        stale = _collect_stale_handoffs(force=False)
+        if not stale:
+            return
+
+        root = get_project_root()
+        archive_dir = root / HANDOFF_DIR / HANDOFF_ARCHIVE_SUBDIR
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        for file_path, ticket_id, reason in stale:
+            dest = archive_dir / file_path.name
+            file_path.rename(dest)
+            sys.stderr.write(
+                f"[handoff-gc] 已歸檔 stale handoff: {file_path.name} ({reason})\n"
+            )
+    except Exception:
+        pass
 
 
 # execute alias 對齊 track.py _create_command_handlers 命名慣例
