@@ -22,21 +22,24 @@ class CursorLocator {
 
   /// 觸發原生端於游標所在螢幕播放定位特效。
   ///
-  /// [durationSeconds] 為設定層單位（雙精度秒，SettingsModel 儲存格式），
-  /// [tint] 為設定層色彩物件；本方法是設定層與傳輸層的換算點——
-  /// 傳輸層以整數毫秒（[AppCursorLocator.durationMsArgKey]）與 ARGB 整數
-  /// （[AppCursorLocator.tintArgbArgKey]）傳遞，換算集中於
-  /// [_durationSecondsToMs] 與 [_tintToArgb] 兩個具名轉換點，避免單位變更
-  /// 隱含在呼叫式中無從察覺（1.4.0-W1-011 實測 E3）。
+  /// [duration] 與 [tint] 為 SPEC-008:277 訂的簽章；本方法是呼叫端與傳輸層
+  /// 的換算點——傳輸層以整數毫秒（[AppCursorLocator.durationMsArgKey]）與
+  /// ARGB 整數（[AppCursorLocator.tintArgbArgKey]）傳遞，色彩換算集中於
+  /// [_tintToArgb] 具名轉換點，避免單位變更隱含在呼叫式中無從察覺
+  /// （1.4.0-W1-011 實測 E3）。轉換與 channel 呼叫同在 try 區塊內，NaN /
+  /// Infinite 等異常輸入與 [PlatformException] 共用同一 catch-log 路徑。
+  ///
+  /// 例外契約：原生端不可用或拋錯時本方法不拋例外，僅記錄；呼叫端無法由
+  /// 回傳值得知播放是否成功。
   Future<void> play({
-    required double durationSeconds,
+    required Duration duration,
     required Color tint,
   }) async {
-    final int durationMs = _durationSecondsToMs(durationSeconds);
-    final int tintArgb = _tintToArgb(tint);
-    // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
-    developer.log('play 呼叫: durationMs=$durationMs, tintArgb=$tintArgb', name: _tag);
     try {
+      final int durationMs = duration.inMilliseconds;
+      final int tintArgb = _tintToArgb(tint);
+      // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+      developer.log('play 呼叫: durationMs=$durationMs, tintArgb=$tintArgb', name: _tag);
       await _channel.invokeMethod<void>(
         AppCursorLocator.playMethod,
         <String, Object?>{
@@ -50,12 +53,11 @@ class CursorLocator {
     } on MissingPluginException catch (e) {
       // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
       developer.log('play MissingPluginException: message=${e.message}', name: _tag, level: 900);
+    } on UnsupportedError catch (e) {
+      // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+      developer.log('play 轉換失敗: message=${e.message}', name: _tag, level: 900);
     }
   }
-
-  /// 設定層（雙精度秒）→ 傳輸層（整數毫秒）換算點。
-  int _durationSecondsToMs(double durationSeconds) =>
-      (durationSeconds * 1000).round();
 
   /// 設定層（Color 物件）→ 傳輸層（ARGB 整數）換算點。
   int _tintToArgb(Color tint) => tint.toARGB32();

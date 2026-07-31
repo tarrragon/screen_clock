@@ -284,10 +284,7 @@ Color? _asColor(Object? value) {
 }
 
 /// 對應 [Color] 在 shared_preferences 中以 ARGB32 int 儲存（SPEC-004 設計約束）。
-int _colorToInt(Color color) {
-  final int a = (color.a * 255).round() & 0xff;
-  final int r = (color.r * 255).round() & 0xff;
-  final int g = (color.g * 255).round() & 0xff;
-  final int b = (color.b * 255).round() & 0xff;
-  return (a << 24) | (r << 16) | (g << 8) | b;
-}
+///
+/// 使用 SDK [Color.toARGB32] 而非手刻位移，與傳輸層（cursor_locator）的
+/// 換算實作收斂至同一來源（1.4.0-W1-001.5 G 項）。
+int _colorToInt(Color color) => color.toARGB32();
