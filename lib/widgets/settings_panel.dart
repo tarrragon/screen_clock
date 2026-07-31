@@ -76,8 +76,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final SettingsController controller =
-        SettingsScope.controllerOf(context);
+    final SettingsController controller = SettingsScope.controllerOf(context);
     final SettingsModel current = SettingsScope.of(context);
 
     return Center(
@@ -97,10 +96,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      '設定',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    Text('設定', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 16),
                     _buildFontSize(controller, current),
                     const SizedBox(height: 12),
@@ -110,14 +106,16 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       label: '填色',
                       current: current.fillColor,
                       onPick: (Color c) => controller.update(
-                          (SettingsModel s) => s.copyWith(fillColor: c)),
+                        (SettingsModel s) => s.copyWith(fillColor: c),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _buildColorPicker(
                       label: '描邊色',
                       current: current.strokeColor,
                       onPick: (Color c) => controller.update(
-                          (SettingsModel s) => s.copyWith(strokeColor: c)),
+                        (SettingsModel s) => s.copyWith(strokeColor: c),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _buildTimeFormat(controller, current),
@@ -131,7 +129,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     _buildBirthDate(context, controller, current),
                     const SizedBox(height: 24),
                     _buildBindingSection(controller, current),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 24), // magic-exempt: 既有區塊間距沿用值，非本次新增
+                    _buildCursorLocatorSection(controller, current),
+                    const SizedBox(height: 24), // magic-exempt: 既有區塊間距沿用值，非本次新增
                     _buildActions(context, controller),
                   ],
                 ),
@@ -154,14 +154,11 @@ class _SettingsPanelState extends State<SettingsPanel> {
             value: current.fontSize,
             label: current.fontSize.round().toString(),
             divisions: 200,
-            onChanged: (double v) => controller
-                .update((SettingsModel s) => s.copyWith(fontSize: v)),
+            onChanged: (double v) =>
+                controller.update((SettingsModel s) => s.copyWith(fontSize: v)),
           ),
         ),
-        SizedBox(
-          width: 40,
-          child: Text(current.fontSize.round().toString()),
-        ),
+        SizedBox(width: 40, child: Text(current.fontSize.round().toString())),
       ],
     );
   }
@@ -180,8 +177,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
             value: current.strokeWidth,
             label: current.strokeWidth.toStringAsFixed(1),
             divisions: 80,
-            onChanged: (double v) => controller
-                .update((SettingsModel s) => s.copyWith(strokeWidth: v)),
+            onChanged: (double v) => controller.update(
+              (SettingsModel s) => s.copyWith(strokeWidth: v),
+            ),
           ),
         ),
         SizedBox(
@@ -223,7 +221,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
         const SizedBox(height: 4),
         Row(
           children: <Widget>[
-            const SizedBox(width: 80, child: Text('不透明度', style: TextStyle(fontSize: 12))),
+            const SizedBox(
+              width: 80,
+              child: Text('不透明度', style: TextStyle(fontSize: 12)),
+            ),
             Expanded(
               child: Slider(
                 min: 0,
@@ -235,10 +236,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                 onChanged: (double v) => onPick(current.withValues(alpha: v)),
               ),
             ),
-            SizedBox(
-              width: 40,
-              child: Text('${(current.a * 100).round()}%'),
-            ),
+            SizedBox(width: 40, child: Text('${(current.a * 100).round()}%')),
           ],
         ),
       ],
@@ -277,8 +275,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
     SettingsModel current,
   ) {
     final int max = availableScreenCount > 0 ? availableScreenCount : 1;
-    final int safeValue =
-        current.targetScreenIndex < max ? current.targetScreenIndex : 0;
+    final int safeValue = current.targetScreenIndex < max
+        ? current.targetScreenIndex
+        : 0;
     return Row(
       children: <Widget>[
         const SizedBox(width: 80, child: Text('目標螢幕')),
@@ -293,8 +292,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
           ],
           onChanged: (int? v) {
             if (v == null) return;
-            controller
-                .update((SettingsModel s) => s.copyWith(targetScreenIndex: v));
+            controller.update(
+              (SettingsModel s) => s.copyWith(targetScreenIndex: v),
+            );
           },
         ),
         const SizedBox(width: 8),
@@ -312,31 +312,26 @@ class _SettingsPanelState extends State<SettingsPanel> {
         const SizedBox(width: 80, child: Text('開機啟動')),
         Switch(
           value: current.autoLaunch,
-          onChanged: (bool v) => controller
-              .update((SettingsModel s) => s.copyWith(autoLaunch: v)),
+          onChanged: (bool v) =>
+              controller.update((SettingsModel s) => s.copyWith(autoLaunch: v)),
         ),
       ],
     );
   }
 
-  Widget _buildLifeTimer(
-    SettingsController controller,
-    SettingsModel current,
-  ) {
+  Widget _buildLifeTimer(SettingsController controller, SettingsModel current) {
     return Row(
       children: <Widget>[
         const SizedBox(width: 80, child: Text('生命計時')),
         Switch(
           value: current.lifeTimerMode,
-          onChanged: (bool v) => controller
-              .update((SettingsModel s) => s.copyWith(lifeTimerMode: v)),
+          onChanged: (bool v) => controller.update(
+            (SettingsModel s) => s.copyWith(lifeTimerMode: v),
+          ),
         ),
         const SizedBox(width: 8),
         const Expanded(
-          child: Text(
-            '顯示即時年齡取代時間',
-            style: TextStyle(fontSize: 11),
-          ),
+          child: Text('顯示即時年齡取代時間', style: TextStyle(fontSize: 11)),
         ),
       ],
     );
@@ -437,9 +432,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
     MouseBinding binding,
   ) async {
     controller.update(
-      (SettingsModel s) => s.copyWith(
-        bindings: <MouseBinding>[...s.bindings, binding],
-      ),
+      (SettingsModel s) =>
+          s.copyWith(bindings: <MouseBinding>[...s.bindings, binding]),
     );
     await controller.persist();
   }
@@ -532,7 +526,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
   /// 動作摘要文案（集中字面於 AppText，禁硬編中文於 widget）。
   String _actionSummary(MouseAction action) {
     return switch (action) {
-      DragScrollAction(:final ScrollDirection direction, :final double sensitivity) =>
+      DragScrollAction(
+        :final ScrollDirection direction,
+        :final double sensitivity,
+      ) =>
         '${AppText.bindingActionDragScroll}'
             '・${_directionLabel(direction)}'
             '・${AppText.bindingSensitivityPrefix} '
@@ -549,6 +546,99 @@ class _SettingsPanelState extends State<SettingsPanel> {
       ScrollDirection.natural => AppText.bindingDirectionNatural,
       ScrollDirection.inverted => AppText.bindingDirectionInverted,
     };
+  }
+
+  /// 滑鼠定位器設定區（SPEC-008 FR-06）：啟用開關、特效時長、主色調。
+  ///
+  /// 值域夾制屬 1.4.0-W2-010（model 層 fromJson）；本區塊 Slider min/max
+  /// 僅引用 [AppCursorLocator] 常數，不重複實作夾制。啟用開關的熱鍵註冊/
+  /// 解除屬 1.4.0-W2-005，本區塊只負責寫回 [SettingsController]。
+  Widget _buildCursorLocatorSection(
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          AppText.cursorLocatorSectionTitle,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(
+          height: 8,
+        ), // magic-exempt: 沿用既有面板區塊間距慣例，無 spacing token 設施
+        _buildCursorLocatorEnabled(controller, current),
+        const SizedBox(
+          height: 12,
+        ), // magic-exempt: 沿用既有面板區塊間距慣例，無 spacing token 設施
+        _buildCursorLocatorDuration(controller, current),
+        const SizedBox(
+          height: 12,
+        ), // magic-exempt: 沿用既有面板區塊間距慣例，無 spacing token 設施
+        _buildColorPicker(
+          label: AppText.cursorLocatorColorLabel,
+          current: current.cursorLocatorPrimaryColor,
+          onPick: (Color c) => controller.update(
+            (SettingsModel s) => s.copyWith(cursorLocatorPrimaryColor: c),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCursorLocatorEnabled(
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    return Row(
+      children: <Widget>[
+        const SizedBox(
+          width: 80, // magic-exempt: 沿用既有面板欄位標籤寬度慣例
+          child: Text(AppText.cursorLocatorEnabledLabel),
+        ),
+        Switch(
+          key: const ValueKey<String>('cursor-locator-enabled-switch'),
+          value: current.cursorLocatorEnabled,
+          onChanged: (bool v) => controller.update(
+            (SettingsModel s) => s.copyWith(cursorLocatorEnabled: v),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCursorLocatorDuration(
+    SettingsController controller,
+    SettingsModel current,
+  ) {
+    final double seconds = current.cursorLocatorEffectDurationSeconds;
+    return Row(
+      children: <Widget>[
+        const SizedBox(
+          width: 80, // magic-exempt: 沿用既有面板欄位標籤寬度慣例
+          child: Text(AppText.cursorLocatorDurationLabel),
+        ),
+        Expanded(
+          child: Slider(
+            key: const ValueKey<String>('cursor-locator-duration-slider'),
+            min: AppCursorLocator.minDurationSeconds,
+            max: AppCursorLocator.maxDurationSeconds,
+            value: seconds,
+            label: seconds.toStringAsFixed(1),
+            // (3.0 - 0.5) 秒值域 / 0.1 秒單格 = 25 格，對齊既有滑桿 0.1 精度慣例。
+            divisions: 25, // magic-exempt: 由值域/精度推導，見上行註解
+            onChanged: (double v) => controller.update(
+              (SettingsModel s) =>
+                  s.copyWith(cursorLocatorEffectDurationSeconds: v),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 40, // magic-exempt: 沿用既有面板數值顯示欄寬慣例
+          child: Text('${seconds.toStringAsFixed(1)}s'),
+        ),
+      ],
+    );
   }
 
   Widget _buildActions(BuildContext context, SettingsController controller) {
@@ -658,11 +748,12 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
   KeyEventResult _onHotkeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final int code = event.physicalKey.usbHidUsage;
-    final List<int> modifiers = HardwareKeyboard.instance.physicalKeysPressed
-        .map((PhysicalKeyboardKey k) => k.usbHidUsage)
-        .where((int usage) => usage != code)
-        .toList()
-      ..sort();
+    final List<int> modifiers =
+        HardwareKeyboard.instance.physicalKeysPressed
+            .map((PhysicalKeyboardKey k) => k.usbHidUsage)
+            .where((int usage) => usage != code)
+            .toList()
+          ..sort();
     setState(() {
       _hotkeyCode = code;
       _hotkeyModifiers = modifiers;
@@ -676,10 +767,14 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
 
   MouseBinding _buildBinding() {
     final MouseAction action = switch (_actionType) {
-      _AddActionType.dragScroll =>
-        DragScrollAction(direction: _direction, sensitivity: _sensitivity),
-      _AddActionType.hotkey =>
-        HotkeyAction(keyCode: _hotkeyCode ?? 0, modifiers: _hotkeyModifiers),
+      _AddActionType.dragScroll => DragScrollAction(
+        direction: _direction,
+        sensitivity: _sensitivity,
+      ),
+      _AddActionType.hotkey => HotkeyAction(
+        keyCode: _hotkeyCode ?? 0,
+        modifiers: _hotkeyModifiers,
+      ),
     };
     return MouseBinding(buttonNumber: _capturedButton ?? 0, action: action);
   }
@@ -723,7 +818,10 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
         style: const TextStyle(fontSize: 13),
       ),
       const SizedBox(height: 8),
-      const Text(AppText.bindingActionTypeLabel, style: TextStyle(fontSize: 12)),
+      const Text(
+        AppText.bindingActionTypeLabel,
+        style: TextStyle(fontSize: 12),
+      ),
       const SizedBox(height: 4),
       _buildActionTypeSelector(),
       const SizedBox(height: 8),
@@ -801,8 +899,10 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
       const SizedBox(height: 8),
       Row(
         children: <Widget>[
-          const Text(AppText.bindingSensitivityPrefix,
-              style: TextStyle(fontSize: 12)),
+          const Text(
+            AppText.bindingSensitivityPrefix,
+            style: TextStyle(fontSize: 12),
+          ),
           Expanded(
             child: Slider(
               min: 0.1,
@@ -813,10 +913,7 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
               onChanged: (double v) => setState(() => _sensitivity = v),
             ),
           ),
-          SizedBox(
-            width: 32,
-            child: Text(_sensitivity.toStringAsFixed(1)),
-          ),
+          SizedBox(width: 32, child: Text(_sensitivity.toStringAsFixed(1))),
         ],
       ),
     ];
@@ -826,7 +923,7 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
     final String captured = _hotkeyCode == null
         ? AppText.bindingHotkeyNotCaptured
         : '${AppText.bindingKeyCodePrefix} $_hotkeyCode'
-            '・${AppText.bindingModifierPrefix} ${_hotkeyModifiers.length}';
+              '・${AppText.bindingModifierPrefix} ${_hotkeyModifiers.length}';
     return <Widget>[
       Focus(
         focusNode: _hotkeyFocus,
@@ -841,8 +938,10 @@ class _AddBindingFlowState extends State<_AddBindingFlow> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text(AppText.bindingHotkeyCapturePrompt,
-                  style: TextStyle(fontSize: 12)),
+              const Text(
+                AppText.bindingHotkeyCapturePrompt,
+                style: TextStyle(fontSize: 12),
+              ),
               const SizedBox(height: 4),
               Text(captured, style: const TextStyle(fontSize: 13)),
             ],

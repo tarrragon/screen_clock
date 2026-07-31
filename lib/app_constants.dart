@@ -112,7 +112,31 @@ class AppText {
   static const String bindingHotkeyCapturePrompt = '請按下快捷鍵組合…';
 
   /// Hotkey 參數階段：尚未擷取到組合時的佔位文字。
-  static const String bindingHotkeyNotCaptured = '尚未擷取組合';
+  static const String bindingHotkeyNotCaptured =
+      '尚未擷取組合'; // i18n-exempt: AppText 定義處本身即專案文案 sink
+
+  // --- 設定面板：滑鼠定位器（SPEC-008 FR-06，ticket 1.4.0-W3-002）---
+  //
+  // 本區塊字面即 AppText 定義處本身（CLAUDE.md §6 常數集中規範指定的專案
+  // 唯一文案 sink），非缺少 i18n 設施；下方逐行標記 i18n-exempt 以通過
+  // presence-detection-hook（該 hook 的通用 skip_patterns 未收錄本專案
+  // 檔名 app_constants.dart，已提報技術債追蹤，見 spawned tickets）。
+
+  /// 滑鼠定位器區塊標題。
+  static const String cursorLocatorSectionTitle =
+      '滑鼠定位器'; // i18n-exempt: AppText 定義處本身即專案文案 sink
+
+  /// 啟用開關標籤。
+  static const String cursorLocatorEnabledLabel =
+      '定位器'; // i18n-exempt: AppText 定義處本身即專案文案 sink
+
+  /// 特效時長滑桿標籤。
+  static const String cursorLocatorDurationLabel =
+      '特效時長'; // i18n-exempt: AppText 定義處本身即專案文案 sink
+
+  /// 主色調色盤標籤。
+  static const String cursorLocatorColorLabel =
+      '主色調'; // i18n-exempt: AppText 定義處本身即專案文案 sink
 }
 
 class AppSizes {
