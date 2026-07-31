@@ -2,11 +2,14 @@
 // FR-01，UC-06 主成功場景步驟 1 / 替代場景 06c / 例外場景 EX-06-01）。
 //
 // 驗證熱鍵註冊 / 解除生命週期綁定 SettingsModel.cursorLocatorEnabled 的
-// 翻轉（D2 去重）、觸發時讀取當下最新設定值換算播放參數（D3）、熱鍵定義
-// 引用 AppCursorLocator 常數無硬編碼（D5）、註冊失敗不外洩例外（EX-06-01）。
+// 翻轉、觸發時讀取當下最新設定值換算播放參數、熱鍵定義引用
+// AppCursorLocator 常數無硬編碼、註冊 / 解除失敗皆不外洩例外且維持可重試
+// 的內部狀態。
 //
 // 依 test-assertion-design-rules D 規則：全程以 HotKeyRegistrar 替身記錄
-// 呼叫序列斷言，不使用 Stopwatch 計時門檻。
+// 呼叫序列斷言，不使用 Stopwatch 計時門檻；`pumpEventQueue()` 排空整個
+// 事件佇列（非固定推進一個 microtask turn），對替身未來加入 await 延遲
+// 仍具穩健性。
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -23,6 +26,7 @@ class _FakeHotKeyRegistrar implements HotKeyRegistrar {
   HotKey? lastRegisteredHotKey;
   HotKeyHandler? lastKeyDownHandler;
   bool throwOnRegister = false;
+  bool throwOnUnregister = false;
 
   @override
   Future<void> register(
@@ -40,6 +44,9 @@ class _FakeHotKeyRegistrar implements HotKeyRegistrar {
   @override
   Future<void> unregister(HotKey hotKey) async {
     calls.add('unregister');
+    if (throwOnUnregister) {
+      throw PlatformException(code: 'ERROR', message: 'boom');
+    }
   }
 }
 
@@ -52,9 +59,19 @@ void main() {
   late _FakeHotKeyRegistrar registrar;
   // ValueNotifier<SettingsModel>（非 SettingsController）：本測試只需
   // ValueListenable 介面（.value/.addListener/.removeListener），與受測
-  // CursorLocatorHotkeyController 的窄化依賴一致（Phase 4 coupling 審查），
-  // 不需要 SettingsController 額外的持久化 / 開機啟動服務依賴。
+  // CursorLocatorHotkeyController 的窄化依賴一致，不需要 SettingsController
+  // 額外的持久化 / 開機啟動服務依賴。
   late ValueNotifier<SettingsModel> settings;
+
+  // 9 個測試共用的建構樣板；讀取當下的 settings/locator/registrar 閉包變數，
+  // 故「停用狀態下 start() 不註冊熱鍵」等先替換 settings 的測試不受影響。
+  CursorLocatorHotkeyController buildController() {
+    return CursorLocatorHotkeyController(
+      settings: settings,
+      locator: locator,
+      registrar: registrar,
+    );
+  }
 
   setUp(() {
     channel = const MethodChannel(AppCursorLocator.channelName);
@@ -74,13 +91,8 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('啟用狀態下 start() 註冊熱鍵，鍵值引用 AppCursorLocator 常數（D5）', () async {
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+  test('啟用狀態下 start() 註冊熱鍵，鍵值引用 AppCursorLocator 常數', () async {
+    final CursorLocatorHotkeyController controller = buildController();
 
     await controller.start();
 
@@ -97,12 +109,7 @@ void main() {
     settings = ValueNotifier<SettingsModel>(
       SettingsModel.defaults().copyWith(cursorLocatorEnabled: false),
     );
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+    final CursorLocatorHotkeyController controller = buildController();
 
     await controller.start();
 
@@ -111,16 +118,11 @@ void main() {
   });
 
   test('熱鍵觸發呼叫 CursorLocator.play，帶入當下設定值換算後參數（AC1）', () async {
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+    final CursorLocatorHotkeyController controller = buildController();
     await controller.start();
 
     registrar.lastKeyDownHandler!(registrar.lastRegisteredHotKey!);
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
 
     expect(playCalls, hasLength(1));
     expect(playCalls.single.method, AppCursorLocator.playMethod);
@@ -130,13 +132,8 @@ void main() {
     });
   });
 
-  test('觸發時讀取當下最新設定值，非註冊當下快照（D3）', () async {
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+  test('觸發時讀取當下最新設定值，非註冊當下快照', () async {
+    final CursorLocatorHotkeyController controller = buildController();
     await controller.start();
 
     settings.value = settings.value.copyWith(
@@ -144,7 +141,7 @@ void main() {
       cursorLocatorPrimaryColor: const Color(0xFFFF0000),
     );
     registrar.lastKeyDownHandler!(registrar.lastRegisteredHotKey!);
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
 
     expect(playCalls, hasLength(1));
     expect(playCalls.single.arguments, <String, Object?>{
@@ -153,29 +150,19 @@ void main() {
     });
   });
 
-  test('設定停用時解除熱鍵註冊，非僅忽略觸發（AC2 / D2）', () async {
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+  test('設定停用時解除熱鍵註冊，非僅忽略觸發（AC2）', () async {
+    final CursorLocatorHotkeyController controller = buildController();
     await controller.start();
 
     settings.value = settings.value.copyWith(cursorLocatorEnabled: false);
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
 
     expect(registrar.calls, <String>['register', 'unregister']);
     expect(controller.isRegistered, isFalse);
   });
 
-  test('非啟用開關的設定變更不觸發重複註冊（D2 去重）', () async {
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+  test('非啟用開關的設定變更不觸發重複註冊', () async {
+    final CursorLocatorHotkeyController controller = buildController();
     await controller.start();
 
     settings.value = settings.value.copyWith(
@@ -184,7 +171,7 @@ void main() {
     settings.value = settings.value.copyWith(
       cursorLocatorPrimaryColor: const Color(0xFF000000),
     );
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
 
     expect(registrar.calls, <String>['register']);
   });
@@ -192,18 +179,13 @@ void main() {
   test(
     'enabled → disabled → enabled 依序 register/unregister/register',
     () async {
-      final CursorLocatorHotkeyController controller =
-          CursorLocatorHotkeyController(
-            settings: settings,
-            locator: locator,
-            registrar: registrar,
-          );
+      final CursorLocatorHotkeyController controller = buildController();
       await controller.start();
 
       settings.value = settings.value.copyWith(cursorLocatorEnabled: false);
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
       settings.value = settings.value.copyWith(cursorLocatorEnabled: true);
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
 
       expect(registrar.calls, <String>['register', 'unregister', 'register']);
       expect(controller.isRegistered, isTrue);
@@ -212,25 +194,43 @@ void main() {
 
   test('熱鍵註冊失敗時定位器維持停用，不拋例外（AC3 / EX-06-01）', () async {
     registrar.throwOnRegister = true;
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+    final CursorLocatorHotkeyController controller = buildController();
 
     await expectLater(controller.start(), completes);
 
     expect(controller.isRegistered, isFalse);
   });
 
+  test('熱鍵解除失敗時維持已註冊狀態，可於下次翻轉重試', () async {
+    final CursorLocatorHotkeyController controller = buildController();
+    await controller.start();
+
+    registrar.throwOnUnregister = true;
+    settings.value = settings.value.copyWith(cursorLocatorEnabled: false);
+    await pumpEventQueue();
+
+    // 解除失敗：內部狀態維持「已註冊」，不因清空 handle 而失去重試機會。
+    expect(registrar.calls, <String>['register', 'unregister']);
+    expect(controller.isRegistered, isTrue);
+
+    // 使用者再次翻轉（enabled 目前仍是 false，先切回 true 才能製造一次真正
+    // 的翻轉；ValueNotifier 對相等的值不會通知監聽者）。翻回 true 時內部
+    // 狀態仍記得「已註冊」，判斷已是目標狀態故不重複 register——這正是
+    // retry 機制的體現：不會補一個多餘的 register 呼叫。
+    registrar.throwOnUnregister = false;
+    settings.value = settings.value.copyWith(cursorLocatorEnabled: true);
+    await pumpEventQueue();
+    expect(registrar.calls, <String>['register', 'unregister']);
+
+    settings.value = settings.value.copyWith(cursorLocatorEnabled: false);
+    await pumpEventQueue();
+
+    expect(registrar.calls, <String>['register', 'unregister', 'unregister']);
+    expect(controller.isRegistered, isFalse);
+  });
+
   test('stop() 解除已註冊熱鍵並停止監聽後續啟用開關變化', () async {
-    final CursorLocatorHotkeyController controller =
-        CursorLocatorHotkeyController(
-          settings: settings,
-          locator: locator,
-          registrar: registrar,
-        );
+    final CursorLocatorHotkeyController controller = buildController();
     await controller.start();
 
     await controller.stop();
@@ -238,7 +238,7 @@ void main() {
     expect(controller.isRegistered, isFalse);
 
     settings.value = settings.value.copyWith(cursorLocatorEnabled: true);
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
 
     // stop() 後已移除監聽，enabled 再次翻轉不應觸發新的 register。
     expect(registrar.calls, <String>['register', 'unregister']);

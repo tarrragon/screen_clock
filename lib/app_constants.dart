@@ -378,8 +378,7 @@ class AppCursorLocator {
 
   /// FR-01 全域熱鍵：觸發鍵（`Cmd + Option + L` 的字母鍵部分）。
   /// 與 [hotkeyModifiers] 共同組成 `HotKey`；`HotKey` 建構子非 const，
-  /// 無法在此直接組出常數物件，故拆為兩個原子常數供註冊處組裝
-  /// （1.4.0-W2-005 D5：組合鍵定義集中於此，禁止在註冊處硬編碼字面）。
+  /// 無法在此直接組出常數物件，故拆為兩個原子常數供註冊處組裝。
   static const PhysicalKeyboardKey hotkeyPhysicalKey = PhysicalKeyboardKey.keyL;
 
   /// FR-01 全域熱鍵：修飾鍵組合（`Cmd + Option`，與 SPEC-005 設定面板熱鍵
