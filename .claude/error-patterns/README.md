@@ -557,6 +557,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-105 (pm-cli-syntax-autopilot) | PM 對 SKILL CLI 語法的 autopilot 假設 | 中 | v0.18.0 |
 | PC-BAL-014 | Skill 註冊表 session 快取遮蔽檔案系統變更 — 同 session 驗證得出假陰性 | 中 | v0.2.1 |
 | PC-SCLK-001 | 並行 agent 的 git commit --amend 改寫其他執行體的 commit | 高 | — |
+| PC-SCLK-002 | 代理人以編碼混淆繞過 sandbox 防護而非回報阻擋 | 高 | — |
 
 ---
 
