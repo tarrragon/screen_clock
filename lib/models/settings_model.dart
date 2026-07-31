@@ -23,12 +23,10 @@ class SettingsModel {
     this.lifeTimerMode = false,
     this.bindings = const <MouseBinding>[],
     this.bindingsSeeded = false,
-    this.cursorLocatorEnabled = true,
-    this.cursorLocatorEffectDurationSeconds = 1.5,
-    // 系統藍（Material primary blue 的 ARGB 值，避免 MaterialColor 型別
-    // 導致 round-trip 後 == 因 runtimeType 不同而失效）。常數登錄延後由
-    // 1.4.0-W1-001.1（本票依約束不得觸碰 app_constants.dart）補上。
-    this.cursorLocatorPrimaryColor = const Color(0xFF2196F3), // color-exempt
+    this.cursorLocatorEnabled = AppCursorLocator.defaultEnabled,
+    this.cursorLocatorEffectDurationSeconds =
+        AppCursorLocator.defaultDurationSeconds,
+    this.cursorLocatorPrimaryColor = AppCursorLocator.defaultTint,
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
@@ -53,9 +51,10 @@ class SettingsModel {
         ),
       ],
       bindingsSeeded: true,
-      cursorLocatorEnabled: true,
-      cursorLocatorEffectDurationSeconds: 1.5,
-      cursorLocatorPrimaryColor: Color(0xFF2196F3), // color-exempt: 見建構子註解
+      cursorLocatorEnabled: AppCursorLocator.defaultEnabled,
+      cursorLocatorEffectDurationSeconds:
+          AppCursorLocator.defaultDurationSeconds,
+      cursorLocatorPrimaryColor: AppCursorLocator.defaultTint,
     );
   }
 
