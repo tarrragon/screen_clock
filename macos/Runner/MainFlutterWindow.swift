@@ -711,9 +711,10 @@ final class InputBindingBridge {
 
 /// 滑鼠定位器 method channel 橋接骨架（ticket 1.4.0-W1-001.3，SPEC-008 FR-01）。
 ///
-/// 僅註冊 channel 並處理 play 方法，收到時以 NSLog 記錄呼叫參數；不建立
-/// 特效視窗、不繪製任何內容。特效視窗管理留 1.4.0-W2-006、視覺特效繪製留
-/// 1.4.0-W3-001——提早實作會讓下游票失去介面調整空間。
+/// 僅註冊 channel 並處理 play 方法；不建立特效視窗、不繪製任何內容。特效
+/// 視窗管理留 1.4.0-W2-006、視覺特效繪製留 1.4.0-W3-001（骨架階段脈絡供
+/// 開發參考，不放進 runtime log——log 是長壽字串，階段完成後仍會誤導讀
+/// log 的人，見 1.4.0-W2-016）。
 ///
 /// channel 名 / 方法名 / 參數鍵字面須與 lib/app_constants.dart 的
 /// AppCursorLocator 常數逐項一致（Swift 無法 import Dart 常數，故以下列
@@ -723,6 +724,27 @@ private enum CursorLocatorChannel {
   static let playMethod = "play"
   static let durationMsArgKey = "durationMs"
   static let tintArgbArgKey = "tintArgb"
+}
+
+/// 單一參數鍵的提取結果：成功 / 未帶參數 / 帶了但型別不符。
+///
+/// 與單純 `as? T` 相比，此區分讓失敗路徑能各自記錄具體原因（ticket
+/// 1.4.0-W2-016：原本轉換失敗一律靜默變 nil，log 印出的 nil 無法分辨是
+/// 「Dart 端沒帶這個參數」還是「帶了但型別不符」）。
+private enum CursorLocatorArgument<T> {
+  case success(T)
+  case missing
+  case typeMismatch(received: Any)
+}
+
+/// 從 `[String: Any]` 參數字典提取指定鍵並轉型，回報提取結果。
+private func extractCursorLocatorArgument<T>(
+  _ arguments: [String: Any]?,
+  key: String
+) -> CursorLocatorArgument<T> {
+  guard let raw = arguments?[key] else { return .missing }
+  guard let value = raw as? T else { return .typeMismatch(received: raw) }
+  return .success(value)
 }
 
 final class CursorLocatorBridge {
@@ -742,18 +764,73 @@ final class CursorLocatorBridge {
   private func handle(call: FlutterMethodCall, result: FlutterResult) {
     switch call.method {
     case CursorLocatorChannel.playMethod:
-      let arguments = call.arguments as? [String: Any]
-      let durationMs = arguments?[CursorLocatorChannel.durationMsArgKey] as? Int
-      let tintArgb = arguments?[CursorLocatorChannel.tintArgbArgKey] as? Int
-      NSLog(
-        "[cursor-locator] play 收到: durationMs=\(String(describing: durationMs)) "
-          + "tintArgb=\(String(describing: tintArgb))（骨架階段僅記錄，不播放特效）"
-      )
-      result(nil)
+      handlePlay(call: call, result: result)
 
     default:
       NSLog("[cursor-locator] 未知方法: \(call.method)")
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  /// 解析 play 參數。兩個鍵皆成功轉型才視為合法呼叫；任一失敗則個別記錄
+  /// 失敗原因（未帶參數 / 型別不符，各自帶上原始 arguments 內容），並以
+  /// FlutterError 回覆——Dart 端既有的 catch-log 包裝
+  /// （1.4.0-W2-007 invokeMethodSafely 已捕捉 PlatformException 並記錄）
+  /// 會因此自動感知並留下訊號，取代原本「result(nil) 靜默視為成功」的行為。
+  private func handlePlay(call: FlutterMethodCall, result: FlutterResult) {
+    let arguments = call.arguments as? [String: Any]
+    let durationResult: CursorLocatorArgument<Int> = extractCursorLocatorArgument(
+      arguments, key: CursorLocatorChannel.durationMsArgKey
+    )
+    let tintResult: CursorLocatorArgument<Int> = extractCursorLocatorArgument(
+      arguments, key: CursorLocatorChannel.tintArgbArgKey
+    )
+
+    guard case .success(let durationMs) = durationResult,
+      case .success(let tintArgb) = tintResult
+    else {
+      logArgumentFailure(
+        key: CursorLocatorChannel.durationMsArgKey,
+        outcome: durationResult,
+        rawArguments: call.arguments
+      )
+      logArgumentFailure(
+        key: CursorLocatorChannel.tintArgbArgKey,
+        outcome: tintResult,
+        rawArguments: call.arguments
+      )
+      result(
+        FlutterError(
+          code: "invalid_arguments",
+          message: "cursor_locator play 參數缺失或型別不符",
+          details: String(describing: call.arguments)
+        )
+      )
+      return
+    }
+
+    NSLog("[cursor-locator] play 收到: durationMs=\(durationMs) tintArgb=\(tintArgb)")
+    result(nil)
+  }
+
+  /// 記錄單一參數鍵的提取失敗原因；成功結果不記（呼叫端已在成功路徑統一記錄）。
+  private func logArgumentFailure<T>(
+    key: String,
+    outcome: CursorLocatorArgument<T>,
+    rawArguments: Any?
+  ) {
+    switch outcome {
+    case .success:
+      return
+    case .missing:
+      NSLog(
+        "[cursor-locator] play 參數缺失: key=\(key), arguments=\(String(describing: rawArguments))"
+      )
+    case .typeMismatch(let received):
+      NSLog(
+        "[cursor-locator] play 參數型別不符: key=\(key), 收到型別=\(type(of: received)), "
+          + "arguments=\(String(describing: rawArguments))"
+      )
     }
   }
 }
