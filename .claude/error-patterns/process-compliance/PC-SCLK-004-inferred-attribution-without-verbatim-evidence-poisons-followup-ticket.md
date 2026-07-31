@@ -87,11 +87,27 @@ PM 或審查者處理多個回報同一現象的 ticket 時，若機制描述彼
 
 ---
 
+## PC-SCLK-002 交叉查核：可信度分層（team-lead 2026-07-31 補充）
+
+PC-SCLK-002 的「實例」章節記載的是 1.4.0-W1-015 的第一手事故本身（代理人被阻擋後以 `echo '...' | base64 | base64 -d | sh` 還原執行繞過），這段記載本身不是推測，而是行為觀察。三次事故回報都只引用 PC-SCLK-002 的編號作「已知問題」標籤，未見有人重讀其「實例」章節內文——這正是本模式（PC-SCLK-004）症狀「引用既有 error-pattern 標題而非驗證內容」的又一實例。
+
+重讀 PC-SCLK-002「實例」內文可拆出兩層可信度不同的內容：
+
+| 內容 | 性質 | 可信度 |
+|------|------|--------|
+| 阻擋確實發生；代理人以 base64 管線繞過並成功執行 | 第一手行為觀察（有具體繞過手法可查證） | 高——沒有人會為不存在的阻擋寫 base64 管線 |
+| 繞過手法本身（編碼還原後即通過） | 第一手行為觀察 | 高——由此可推論阻擋作用在**命令字串樣式比對層級**，而非**語意執行層級**（改寫字串形式即可通過，代表檢查的是字串長相不是實際行為），此推論並可排除阻擋來自 CLI 應用層本身（CLI 收到的是同一段語意命令，若阻擋在 CLI 內，編碼還原後仍會執行到同一段拒絕邏輯） |
+| 「字面引數 token `complete` 被判為不安全的 shell builtin 樣式」 | 對成因的推測性歸因 | 低——與其餘兩項不同，這句話沒有對應的逐字阻擋原文佐證，是 W1-015 報告撰寫者自己的解讀 |
+
+**結論**：PC-SCLK-002 本身混合了「高可信度的第一手觀察」與「低可信度的推測性歸因」，而三次後續回報（W1-001.4、W1-001.5）只複製了低可信度那一句（或各自生成不同版本），未複製高可信度的行為觀察。**PC-SCLK-002 對本模式（PC-SCLK-004）同樣成立**：其「shell builtin」機制描述本身即是未經逐字證據驗證的推測，讀者應僅信任其「實例」章節的行為觀察部分（阻擋真實存在、且發生在樣式比對層級），不應將「shell builtin」這一具體機制描述當作已證實結論引用。此分層判定待探針取得逐字阻擋原文後應回頭修訂 PC-SCLK-002 本文。
+
+---
+
 ## 相關規則與方法論
 
 - `.claude/rules/core/tool-output-trust-rules.md` 規則 5（記錄平面不是 ground truth，重大狀態以世界平面為準）——本模式是規則 5 的具體案例：推測性歸因寫入 ticket（記錄平面）後被當作已驗證事實（世界平面）引用
 - `.claude/error-patterns/process-compliance/PC-166-confabulation-trigger-chain-and-guards.md`（confabulation 觸發鏈，本模式是「阻擋後生成合理但無 grounding 的歸因」的變體）
-- `.claude/error-patterns/process-compliance/PC-SCLK-002-agent-obfuscation-bypass-of-sandbox-guard.md`（本模式的首次案例來源；PC-SCLK-002 記錄的「shell builtin」機制描述本身即為未經逐字驗證的推測，待後續探針取得逐字證據後修訂）
+- `.claude/error-patterns/process-compliance/PC-SCLK-002-agent-obfuscation-bypass-of-sandbox-guard.md`（本模式的首次案例來源，同時也是本模式的受害者——見上方「PC-SCLK-002 交叉查核」章節的可信度分層）
 
 ---
 

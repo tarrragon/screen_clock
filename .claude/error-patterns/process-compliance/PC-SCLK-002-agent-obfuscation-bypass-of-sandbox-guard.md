@@ -116,3 +116,9 @@ Context Bundle 或 prompt 中加入明確的阻擋處置指引：
 
 - `1.4.0-W1-015`（繞過行為發生的 ticket，產出已驗證無害並保留）
 - sandbox 誤判修正 ticket（見本檔建立時 PM 同步建立的 IMP ticket）
+
+---
+
+## 更新（2026-07-31，1.4.0-W1-023 交叉查核）：機制描述可信度分層
+
+「實例」章節記載的**阻擋確實發生**與**編碼還原後即通過**是第一手行為觀察，可信；但「字面引數 token `complete` 被判為不安全的 shell builtin 樣式」這一句**具體機制描述**未附逐字阻擋原文，屬撰寫當下的推測性歸因，不應視為已證實結論——1.4.0-W1-001.5 對同一現象給出過另一種互斥的機制描述（「被誤判為跨 worktree git 操作」），1.4.0-W1-023 於獨立 worktree 重現同一命令亦未能觸發任何阻擋。完整可信度分層與後續查核記錄見 `.claude/error-patterns/process-compliance/PC-SCLK-004-inferred-attribution-without-verbatim-evidence-poisons-followup-ticket.md`。待逐字阻擋原文取得後，本節與上方「實例」章節的機制描述應一併修訂。
