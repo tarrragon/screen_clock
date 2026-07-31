@@ -272,11 +272,13 @@ depends_on_domains:
 
 ```dart
 // lib/platform/cursor_locator.dart
-abstract class CursorLocator {
+class CursorLocator {
   /// 在游標所在螢幕播放定位特效。
   Future<void> play({required Duration duration, required Color tint});
 }
 ```
+
+`CursorLocator` 宣告為 concrete class 而非 abstract class：建構子已可注入 `MethodChannel`（見 `cursor_locator_test.dart`），可測試性不依賴額外抽象層；本類別在專案內永遠只有一個實作，開抽象層不增加彈性，僅增加間接層（1.4.0-W1-001.5 J 項，改 SPEC 對齊 code）。
 
 Method channel `screen_clock/cursor_locator` 的 Dart 至原生方向方法：
 

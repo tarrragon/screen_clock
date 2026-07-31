@@ -1,8 +1,9 @@
-// CursorLocator 單元測試（ticket 1.4.0-W1-001.3）。
+// CursorLocator 單元測試（ticket 1.4.0-W1-001.3；簽章與例外路徑於
+// 1.4.0-W1-001.5 調整）。
 //
 // 驗證 Dart → 原生的 play 呼叫橋接：method channel 名 / 方法名 / 參數鍵
-// 引用 AppCursorLocator 常數、參數換算（秒→毫秒、Color→ARGB）、
-// PlatformException / MissingPluginException 不外洩。
+// 引用 AppCursorLocator 常數、參數換算（Duration→毫秒、Color→ARGB）、
+// PlatformException / MissingPluginException / 轉換期例外不外洩。
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,7 +36,7 @@ void main() {
 
   test('play 呼叫使用 AppCursorLocator.playMethod 並帶入換算後參數', () async {
     await locator.play(
-      durationSeconds: 1.5,
+      duration: const Duration(milliseconds: 1500),
       tint: const Color(0xFF2196F3),
     );
 
@@ -50,18 +51,6 @@ void main() {
     );
   });
 
-  test('秒轉毫秒四捨五入', () async {
-    await locator.play(
-      durationSeconds: 0.5006,
-      tint: const Color(0xFF000000),
-    );
-
-    expect(
-      calls.single.arguments[AppCursorLocator.durationMsArgKey],
-      501,
-    );
-  });
-
   test('PlatformException 不外洩', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
@@ -69,7 +58,10 @@ void main() {
     });
 
     await expectLater(
-      locator.play(durationSeconds: 1.0, tint: const Color(0xFFFFFFFF)),
+      locator.play(
+        duration: const Duration(seconds: 1),
+        tint: const Color(0xFFFFFFFF),
+      ),
       completes,
     );
   });
@@ -80,8 +72,32 @@ void main() {
         .setMockMethodCallHandler(channel, null);
 
     await expectLater(
-      locator.play(durationSeconds: 1.0, tint: const Color(0xFFFFFFFF)),
+      locator.play(
+        duration: const Duration(seconds: 1),
+        tint: const Color(0xFFFFFFFF),
+      ),
       completes,
     );
+  });
+
+  test('色彩轉換期例外（NaN 分量）不外洩，走 catch-log 路徑', () async {
+    // 損毀或竄改的偏好設定檔可能解析出 NaN 分量的 Color；_floatToInt8 對 NaN
+    // 呼叫 round() 會拋 UnsupportedError，驗證此例外落在既有 catch-log 路徑
+    // 而非未捕捉例外（1.4.0-W1-001.5 B 項）。
+    const Color corruptTint = Color.from(
+      alpha: double.nan,
+      red: 0,
+      green: 0,
+      blue: 0,
+    );
+
+    await expectLater(
+      locator.play(
+        duration: const Duration(seconds: 1),
+        tint: corruptTint,
+      ),
+      completes,
+    );
+    expect(calls, isEmpty);
   });
 }
