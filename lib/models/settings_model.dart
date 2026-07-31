@@ -1,9 +1,14 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_constants.dart';
 import '../input/mouse_action.dart';
 import '../input/mouse_binding.dart';
+
+/// 日誌標籤（觀測性規則 5：解析路徑須自帶日誌，見 quality-baseline）。
+const String _tag = 'settings-model';
 
 /// 使用者設定資料模型（SPEC-004 FR-01）。
 ///
@@ -79,9 +84,10 @@ class SettingsModel {
           _asBool(json[AppSettingsKeys.bindingsSeededKey]) ?? false,
       cursorLocatorEnabled:
           _asBool(json['cursorLocatorEnabled']) ?? d.cursorLocatorEnabled,
-      cursorLocatorEffectDurationSeconds:
-          _asDouble(json['cursorLocatorEffectDurationSeconds']) ??
-              d.cursorLocatorEffectDurationSeconds,
+      cursorLocatorEffectDurationSeconds: _asClampedDuration(
+        json['cursorLocatorEffectDurationSeconds'],
+        d.cursorLocatorEffectDurationSeconds,
+      ),
       cursorLocatorPrimaryColor:
           _asColor(json['cursorLocatorPrimaryColor']) ??
               d.cursorLocatorPrimaryColor,
@@ -250,6 +256,31 @@ double? _asDouble(Object? value) {
   if (value is int) return value.toDouble();
   if (value is String) return double.tryParse(value);
   return null;
+}
+
+/// 解析並夾制游標定位器特效時長於值域內（SPEC-008 FR-06）。
+///
+/// 型別不符或非有限值（NaN / Infinity）落回 [fallback] 並記錄日誌；
+/// 有限但越界的值夾制至 [AppCursorLocator.minDurationSeconds] ～
+/// [AppCursorLocator.maxDurationSeconds]（1.4.0-W2-010）。
+double _asClampedDuration(Object? value, double fallback) {
+  final double? parsed = _asDouble(value);
+  if (parsed == null) return fallback;
+  if (!parsed.isFinite) {
+    developer.log(
+      // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+      'cursorLocatorEffectDurationSeconds 非有限值，落回預設: $parsed',
+      name: _tag,
+      level: 900,
+    );
+    return fallback;
+  }
+  return parsed
+      .clamp(
+        AppCursorLocator.minDurationSeconds,
+        AppCursorLocator.maxDurationSeconds,
+      )
+      .toDouble();
 }
 
 int? _asInt(Object? value) {

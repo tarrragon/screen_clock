@@ -527,4 +527,95 @@ void main() {
       expect(a.hashCode == b.hashCode, isFalse);
     });
   });
+
+  group(
+      'SettingsModel cursorLocatorEffectDurationSeconds 值域夾制 '
+      '(1.4.0-W2-010, SPEC-008 FR-06)', () {
+    test('低於下限的值夾制為 minDurationSeconds', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{'cursorLocatorEffectDurationSeconds': 0.1},
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.minDurationSeconds,
+      );
+    });
+
+    test('高於上限的值夾制為 maxDurationSeconds', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{'cursorLocatorEffectDurationSeconds': 5.0},
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.maxDurationSeconds,
+      );
+    });
+
+    test('恰為下限值不受影響（邊界含在合法範圍內）', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{
+          'cursorLocatorEffectDurationSeconds':
+              AppCursorLocator.minDurationSeconds,
+        },
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.minDurationSeconds,
+      );
+    });
+
+    test('恰為上限值不受影響（邊界含在合法範圍內）', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{
+          'cursorLocatorEffectDurationSeconds':
+              AppCursorLocator.maxDurationSeconds,
+        },
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.maxDurationSeconds,
+      );
+    });
+
+    test('範圍內的值不受影響（既有 round-trip 行為維持）', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{'cursorLocatorEffectDurationSeconds': 2.5},
+      );
+      expect(decoded.cursorLocatorEffectDurationSeconds, 2.5);
+    });
+
+    test('NaN 落回預設值，不進入模型', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{'cursorLocatorEffectDurationSeconds': double.nan},
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.defaultDurationSeconds,
+      );
+    });
+
+    test('正無限大落回預設值，不進入模型', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{
+          'cursorLocatorEffectDurationSeconds': double.infinity,
+        },
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.defaultDurationSeconds,
+      );
+    });
+
+    test('負無限大落回預設值，不進入模型', () {
+      final SettingsModel decoded = SettingsModel.fromJson(
+        <String, Object?>{
+          'cursorLocatorEffectDurationSeconds': double.negativeInfinity,
+        },
+      );
+      expect(
+        decoded.cursorLocatorEffectDurationSeconds,
+        AppCursorLocator.defaultDurationSeconds,
+      );
+    });
+  });
 }
