@@ -113,8 +113,8 @@ void main() {
   });
 
   group('SettingsModel bindings (schema v3, SPEC-007 FR-02)', () {
-    test('schemaVersion is 3', () {
-      expect(SettingsModel.schemaVersion, 3);
+    test('schemaVersion is 4', () {
+      expect(SettingsModel.schemaVersion, 4);
     });
 
     test('defaults to a single side-button drag-scroll binding', () {
@@ -320,17 +320,14 @@ void main() {
       'bindingsSeeded': true,
     };
 
-    // v4 骨架（SPEC-008 FR-06 / SPEC-009 A.1「規劃中」列）：三個新欄位的
-    // JSON 鍵名尚未定案（1.4.0-W1-001 實作前不預先斷言），故僅以未知鍵佔位、
-    // 標註 schemaVersion=4，驗證「現行 model 遇到未知鍵與更高 schemaVersion
-    // 時仍能正確解析既有欄位」（NFR-04 的前置條件）。待 1.4.0-W1-001 落地後
-    // 補上三個新欄位的實際鍵名與逐欄位斷言，接線進本測試矩陣。
+    // v4（1.4.0-W1-001.2 落地，SPEC-008 FR-06 / SPEC-009 A.1）：v3-late +
+    // 游標定位器三項設定，schemaVersion=4。鍵名與 SettingsModel 實作一致。
     final Map<String, Object> v4Fixture = <String, Object>{
       ...v3LateFixture,
       'schemaVersion': 4,
-      'cursorLocatorEnabled': false, // 佔位鍵名，非最終鍵名
-      'cursorLocatorEffectDurationSeconds': 2.0, // 佔位鍵名，非最終鍵名
-      'cursorLocatorPrimaryColor': 0xFF00FF00, // 佔位鍵名，非最終鍵名
+      'cursorLocatorEnabled': false,
+      'cursorLocatorEffectDurationSeconds': 2.0,
+      'cursorLocatorPrimaryColor': 0xFF00FF00,
     };
 
     test('v1 fixture: 7 欄逐一還原，其餘欄位落回 defaults', () {
@@ -447,13 +444,8 @@ void main() {
     });
 
     test(
-        'v4 骨架 fixture: 未知鍵與 schemaVersion=4 不影響既有欄位解析（NFR-04 前置）',
+        'v4 fixture: 逐一還原游標定位器三欄，既有欄位不受影響（INV-03）',
         () {
-      // 三個新欄位（啟用開關 / 特效時長 / 主色調，SPEC-008 FR-06）的實際鍵名
-      // 尚未定案，本測試不斷言這三個欄位，僅驗證既有 11 個欄位在
-      // schemaVersion 提升與新增未知鍵的情況下仍正確解析（INV-03 純加欄
-      // 相容性的前置驗證）。1.4.0-W1-001 落地後，於此新增三個欄位的
-      // 逐欄位斷言並接線進矩陣。
       final SettingsModel decoded = SettingsModel.fromJson(v4Fixture);
       expect(decoded.fontSize, 96.0);
       expect(decoded.fillColor, const Color(0xFFAABBCC));
@@ -469,6 +461,70 @@ void main() {
       );
       expect(decoded.bindings, hasLength(2));
       expect(decoded.bindingsSeeded, isTrue);
+      expect(decoded.cursorLocatorEnabled, isFalse);
+      expect(decoded.cursorLocatorEffectDurationSeconds, 2.0);
+      expect(decoded.cursorLocatorPrimaryColor, const Color(0xFF00FF00));
+    });
+
+    test('fromJson v3-early (缺游標定位器三欄) 補預設值不拋例外', () {
+      final SettingsModel decoded = SettingsModel.fromJson(v3EarlyFixture);
+      expect(decoded.cursorLocatorEnabled, isTrue);
+      expect(decoded.cursorLocatorEffectDurationSeconds, 1.5);
+      expect(decoded.cursorLocatorPrimaryColor, const Color(0xFF2196F3));
+    });
+
+    test('fromJson v3-late (缺游標定位器三欄) 補預設值不拋例外', () {
+      final SettingsModel decoded = SettingsModel.fromJson(v3LateFixture);
+      expect(decoded.cursorLocatorEnabled, isTrue);
+      expect(decoded.cursorLocatorEffectDurationSeconds, 1.5);
+      expect(decoded.cursorLocatorPrimaryColor, const Color(0xFF2196F3));
+    });
+  });
+
+  group('SettingsModel cursor locator fields (schema v4, SPEC-008 FR-06)', () {
+    test('defaults to enabled / 1.5s / system blue', () {
+      final SettingsModel d = SettingsModel.defaults();
+      expect(d.cursorLocatorEnabled, isTrue);
+      expect(d.cursorLocatorEffectDurationSeconds, 1.5);
+      expect(d.cursorLocatorPrimaryColor, const Color(0xFF2196F3));
+    });
+
+    test('round-trips 三欄位（fromJson(model.toJson()) == model）', () {
+      final SettingsModel original = SettingsModel.defaults().copyWith(
+        cursorLocatorEnabled: false,
+        cursorLocatorEffectDurationSeconds: 2.5,
+        cursorLocatorPrimaryColor: const Color(0xFFFF00FF),
+      );
+      final SettingsModel decoded =
+          SettingsModel.fromJson(original.toJson());
+      expect(decoded, original);
+      expect(decoded.cursorLocatorEnabled, isFalse);
+      expect(decoded.cursorLocatorEffectDurationSeconds, 2.5);
+      expect(decoded.cursorLocatorPrimaryColor, const Color(0xFFFF00FF));
+    });
+
+    test('copyWith 更新三欄位並保留其他欄位', () {
+      final SettingsModel original = SettingsModel.defaults();
+      final SettingsModel updated = original.copyWith(
+        cursorLocatorEnabled: false,
+      );
+      expect(updated.cursorLocatorEnabled, isFalse);
+      expect(
+        updated.cursorLocatorEffectDurationSeconds,
+        original.cursorLocatorEffectDurationSeconds,
+      );
+      expect(
+        updated.cursorLocatorPrimaryColor,
+        original.cursorLocatorPrimaryColor,
+      );
+      expect(updated.fontSize, original.fontSize);
+    });
+
+    test('participates in equality and hashCode', () {
+      final SettingsModel a = SettingsModel.defaults();
+      final SettingsModel b = a.copyWith(cursorLocatorEnabled: false);
+      expect(a == b, isFalse);
+      expect(a.hashCode == b.hashCode, isFalse);
     });
   });
 }

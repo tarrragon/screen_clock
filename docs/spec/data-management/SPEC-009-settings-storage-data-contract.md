@@ -4,8 +4,8 @@ title: "使用者設定持久化資料契約"
 status: draft
 source_proposal: null
 created: "2026-07-29"
-updated: "2026-07-29"
-version: "1.1"
+updated: "2026-07-31"
+version: "1.2"
 owner: sassafras-data-administrator
 
 # Domain 歸屬
@@ -24,7 +24,7 @@ related_specs: [SPEC-004, SPEC-007, SPEC-008]
 
 A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下的 JSON 檔）仍必須成立的邏輯約定；B 區記錄綁定當前 `shared_preferences` 單鍵 JSON 字串實作的細節，儲存後端更換時本區需整段重寫。
 
-**資料來源**：欄位與行為一律以實際程式碼為準（`lib/models/settings_model.dart`、`lib/services/settings_service.dart`、`lib/state/settings_controller.dart`、`lib/app_constants.dart`），歷史版本差異以 git 歷史逐版本比對取得。v4 條目來源為 SPEC-008 FR-06（規格，尚未實作）。
+**資料來源**：欄位與行為一律以實際程式碼為準（`lib/models/settings_model.dart`、`lib/services/settings_service.dart`、`lib/state/settings_controller.dart`、`lib/app_constants.dart`），歷史版本差異以 git 歷史逐版本比對取得。v4 已於 `1.4.0-W1-001.2` 落地為 code。
 
 ## 可攜性邊界原則
 
@@ -41,11 +41,11 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 
 ### A.1 表/欄位語意
 
-單一邏輯實體 `SettingsModel`，一份使用者設定為一筆紀錄（單例）。下表為 schema v3（現行 code）的完整欄位集。
+單一邏輯實體 `SettingsModel`，一份使用者設定為一筆紀錄（單例）。下表為 schema v4（現行 code）的完整欄位集。
 
 | 欄位 | 型別 | 單位/格式 | 值域 | 說明 |
 |------|------|----------|------|------|
-| `schemaVersion` | int | 整數版本號 | >= 1，現行寫入值 3 | 寫出時恆為 code 常數；見 A.3 INV-02 與 A.3 註記（讀取端不使用） |
+| `schemaVersion` | int | 整數版本號 | >= 1，現行寫入值 4 | 寫出時恆為 code 常數；見 A.3 INV-02 與 A.3 註記（讀取端不使用） |
 | `fontSize` | double | 邏輯像素 | > 0，預設 `AppSizes.clockFontSize` | 時鐘字級（SPEC-002 FR-04） |
 | `fillColor` | Color | ARGB32 整數 | 0x00000000–0xFFFFFFFF | 時鐘填色 |
 | `strokeColor` | Color | ARGB32 整數 | 0x00000000–0xFFFFFFFF | 時鐘描邊色 |
@@ -57,6 +57,9 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 | `lifeTimerMode` | bool | — | true / false，預設 false | 生命計時模式開關 |
 | `bindings` | List\<MouseBinding\> | 物件清單 | 同 `buttonNumber` 已去重 | 滑鼠按鍵綁定清單（SPEC-007 FR-02） |
 | `bindingsSeeded` | bool | — | true / false | **欄位級 migration 旗標**（非使用者設定）；一次性預設綁定 seed 遷移旗標；缺鍵視為 false（未遷移）。與 `schemaVersion` 正交，見下方「欄位級 migration 旗標」說明 |
+| `cursorLocatorEnabled` | bool | — | true / false，預設 true | 游標定位器啟用開關（SPEC-008 FR-06） |
+| `cursorLocatorEffectDurationSeconds` | double | 秒 | 0.5–3.0，預設 1.5 | 游標定位器特效時長（SPEC-008 FR-06）；值域僅由 UI 元件與預設值保證，持久層不驗證 |
+| `cursorLocatorPrimaryColor` | Color | ARGB32 整數 | 0x00000000–0xFFFFFFFF，預設 `0xFF2196F3`（系統藍） | 游標定位器主色調（SPEC-008 FR-06） |
 
 **Schema 版本演進**（逐版本以 git 比對 `toJson()` 欄位集取得）：
 
@@ -66,9 +69,9 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 | 2 | `afa3d67` feat: 生命計時模式 | `lifeTimerMode`、`birthDate` | v1 資料缺兩欄 → `lifeTimerMode` 補 false、`birthDate` 補 null |
 | 3 | `d05724a` feat(1.3.0-W2-002) | `bindings` | v2 資料缺 `bindings` → 解析為空清單 |
 | 3（同版擴充） | `10284df` feat(1.3.0-W3-002) | `bindingsSeeded` | 缺鍵 → false，觸發一次性 seed 遷移（見 A.6 / B.3）。**未提升 schemaVersion**，v3 內部存在「有無 `bindingsSeeded`」兩種資料形態 |
-| 4 | 規劃中（1.4.0-W1-001） | 滑鼠定位器三項設定：啟用開關（bool，預設 true）、特效時長（double 秒，預設 1.5，範圍 0.5–3.0）、主色調（Color，預設系統藍） | v3 及更早資料缺欄 → 補上述預設值，不拋例外 |
+| 4 | `1.4.0-W1-001.2` | 游標定位器三項設定：`cursorLocatorEnabled`（bool，預設 true）、`cursorLocatorEffectDurationSeconds`（double 秒，預設 1.5，範圍 0.5–3.0）、`cursorLocatorPrimaryColor`（Color ARGB32 int，預設 `0xFF2196F3` 系統藍） | v3 及更早資料缺欄 → 補上述預設值，不拋例外 |
 
-> v4 列來源為 **SPEC-008 FR-06 規格**，非 code（`lib/models/settings_model.dart` 的 `schemaVersion` 常數於本文件撰寫時仍為 3）。實際 JSON 鍵名與 Dart 欄位名於 1.4.0-W1-001 實作前不預先斷言，本表僅記錄規格已定的語意、型別與預設值。
+> v4 列來源為 **`lib/models/settings_model.dart`（1.4.0-W1-001.2 落地）**。三個欄位的 Dart 欄位名與 JSON 鍵名一致（同 SettingsModel 其餘欄位慣例，未經 `AppSettingsKeys` 間接層）。`cursorLocatorPrimaryColor` 預設值刻意不用 `Colors.blue`（`MaterialColor` 子型別，round-trip 後與 `Color` 比較 `==` 會因 `runtimeType` 不同而失效），改採同色值的 `Color(0xFF2196F3)`。
 
 **欄位級 migration 旗標**（`bindingsSeeded` 及未來同類欄位）：
 
@@ -236,7 +239,7 @@ G-04 的理由：每個旗標為資料形態引入一次二分，N 個旗標即 
 | Schema 演進策略 | 支援演進，採「加欄 + 預設值 fallback」，無版本分支 migration | 無 `onUpgrade` 鉤子；`fromJson()` 不讀 `schemaVersion`。依賴規則：只要維持 INV-03（只加欄、不改型別、不刪欄），此策略成立。何時必須升級為以 `schemaVersion` 分派的顯式 migration 層，見 A.3「升級為版本分支解析（方案 B）的觸發條件」T-01 至 T-04 |
 | 例外：命令式 migration | `_migrateBindingSeed()`（`PreferencesSettingsService`）是目前唯一的命令式遷移；其觸發依據 `bindingsSeeded` 這個欄位級 migration 旗標，治理規則見 A.3 G-01 至 G-04 | 觸發條件為 `bindingsSeeded == false`（含缺鍵），非版本號比較。行為：綁定為空才補入 `defaults().bindings`（避免覆蓋 v3 早期使用者自訂），無論如何標記 seeded 並立即回寫 |
 | Seed 資料政策 | `SettingsModel.defaults()` 內含一筆預設綁定 | 側鍵拖曳滾動（`AppInputBinding.defaultDragScrollButton` + `DragScrollAction`，SPEC-007 FR-03），使功能首次啟動即可用；`defaults()` 的 `bindingsSeeded` 為 true |
-| v4 演進（規劃中） | 沿用加欄 + 預設值 fallback，不需命令式 migration | SPEC-008 FR-06 已聲明「v3 及更早資料缺欄 → 補預設值」；三項新設定皆有明確預設值，符合現行策略 |
+| v4 演進 | 沿用加欄 + 預設值 fallback，不需命令式 migration | `1.4.0-W1-001.2` 落地確認：三項新設定皆有明確預設值，`fromJson()` 缺欄補預設值不拋例外，符合現行策略 |
 
 ---
 
@@ -271,3 +274,4 @@ G-04 的理由：每個旗標為資料形態引入一次二分，N 個旗標即 
 |------|------|---------|
 | 1.0 | 2026-07-29 | 初始版本：記錄 schema v1–v3 既成事實與 v4 規劃條目（1.4.0-W1-007） |
 | 1.1 | 2026-07-29 | 回填 1.4.0-W1-011 評估結論：A.1 `bindingsSeeded` 標註為欄位級 migration 旗標並補正交性說明；A.3 補 `schemaVersion` 單向稽核標記的實測佐證、migration 治理規則 G-01–G-04、版本分支解析升級觸發條件 T-01–T-04；A.5 記錄降級寫回截斷（direction B）為已接受風險（1.4.0-W1-016） |
+| 1.2 | 2026-07-31 | 回填 1.4.0-W1-001.2 落地結果：A.1 主表與版本演進表 v4 列由「規劃中」轉為實作事實，補上三個欄位的實際 Dart/JSON 鍵名（`cursorLocatorEnabled` / `cursorLocatorEffectDurationSeconds` / `cursorLocatorPrimaryColor`）與 `cursorLocatorPrimaryColor` 預設值改用 `Color(0xFF2196F3)`（非 `Colors.blue`）的理由；B.3 v4 演進列更新為已確認 |

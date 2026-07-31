@@ -7,7 +7,7 @@ import '../input/mouse_binding.dart';
 
 /// 使用者設定資料模型（SPEC-004 FR-01）。
 ///
-/// MVP 階段 7 個欄位 + schemaVersion。所有欄位 non-null、不可變；
+/// schema v4（SPEC-009 A.1）；除 [birthDate] 外所有欄位 non-null、不可變；
 /// 變更透過 [copyWith]。
 @immutable
 class SettingsModel {
@@ -23,6 +23,12 @@ class SettingsModel {
     this.lifeTimerMode = false,
     this.bindings = const <MouseBinding>[],
     this.bindingsSeeded = false,
+    this.cursorLocatorEnabled = true,
+    this.cursorLocatorEffectDurationSeconds = 1.5,
+    // 系統藍（Material primary blue 的 ARGB 值，避免 MaterialColor 型別
+    // 導致 round-trip 後 == 因 runtimeType 不同而失效）。常數登錄延後由
+    // 1.4.0-W1-001.1（本票依約束不得觸碰 app_constants.dart）補上。
+    this.cursorLocatorPrimaryColor = const Color(0xFF2196F3), // color-exempt
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
@@ -47,6 +53,9 @@ class SettingsModel {
         ),
       ],
       bindingsSeeded: true,
+      cursorLocatorEnabled: true,
+      cursorLocatorEffectDurationSeconds: 1.5,
+      cursorLocatorPrimaryColor: Color(0xFF2196F3), // color-exempt: 見建構子註解
     );
   }
 
@@ -69,12 +78,20 @@ class SettingsModel {
       bindings: _bindingsFromJson(json[AppSettingsKeys.bindingsKey]),
       bindingsSeeded:
           _asBool(json[AppSettingsKeys.bindingsSeededKey]) ?? false,
+      cursorLocatorEnabled:
+          _asBool(json['cursorLocatorEnabled']) ?? d.cursorLocatorEnabled,
+      cursorLocatorEffectDurationSeconds:
+          _asDouble(json['cursorLocatorEffectDurationSeconds']) ??
+              d.cursorLocatorEffectDurationSeconds,
+      cursorLocatorPrimaryColor:
+          _asColor(json['cursorLocatorPrimaryColor']) ??
+              d.cursorLocatorPrimaryColor,
     );
   }
 
-  /// schemaVersion 3：新增 bindings（滑鼠按鍵綁定清單）。
-  /// 舊版（v2）資料缺 bindings 欄，fromJson 解析為空清單，向後相容。
-  static const int schemaVersion = 3;
+  /// schemaVersion 4：新增游標定位器三項設定（SPEC-008 FR-06）。
+  /// v3 及更早資料缺這三欄，fromJson 解析為對應預設值，向後相容（INV-03）。
+  static const int schemaVersion = 4;
 
   final double fontSize;
   final Color fillColor;
@@ -98,6 +115,15 @@ class SettingsModel {
   /// false 代表舊資料尚未遷移；load 時若為 false 會評估補入預設綁定並標記為 true。
   final bool bindingsSeeded;
 
+  /// 游標定位器啟用開關（SPEC-008 FR-06）。
+  final bool cursorLocatorEnabled;
+
+  /// 游標定位器特效時長，單位秒（SPEC-008 FR-06）；值域 0.5–3.0。
+  final double cursorLocatorEffectDurationSeconds;
+
+  /// 游標定位器主色調（SPEC-008 FR-06）；以 ARGB int 經 [_asColor] 存取。
+  final Color cursorLocatorPrimaryColor;
+
   Map<String, Object> toJson() {
     final Map<String, Object> json = <String, Object>{
       'schemaVersion': schemaVersion,
@@ -119,6 +145,10 @@ class SettingsModel {
       for (final MouseBinding binding in bindings) binding.toJson(),
     ];
     json[AppSettingsKeys.bindingsSeededKey] = bindingsSeeded;
+    json['cursorLocatorEnabled'] = cursorLocatorEnabled;
+    json['cursorLocatorEffectDurationSeconds'] =
+        cursorLocatorEffectDurationSeconds;
+    json['cursorLocatorPrimaryColor'] = _colorToInt(cursorLocatorPrimaryColor);
     return json;
   }
 
@@ -134,6 +164,9 @@ class SettingsModel {
     bool? lifeTimerMode,
     List<MouseBinding>? bindings,
     bool? bindingsSeeded,
+    bool? cursorLocatorEnabled,
+    double? cursorLocatorEffectDurationSeconds,
+    Color? cursorLocatorPrimaryColor,
   }) {
     return SettingsModel(
       fontSize: fontSize ?? this.fontSize,
@@ -149,6 +182,12 @@ class SettingsModel {
           ? dedupeBindingsByButton(bindings)
           : this.bindings,
       bindingsSeeded: bindingsSeeded ?? this.bindingsSeeded,
+      cursorLocatorEnabled: cursorLocatorEnabled ?? this.cursorLocatorEnabled,
+      cursorLocatorEffectDurationSeconds:
+          cursorLocatorEffectDurationSeconds ??
+              this.cursorLocatorEffectDurationSeconds,
+      cursorLocatorPrimaryColor:
+          cursorLocatorPrimaryColor ?? this.cursorLocatorPrimaryColor,
     );
   }
 
@@ -166,7 +205,11 @@ class SettingsModel {
         other.birthDate == birthDate &&
         other.lifeTimerMode == lifeTimerMode &&
         listEquals(other.bindings, bindings) &&
-        other.bindingsSeeded == bindingsSeeded;
+        other.bindingsSeeded == bindingsSeeded &&
+        other.cursorLocatorEnabled == cursorLocatorEnabled &&
+        other.cursorLocatorEffectDurationSeconds ==
+            cursorLocatorEffectDurationSeconds &&
+        other.cursorLocatorPrimaryColor == cursorLocatorPrimaryColor;
   }
 
   @override
@@ -182,6 +225,9 @@ class SettingsModel {
         lifeTimerMode,
         Object.hashAll(bindings),
         bindingsSeeded,
+        cursorLocatorEnabled,
+        cursorLocatorEffectDurationSeconds,
+        cursorLocatorPrimaryColor,
       );
 }
 
