@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer' as developer;
+
 import 'package:flutter/services.dart';
 
 import '../app_constants.dart';
@@ -16,8 +17,10 @@ import '../app_constants.dart';
 /// 不動原生視窗，沿用 v1.2.0 的 Flutter 層條件渲染隱藏機制。
 class FullscreenDetector {
   FullscreenDetector({MethodChannel? channel})
-      : _channel = channel ??
-            const MethodChannel(AppFullscreenDetect.channelName);
+    : _channel =
+          channel ?? const MethodChannel(AppFullscreenDetect.channelName);
+
+  static const String _tag = 'fullscreen-detect';
 
   final MethodChannel _channel;
 
@@ -41,7 +44,8 @@ class FullscreenDetector {
   /// 處理原生端 method call；僅認得覆蓋狀態變化方法。
   Future<void> _handleNativeCall(MethodCall call) async {
     if (call.method != AppFullscreenDetect.onCoverageChangedMethod) {
-      debugPrint('[fullscreen-detect] 未知原生方法: ${call.method}');
+      // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+      developer.log('未知原生方法: ${call.method}', name: _tag, level: 900);
       return;
     }
     final bool covered = _parseCovered(call.arguments);
@@ -56,7 +60,8 @@ class FullscreenDetector {
         return value;
       }
     }
-    debugPrint('[fullscreen-detect] 參數格式異常: $arguments');
+    // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+    developer.log('參數格式異常: $arguments', name: _tag, level: 900);
     return false;
   }
 }

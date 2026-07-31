@@ -1,7 +1,9 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer' as developer;
+
 import 'package:flutter/services.dart';
 
 import '../app_constants.dart';
+import '../platform/method_channel_safety.dart';
 import 'mouse_binding.dart';
 
 /// 原生輸入綁定橋接（SPEC-007 FR-07，ticket 1.3.0-W2-001）。
@@ -14,8 +16,9 @@ import 'mouse_binding.dart';
 /// 回報，由面板層（FR-07/FR-08）切換引導與功能啟用狀態。
 class InputBindingChannel {
   InputBindingChannel({MethodChannel? channel})
-      : _channel =
-            channel ?? const MethodChannel(AppInputBinding.channelName);
+    : _channel = channel ?? const MethodChannel(AppInputBinding.channelName);
+
+  static const String _tag = 'input-binding';
 
   final MethodChannel _channel;
 
@@ -59,8 +62,7 @@ class InputBindingChannel {
   ///
   /// 原生回傳非 bool 或呼叫失敗時保守視為未授權，避免誤判為可用而後續崩潰。
   Future<bool> queryPermission() async {
-    final Object? result =
-        await _invoke(AppInputBinding.queryPermissionMethod);
+    final Object? result = await _invoke(AppInputBinding.queryPermissionMethod);
     return result is bool && result;
   }
 
@@ -69,34 +71,32 @@ class InputBindingChannel {
   /// 回傳查詢當下的授權狀態；使用者於系統設定操作後的最終結果由
   /// [onPermissionChanged] 通知，呼叫端不應以此回傳值當作最終授權。
   Future<bool> requestPermission() async {
-    final Object? result =
-        await _invoke(AppInputBinding.requestPermissionMethod);
+    final Object? result = await _invoke(
+      AppInputBinding.requestPermissionMethod,
+    );
     return result is bool && result;
   }
 
   /// 下傳綁定清單到原生端（本階段僅儲存，不建立 tap）。
   Future<void> updateBindings(List<MouseBinding> bindings) async {
-    final List<Map<String, Object>> payload =
-        bindings.map((MouseBinding binding) => binding.toJson()).toList();
-    await _invoke(
-      AppInputBinding.updateBindingsMethod,
-      <String, Object>{AppInputBinding.bindingsArgKey: payload},
-    );
+    final List<Map<String, Object>> payload = bindings
+        .map((MouseBinding binding) => binding.toJson())
+        .toList();
+    await _invoke(AppInputBinding.updateBindingsMethod, <String, Object>{
+      AppInputBinding.bindingsArgKey: payload,
+    });
   }
 
-  /// 統一 invokeMethod 包裝，PlatformException 時記錄並回傳 null，避免拋出
-  /// 中斷面板流程（FR-07 NFR-02：權限缺失需安全停用而非崩潰）。
-  Future<Object?> _invoke(String method, [Object? arguments]) async {
-    try {
-      return await _channel.invokeMethod<Object?>(method, arguments);
-    } on PlatformException catch (error) {
-      debugPrint('[input-binding] $method 失敗: ${error.message}');
-      return null;
-    } on MissingPluginException catch (error) {
-      debugPrint('[input-binding] $method 無原生處理: ${error.message}');
-      return null;
-    }
-  }
+  /// 統一 invokeMethod 包裝，呼叫失敗時記錄並回傳 null，避免拋出中斷面板
+  /// 流程（FR-07 NFR-02：權限缺失需安全停用而非崩潰）。骨架收斂至
+  /// [invokeMethodSafely]（1.4.0-W2-007）。
+  Future<Object?> _invoke(String method, [Object? arguments]) =>
+      invokeMethodSafely<Object?>(
+        _channel,
+        method,
+        tag: _tag,
+        arguments: arguments,
+      );
 
   /// 處理原生端 method call；認得授權狀態變化與側鍵捕捉回報方法。
   Future<void> _handleNativeCall(MethodCall call) async {
@@ -108,20 +108,23 @@ class InputBindingChannel {
         _handleButtonCaptured(call.arguments);
         return;
       default:
-        debugPrint('[input-binding] 未知原生方法: ${call.method}');
+        // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+        developer.log('未知原生方法: ${call.method}', name: _tag, level: 900);
     }
   }
 
   /// 解析捕捉到的側鍵編號並路由到回呼；型別不符時忽略，不拋出。
   void _handleButtonCaptured(Object? arguments) {
     if (arguments is Map) {
-      final Object? value = arguments[AppInputBinding.capturedButtonNumberArgKey];
+      final Object? value =
+          arguments[AppInputBinding.capturedButtonNumberArgKey];
       if (value is int) {
         _onButtonCaptured?.call(value);
         return;
       }
     }
-    debugPrint('[input-binding] 捕捉參數格式異常: $arguments');
+    // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+    developer.log('捕捉參數格式異常: $arguments', name: _tag, level: 900);
   }
 
   /// 從原生參數解析 granted 旗標；型別不符時保守視為未授權。
@@ -132,7 +135,8 @@ class InputBindingChannel {
         return value;
       }
     }
-    debugPrint('[input-binding] 參數格式異常: $arguments');
+    // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+    developer.log('參數格式異常: $arguments', name: _tag, level: 900);
     return false;
   }
 }
