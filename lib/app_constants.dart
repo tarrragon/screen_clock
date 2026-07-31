@@ -302,6 +302,74 @@ class AppInputBinding {
   static const String capturedButtonNumberArgKey = 'buttonNumber';
 }
 
+/// 滑鼠定位器 domain 常數（SPEC-008）。
+///
+/// 集中 channel 契約（channel 名、方法名、參數鍵）與動畫預設值，
+/// 供 Dart 與 Swift 兩側共同引用；字面一旦被下游票（W1-001.3 channel
+/// 骨架、W3-001 視覺特效）引用即不可任意更動，故一次定案。
+class AppCursorLocator {
+  AppCursorLocator._();
+
+  /// 原生 ↔ Dart 滑鼠定位器 method channel 名稱（SPEC-008 介面規格）。
+  /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
+  static const String channelName = 'screen_clock/cursor_locator';
+
+  /// Dart → 原生：於游標所在螢幕播放定位特效。
+  static const String playMethod = 'play';
+
+  /// play 參數鍵：特效時長，單位毫秒（SPEC-008 FR-06 特效時長設定）。
+  static const String durationMsArgKey = 'durationMs';
+
+  /// play 參數鍵：主色調，ARGB 整數值（SPEC-008 FR-06 主色調設定）。
+  static const String tintArgbArgKey = 'tintArgb';
+
+  /// FR-06 預設值：啟用開關預設為開啟。
+  static const bool defaultEnabled = true;
+
+  /// FR-06 預設值：特效時長，單位毫秒（1.5 秒）。
+  static const int defaultDurationMs = 1500;
+
+  /// FR-06 預設值：特效時長下限，單位毫秒（0.5 秒）。
+  static const int minDurationMs = 500;
+
+  /// FR-06 預設值：特效時長上限，單位毫秒（3.0 秒）。
+  static const int maxDurationMs = 3000;
+
+  /// FR-06 預設值：主色調，系統藍。
+  // color-exempt: 本檔即常數集中定義處（AppColors 同類先例），非散落硬編碼
+  static const Color defaultTint = Colors.blue;
+
+  /// FR-03 聚光燈：壓暗透明度上限（55%）。
+  static const double spotlightMaxDimOpacity = 0.55;
+
+  /// FR-03 聚光燈：保留明亮圓形區域半徑，單位 px。
+  static const double spotlightRadiusPx = 120;
+
+  /// FR-04 邊框閃爍：邊框寬度，單位 px。
+  static const double borderWidthPx = 8;
+
+  /// FR-04 邊框閃爍：閃爍次數。
+  static const int borderFlashCount = 3;
+
+  /// FR-04 邊框閃爍：單次淡入淡出週期，單位毫秒。
+  static const int borderFlashCycleDurationMs = 200;
+
+  /// FR-05 波紋擴散：單圈起始半徑，單位 px。
+  static const double rippleStartRadiusPx = 20;
+
+  /// FR-05 波紋擴散：單圈結束半徑，單位 px。
+  static const double rippleEndRadiusPx = 180;
+
+  /// FR-05 波紋擴散：單圈歷時，單位毫秒。
+  static const int rippleDurationMs = 500;
+
+  /// FR-05 波紋擴散：圈數。
+  static const int rippleCount = 3;
+
+  /// FR-05 波紋擴散：每圈發出間隔，單位毫秒。
+  static const int rippleIntervalMs = 150;
+}
+
 /// SettingsModel 中 bindings 欄的 JSON 鍵（SPEC-007 FR-02）。
 class AppSettingsKeys {
   AppSettingsKeys._();
