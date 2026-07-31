@@ -40,6 +40,13 @@ class MainFlutterWindow: NSWindow {
       messenger: flutterViewController.engine.binaryMessenger
     )
 
+    // ticket 1.4.0-W1-001.3：滑鼠定位器 method channel 橋接骨架（SPEC-008 FR-01）。
+    // 收到 play 僅 NSLog 記錄；特效視窗管理留 1.4.0-W2-006、視覺特效繪製留
+    // 1.4.0-W3-001，本階段刻意不做事以保留下游介面調整空間。
+    self.cursorLocatorBridge = CursorLocatorBridge(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
+
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     super.awakeFromNib()
@@ -50,6 +57,9 @@ class MainFlutterWindow: NSWindow {
 
   /// 滑鼠輸入綁定原生橋接（強參考持有，隨視窗生命週期存活）。
   private var inputBindingBridge: InputBindingBridge?
+
+  /// 滑鼠定位器 method channel 橋接（強參考持有，隨視窗生命週期存活）。
+  private var cursorLocatorBridge: CursorLocatorBridge?
 
   /// 接上 `launch_at_startup` method channel。
   ///
@@ -696,5 +706,54 @@ final class InputBindingBridge {
       wheel3: 0
     )
     scroll?.post(tap: .cghidEventTap)
+  }
+}
+
+/// 滑鼠定位器 method channel 橋接骨架（ticket 1.4.0-W1-001.3，SPEC-008 FR-01）。
+///
+/// 僅註冊 channel 並處理 play 方法，收到時以 NSLog 記錄呼叫參數；不建立
+/// 特效視窗、不繪製任何內容。特效視窗管理留 1.4.0-W2-006、視覺特效繪製留
+/// 1.4.0-W3-001——提早實作會讓下游票失去介面調整空間。
+///
+/// channel 名 / 方法名 / 參數鍵字面須與 lib/app_constants.dart 的
+/// AppCursorLocator 常數逐項一致（Swift 無法 import Dart 常數，故以下列
+/// enum 承載相同字面）。
+private enum CursorLocatorChannel {
+  static let name = "screen_clock/cursor_locator"
+  static let playMethod = "play"
+  static let durationMsArgKey = "durationMs"
+  static let tintArgbArgKey = "tintArgb"
+}
+
+final class CursorLocatorBridge {
+  private let channel: FlutterMethodChannel
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.channel = FlutterMethodChannel(
+      name: CursorLocatorChannel.name,
+      binaryMessenger: messenger
+    )
+    self.channel.setMethodCallHandler { [weak self] (call, result) in
+      self?.handle(call: call, result: result)
+    }
+    NSLog("[cursor-locator] channel 已註冊: \(CursorLocatorChannel.name)")
+  }
+
+  private func handle(call: FlutterMethodCall, result: FlutterResult) {
+    switch call.method {
+    case CursorLocatorChannel.playMethod:
+      let arguments = call.arguments as? [String: Any]
+      let durationMs = arguments?[CursorLocatorChannel.durationMsArgKey] as? Int
+      let tintArgb = arguments?[CursorLocatorChannel.tintArgbArgKey] as? Int
+      NSLog(
+        "[cursor-locator] play 收到: durationMs=\(String(describing: durationMs)) "
+          + "tintArgb=\(String(describing: tintArgb))（骨架階段僅記錄，不播放特效）"
+      )
+      result(nil)
+
+    default:
+      NSLog("[cursor-locator] 未知方法: \(call.method)")
+      result(FlutterMethodNotImplemented)
+    }
   }
 }
