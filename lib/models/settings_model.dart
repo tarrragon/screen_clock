@@ -7,7 +7,8 @@ import '../app_constants.dart';
 import '../input/mouse_action.dart';
 import '../input/mouse_binding.dart';
 
-/// 日誌標籤（觀測性規則 5：解析路徑須自帶日誌，見 quality-baseline）。
+/// 日誌標籤（觀測性規則 1：防禦分支落回預設值須記錄日誌，見
+/// .claude/rules/core/observability-rules.md）。
 const String _tag = 'settings-model';
 
 /// 使用者設定資料模型（SPEC-004 FR-01）。
