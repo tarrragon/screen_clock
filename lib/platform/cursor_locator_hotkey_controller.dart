@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
 import '../app_constants.dart';
 import '../models/settings_model.dart';
-import '../state/settings_controller.dart';
 import 'cursor_locator.dart';
 
 /// 熱鍵註冊 / 解除的最小介面（ticket 1.4.0-W2-005 D1：可測性）。
@@ -46,9 +46,15 @@ class HotkeyManagerRegistrar implements HotKeyRegistrar {
 ///
 /// 註冊失敗依 SPEC-008 EX-06-01：記錄 warning 日誌、定位器維持停用，
 /// 不做 GUI 提示（本票不動 `settings_panel.dart`，見 ticket AC 裁決）。
+///
+/// [settings] 收窄為 [ValueListenable]（而非具體的 `SettingsController`）：
+/// 本類別全程只用到 `.value` / `.addListener` / `.removeListener`，不需要
+/// `SettingsController` 額外攜帶的 `persist()` / `resetToStartup()` 等能力
+/// （Phase 4 coupling 審查：依賴窄化，`SettingsController` 已是
+/// `ValueListenable<SettingsModel>` 子型別，呼叫端無需改動）。
 class CursorLocatorHotkeyController {
   CursorLocatorHotkeyController({
-    required SettingsController settings,
+    required ValueListenable<SettingsModel> settings,
     required CursorLocator locator,
     HotKeyRegistrar? registrar,
   }) : _settings = settings,
@@ -57,7 +63,7 @@ class CursorLocatorHotkeyController {
 
   static const String _tag = 'cursor-locator-hotkey';
 
-  final SettingsController _settings;
+  final ValueListenable<SettingsModel> _settings;
   final CursorLocator _locator;
   final HotKeyRegistrar _registrar;
 

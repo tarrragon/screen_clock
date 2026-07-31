@@ -8,6 +8,7 @@
 // 依 test-assertion-design-rules D 規則：全程以 HotKeyRegistrar 替身記錄
 // 呼叫序列斷言，不使用 Stopwatch 計時門檻。
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -16,9 +17,6 @@ import 'package:screen_clock/app_constants.dart';
 import 'package:screen_clock/models/settings_model.dart';
 import 'package:screen_clock/platform/cursor_locator.dart';
 import 'package:screen_clock/platform/cursor_locator_hotkey_controller.dart';
-import 'package:screen_clock/services/auto_launch_service.dart';
-import 'package:screen_clock/services/settings_service.dart';
-import 'package:screen_clock/state/settings_controller.dart';
 
 class _FakeHotKeyRegistrar implements HotKeyRegistrar {
   final List<String> calls = <String>[];
@@ -52,15 +50,11 @@ void main() {
   late CursorLocator locator;
   late List<MethodCall> playCalls;
   late _FakeHotKeyRegistrar registrar;
-  late SettingsController settings;
-
-  SettingsController buildController(SettingsModel initial) {
-    return SettingsController(
-      initial: initial,
-      service: InMemorySettingsService(),
-      autoLaunchService: InMemoryAutoLaunchService(),
-    );
-  }
+  // ValueNotifier<SettingsModel>（非 SettingsController）：本測試只需
+  // ValueListenable 介面（.value/.addListener/.removeListener），與受測
+  // CursorLocatorHotkeyController 的窄化依賴一致（Phase 4 coupling 審查），
+  // 不需要 SettingsController 額外的持久化 / 開機啟動服務依賴。
+  late ValueNotifier<SettingsModel> settings;
 
   setUp(() {
     channel = const MethodChannel(AppCursorLocator.channelName);
@@ -72,7 +66,7 @@ void main() {
           return null;
         });
     registrar = _FakeHotKeyRegistrar();
-    settings = buildController(SettingsModel.defaults());
+    settings = ValueNotifier<SettingsModel>(SettingsModel.defaults());
   });
 
   tearDown(() {
@@ -100,7 +94,7 @@ void main() {
   });
 
   test('停用狀態下 start() 不註冊熱鍵', () async {
-    settings = buildController(
+    settings = ValueNotifier<SettingsModel>(
       SettingsModel.defaults().copyWith(cursorLocatorEnabled: false),
     );
     final CursorLocatorHotkeyController controller =
@@ -145,11 +139,9 @@ void main() {
         );
     await controller.start();
 
-    settings.update(
-      (s) => s.copyWith(
-        cursorLocatorEffectDurationSeconds: 2.5,
-        cursorLocatorPrimaryColor: const Color(0xFFFF0000),
-      ),
+    settings.value = settings.value.copyWith(
+      cursorLocatorEffectDurationSeconds: 2.5,
+      cursorLocatorPrimaryColor: const Color(0xFFFF0000),
     );
     registrar.lastKeyDownHandler!(registrar.lastRegisteredHotKey!);
     await Future<void>.delayed(Duration.zero);
@@ -170,7 +162,7 @@ void main() {
         );
     await controller.start();
 
-    settings.update((s) => s.copyWith(cursorLocatorEnabled: false));
+    settings.value = settings.value.copyWith(cursorLocatorEnabled: false);
     await Future<void>.delayed(Duration.zero);
 
     expect(registrar.calls, <String>['register', 'unregister']);
@@ -186,9 +178,11 @@ void main() {
         );
     await controller.start();
 
-    settings.update((s) => s.copyWith(cursorLocatorEffectDurationSeconds: 2.0));
-    settings.update(
-      (s) => s.copyWith(cursorLocatorPrimaryColor: const Color(0xFF000000)),
+    settings.value = settings.value.copyWith(
+      cursorLocatorEffectDurationSeconds: 2.0,
+    );
+    settings.value = settings.value.copyWith(
+      cursorLocatorPrimaryColor: const Color(0xFF000000),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -206,9 +200,9 @@ void main() {
           );
       await controller.start();
 
-      settings.update((s) => s.copyWith(cursorLocatorEnabled: false));
+      settings.value = settings.value.copyWith(cursorLocatorEnabled: false);
       await Future<void>.delayed(Duration.zero);
-      settings.update((s) => s.copyWith(cursorLocatorEnabled: true));
+      settings.value = settings.value.copyWith(cursorLocatorEnabled: true);
       await Future<void>.delayed(Duration.zero);
 
       expect(registrar.calls, <String>['register', 'unregister', 'register']);
@@ -243,7 +237,7 @@ void main() {
     expect(registrar.calls, <String>['register', 'unregister']);
     expect(controller.isRegistered, isFalse);
 
-    settings.update((s) => s.copyWith(cursorLocatorEnabled: true));
+    settings.value = settings.value.copyWith(cursorLocatorEnabled: true);
     await Future<void>.delayed(Duration.zero);
 
     // stop() 後已移除監聽，enabled 再次翻轉不應觸發新的 register。
