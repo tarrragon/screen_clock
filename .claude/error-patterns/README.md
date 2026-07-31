@@ -561,6 +561,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-SCLK-003 | 任務 context 指定解法形態而非問題，使執行者實作弱手段並將其固化為驗收條件 | 中 | — |
 | PC-SCLK-004 | 事故回報以推測性歸因取代逐字證據，使後續票面建立在虛構前提上 | 高 | — |
 | PC-SCLK-005 | 共享 working tree 下無 pathspec 的 git commit 會夾帶他人已 staged 的檔案 | 中 | — |
+| PC-SCLK-006 | 規格內的自然語言結論與其自身形式定義相反，TDD 循環無法自曝 | 高 | — |
 
 ---
 
