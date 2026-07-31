@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:screen_clock/app_constants.dart';
 import 'package:screen_clock/input/input_binding_controller.dart';
 import 'package:screen_clock/main.dart';
+import 'package:screen_clock/platform/cursor_locator.dart';
+import 'package:screen_clock/platform/cursor_locator_hotkey_controller.dart';
 import 'package:screen_clock/platform/fullscreen_detector.dart';
 import 'package:screen_clock/models/settings_model.dart';
 import 'package:screen_clock/services/auto_launch_service.dart';
@@ -16,8 +18,9 @@ import 'package:screen_clock/services/settings_service.dart';
 import 'package:screen_clock/state/settings_controller.dart';
 
 void main() {
-  testWidgets('ScreenClockApp builds with transparent scaffold',
-      (WidgetTester tester) async {
+  testWidgets('ScreenClockApp builds with transparent scaffold', (
+    WidgetTester tester,
+  ) async {
     final SettingsController controller = SettingsController(
       initial: SettingsModel.defaults(),
       service: InMemorySettingsService(),
@@ -29,6 +32,10 @@ void main() {
         availableScreenCount: 1,
         fullscreenDetector: FullscreenDetector(),
         inputBindingController: InputBindingController(),
+        cursorLocatorHotkeyController: CursorLocatorHotkeyController(
+          settings: controller,
+          locator: CursorLocator(),
+        ),
       ),
     );
 

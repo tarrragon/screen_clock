@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -8,6 +10,8 @@ import 'package:window_manager/window_manager.dart';
 import 'app_constants.dart';
 import 'input/input_binding_controller.dart';
 import 'models/settings_model.dart';
+import 'platform/cursor_locator.dart';
+import 'platform/cursor_locator_hotkey_controller.dart';
 import 'platform/display_detector.dart';
 import 'platform/fullscreen_detector.dart';
 import 'platform/screen_arg.dart';
@@ -46,6 +50,10 @@ Future<void> main(List<String> args) async {
       availableScreenCount: displayCount,
       fullscreenDetector: FullscreenDetector(),
       inputBindingController: InputBindingController(),
+      cursorLocatorHotkeyController: CursorLocatorHotkeyController(
+        settings: controller,
+        locator: CursorLocator(),
+      ),
     ),
   );
 }
@@ -102,12 +110,16 @@ class ScreenClockApp extends StatefulWidget {
     required this.availableScreenCount,
     required this.fullscreenDetector,
     required this.inputBindingController,
+    required this.cursorLocatorHotkeyController,
   });
 
   final SettingsController controller;
   final int availableScreenCount;
   final FullscreenDetector fullscreenDetector;
   final InputBindingController inputBindingController;
+
+  /// 滑鼠定位器全域熱鍵生命週期（SPEC-008 FR-01，ticket 1.4.0-W2-005）。
+  final CursorLocatorHotkeyController cursorLocatorHotkeyController;
 
   @override
   State<ScreenClockApp> createState() => _ScreenClockAppState();
@@ -140,11 +152,15 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
     // SPEC-007 FR-03：下傳綁定啟動原生 CGEventTap 分派；設定變更時重傳。
     widget.inputBindingController.start(widget.controller.value.bindings);
     widget.controller.addListener(_onSettingsChanged);
+    // SPEC-008 FR-01：依 cursorLocatorEnabled 同步熱鍵註冊狀態並監聽後續翻轉。
+    unawaited(widget.cursorLocatorHotkeyController.start());
   }
 
   /// 設定變更（含綁定）時，將最新綁定重新下傳原生，使分派即時生效。
   void _onSettingsChanged() {
-    widget.inputBindingController.syncBindings(widget.controller.value.bindings);
+    widget.inputBindingController.syncBindings(
+      widget.controller.value.bindings,
+    );
   }
 
   @override
@@ -153,6 +169,7 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
     widget.controller.removeListener(_onSettingsChanged);
     widget.inputBindingController.stop();
     widget.fullscreenDetector.stop();
+    unawaited(widget.cursorLocatorHotkeyController.stop());
     final HotKey? key = _registeredHotKey;
     if (key != null) {
       hotKeyManager.unregister(key);
@@ -248,10 +265,7 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
   Future<void> _registerHotKey() async {
     final HotKey hotKey = HotKey(
       key: PhysicalKeyboardKey.comma,
-      modifiers: <HotKeyModifier>[
-        HotKeyModifier.meta,
-        HotKeyModifier.alt,
-      ],
+      modifiers: <HotKeyModifier>[HotKeyModifier.meta, HotKeyModifier.alt],
       scope: HotKeyScope.system,
     );
     try {
@@ -282,8 +296,7 @@ class _ScreenClockAppState extends State<ScreenClockApp> with TrayListener {
   Future<void> _onPanelClosed() async {
     setState(() => _panelOpen = false);
     try {
-      await windowManager
-          .setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
+      await windowManager.setIgnoreMouseEvents(AppWindow.ignoreMouseEvents);
     } catch (error) {
       debugPrint('[main] restore click-through failed: $error');
     }

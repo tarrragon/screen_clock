@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 
 /// 全專案集中常數定義。
 ///
@@ -373,6 +375,19 @@ class AppCursorLocator {
 
   /// FR-05 波紋擴散：每圈發出間隔，單位毫秒。
   static const int rippleIntervalMs = 150;
+
+  /// FR-01 全域熱鍵：觸發鍵（`Cmd + Option + L` 的字母鍵部分）。
+  /// 與 [hotkeyModifiers] 共同組成 `HotKey`；`HotKey` 建構子非 const，
+  /// 無法在此直接組出常數物件，故拆為兩個原子常數供註冊處組裝
+  /// （1.4.0-W2-005 D5：組合鍵定義集中於此，禁止在註冊處硬編碼字面）。
+  static const PhysicalKeyboardKey hotkeyPhysicalKey = PhysicalKeyboardKey.keyL;
+
+  /// FR-01 全域熱鍵：修飾鍵組合（`Cmd + Option`，與 SPEC-005 設定面板熱鍵
+  /// `Cmd + Option + ,` 同前綴）。
+  static const List<HotKeyModifier> hotkeyModifiers = <HotKeyModifier>[
+    HotKeyModifier.meta,
+    HotKeyModifier.alt,
+  ];
 }
 
 /// SettingsModel 中 bindings 欄的 JSON 鍵（SPEC-007 FR-02）。

@@ -10,6 +10,8 @@ import 'package:screen_clock/app_constants.dart';
 import 'package:screen_clock/input/input_binding_controller.dart';
 import 'package:screen_clock/main.dart';
 import 'package:screen_clock/models/settings_model.dart';
+import 'package:screen_clock/platform/cursor_locator.dart';
+import 'package:screen_clock/platform/cursor_locator_hotkey_controller.dart';
 import 'package:screen_clock/platform/fullscreen_detector.dart';
 import 'package:screen_clock/services/auto_launch_service.dart';
 import 'package:screen_clock/services/settings_service.dart';
@@ -27,10 +29,9 @@ void main() {
 
   Future<void> sendCoverage(bool covered) async {
     final ByteData message = const StandardMethodCodec().encodeMethodCall(
-      MethodCall(
-        AppFullscreenDetect.onCoverageChangedMethod,
-        <String, Object?>{AppFullscreenDetect.coveredArgKey: covered},
-      ),
+      MethodCall(AppFullscreenDetect.onCoverageChangedMethod, <String, Object?>{
+        AppFullscreenDetect.coveredArgKey: covered,
+      }),
     );
     await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .handlePlatformMessage(channel.name, message, (_) {});
@@ -48,6 +49,10 @@ void main() {
         availableScreenCount: 1,
         fullscreenDetector: FullscreenDetector(channel: channel),
         inputBindingController: InputBindingController(),
+        cursorLocatorHotkeyController: CursorLocatorHotkeyController(
+          settings: controller,
+          locator: CursorLocator(),
+        ),
       ),
     );
   }
@@ -57,8 +62,7 @@ void main() {
     expect(find.byType(CenterClock), findsOneWidget);
   });
 
-  testWidgets('被假全螢幕覆蓋時隱藏時鐘，退出後復現',
-      (WidgetTester tester) async {
+  testWidgets('被假全螢幕覆蓋時隱藏時鐘，退出後復現', (WidgetTester tester) async {
     await pumpApp(tester);
     expect(find.byType(CenterClock), findsOneWidget);
 
