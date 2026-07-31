@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/services.dart';
 
 import '../app_constants.dart';
+import 'method_channel_safety.dart';
 
 /// 滑鼠定位器 method channel 橋接（ticket 1.4.0-W1-001.3，SPEC-008 FR-01）。
 ///
@@ -14,7 +15,7 @@ import '../app_constants.dart';
 /// 以對應的常數宣告承載相同字面（method channel 無法跨語言共用常數定義）。
 class CursorLocator {
   CursorLocator({MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel(AppCursorLocator.channelName);
+    : _channel = channel ?? const MethodChannel(AppCursorLocator.channelName);
 
   static const String _tag = 'cursor-locator';
 
@@ -31,29 +32,27 @@ class CursorLocator {
   ///
   /// 例外契約：原生端不可用或拋錯時本方法不拋例外，僅記錄；呼叫端無法由
   /// 回傳值得知播放是否成功。
-  Future<void> play({
-    required Duration duration,
-    required Color tint,
-  }) async {
+  Future<void> play({required Duration duration, required Color tint}) async {
     try {
       final int durationMs = duration.inMilliseconds;
       final int tintArgb = _tintToArgb(tint);
       // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
-      developer.log('play 呼叫: durationMs=$durationMs, tintArgb=$tintArgb', name: _tag);
-      await _channel.invokeMethod<void>(
+      developer.log(
+        'play 呼叫: durationMs=$durationMs, tintArgb=$tintArgb',
+        name: _tag,
+      );
+      await invokeMethodSafely<void>(
+        _channel,
         AppCursorLocator.playMethod,
-        <String, Object?>{
+        tag: _tag,
+        arguments: <String, Object?>{
           AppCursorLocator.durationMsArgKey: durationMs,
           AppCursorLocator.tintArgbArgKey: tintArgb,
         },
       );
-    } on PlatformException catch (e) {
-      // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
-      developer.log('play PlatformException: code=${e.code} message=${e.message}', name: _tag, level: 900);
-    } on MissingPluginException catch (e) {
-      // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
-      developer.log('play MissingPluginException: message=${e.message}', name: _tag, level: 900);
     } on UnsupportedError catch (e) {
+      // 色彩換算（NaN/Infinite 分量）失敗於呼叫 invokeMethod 前即拋出，
+      // 屬本方法的換算邏輯而非 method channel 呼叫本身，故不收進共用包裝。
       // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
       developer.log('play 轉換失敗: message=${e.message}', name: _tag, level: 900);
     }
