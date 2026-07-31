@@ -14,8 +14,8 @@ severity: medium
 |------|------|
 | 編號 | PC-SCLK-005 |
 | 類別 | process-compliance |
-| 風險等級 | 中（本次未造成損害——執行代理人在 commit 前自行發現並改用精準 pathspec 攔截；若未察覺會造成他人未完成工作被夾帶進錯誤 commit，屬 PC-SCLK-001 姊妹風險） |
-| 首發時間 | 2026-07-31（1.4.0-W2-016 修正 CursorLocatorBridge 時發現） |
+| 風險等級 | 中（範圍面：本次未造成損害，執行代理人在 commit 前自行發現並改用精準 pathspec 攔截；互斥面：命令直接失敗未觸及 index，本質安全，僅需正確復原程序） |
+| 首發時間 | 2026-07-31（範圍面：1.4.0-W2-016 修正 CursorLocatorBridge 時發現；互斥面：同日 PM 在 1.4.0-W3-002 追蹤票 commit 時撞見） |
 | 姊妹模式 | PC-SCLK-001（並行 agent 的 `--amend` 改寫他人 commit，同屬「共享 HEAD/index 心智模型失效」家族，但 001 是寫入面直接破壞、本模式是暫存面夾帶）、PC-019（worktree 派發前的未 commit 變更防護，見下方適用條件） |
 
 ---
@@ -60,6 +60,43 @@ severity: medium
 
 ---
 
+## 姊妹面向：`.git/index.lock` 互斥（失敗響亮 vs 夾帶靜默）
+
+範圍問題（上述）與鎖問題（本節）是同一份共享資源（index）在並行寫入下暴露的兩種不同性質的風險，機制不同、後果性質相反：
+
+| 面向 | 共享的是什麼 | 觸發後果 | 有效防護 |
+|------|------|------|------|
+| 範圍（上述章節） | index 的**內容**：多個 agent 的 staged 檔案共存於同一份 index | 靜默夾帶——commit 成功執行，混入他人內容，事後才發現（或發現不了） | `git commit -m "..." -- <path>` |
+| 互斥（本節） | `.git/index.lock`：git 寫入 index 前建立的排他鎖，同時只允許一個寫入程序持有 | 命令當場失敗（`fatal: Unable to create '.git/index.lock': File exists.`），exit 128，什麼都沒發生 | 間隔後重試，**絕不手動刪除 lock 檔** |
+
+**實例**（2026-07-31，PM 在 1.4.0-W3-002 追蹤票 commit 時觸發）：與另一個並行 agent 的 commit 撞期，取得 `.git/index.lock` 失敗，git 回報：
+
+```
+fatal: Unable to create '.git/index.lock': File exists.
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier: remove the file
+manually to continue.
+```
+
+### 為何「會失敗」反而是危險程度較低的那一種
+
+兩者的危險程度直覺上容易顛倒——鎖衝突會直接報錯，看起來像「壞事發生了」；範圍夾帶不報任何錯，commit 顯示成功，看起來像「一切正常」。但實際的危險排序相反：
+
+- 鎖衝突的失敗**無法被忽略**——命令回傳非零、stderr 有明確 `fatal` 字樣，agent 或 PM 一定會注意到，且此時 index 尚未被寫入，狀態未被破壞，重試即可恢復。
+- 範圍夾帶的成功**可以被完全忽略**——commit 正常返回、`git log` 表面正常，若沒有像本模式「解決方案」章節那樣主動核對 `git status`，混入的他人內容會一路留在歷史裡，直到事後被發現（甚至永遠不被發現）。
+
+這是本模式判定「pathspec 紀律遠比鎖處理更重要」的核心理由：鎖問題會自己攔住你，範圍問題不會，攔不住的風險才是需要主動防禦的風險。
+
+### 危險：`fatal` 訊息本身在共享 tree 下具誤導性
+
+git 官方錯誤訊息建議「若確認沒有其他 git 程序在跑，手動刪除 lock 檔即可繼續」——這在單人本機環境下是正確且常見的復原建議（例如編輯器崩潰後殘留 lock 檔）。但在多 agent 共享同一 working tree 的情境下，**這條建議的前提假設（沒有其他 git 程序在跑）通常不成立**：lock 檔存在的當下極可能正是另一個 agent 的 commit 真正進行中。此時依訊息字面建議手動刪除 lock 檔，會在對方寫入 index 的過程中把鎖拆掉，可能造成對方 index 損毀或 commit 內容不完整——這是「正確的工具訊息在錯誤的環境假設下變成有害建議」的具體案例：訊息本身沒有寫錯，錯的是套用訊息建議的環境前提。
+
+**正確處置**：撞到 `index.lock` 衝突時，一律視為「有其他 agent 正在寫入」，間隔數秒後重試 commit 即可（多數情況一次重試即成功，因為對方的寫入通常在數秒內完成）；共享 tree 下**任何情況都不手動刪除 `.git/index.lock`**，即使訊息字面上建議這麼做。
+
+---
+
 ## 解決方案
 
 ### 有效防護：commit 一律帶精準 pathspec
@@ -72,7 +109,7 @@ git commit -m "..."
 git commit -m "..." -- macos/Runner/MainFlutterWindow.swift
 ```
 
-這比「約定不要用 `git add -A` / `git add .`」更根本，因為它不依賴每個 agent 自律避免寬範圍 add——即使自己全程只 `git add <path>`，只要commit 時漏了 pathspec，仍會被他人已 stage 的內容拖下水。`git commit -- <path>` 從 commit 這一步本身就繞過已 staged 的 index 內容，不管 index 裡還有什麼。
+這比「約定不要用 `git add -A` / `git add .`」更根本，因為它不依賴每個 agent 自律避免寬範圍 add——即使自己全程只 `git add <path>`，只要 commit 時漏了 pathspec，仍會被他人已 stage 的內容拖下水。`git commit -- <path>` 從 commit 這一步本身就繞過已 staged 的 index 內容，不管 index 裡還有什麼。
 
 ### 事前預防（agent 側）
 
@@ -98,6 +135,7 @@ git commit -m "..." -- macos/Runner/MainFlutterWindow.swift
 | Agent 自律 | Context Bundle 加入「commit 一律 `-- <path>` pathspec」的並行安全約束 | 可立即施行 |
 | PM 派發 | 檔案修改型並行任務優先 worktree 隔離 | 既有 ARCH-015 規範，但受下方適用條件限制 |
 | Hook 強制 | PreToolUse 偵測共用 working tree 下 `git commit -m` 未帶 `--` pathspec 且當前有 2+ 進行中 ticket 時警告 | 待評估（WARNING 級即可，單一執行體省略 pathspec 是合法且常見的操作，不應硬擋） |
+| Agent 自律（互斥面） | 撞到 `index.lock` 衝突一律間隔重試，禁止依 git 訊息字面建議手動刪除 lock 檔 | 可立即施行 |
 
 ---
 
@@ -116,7 +154,7 @@ Worktree 隔離可從根本避免本模式——每個 agent 各自的 index 天
 
 ## 相關規則
 
-- `.claude/rules/core/bash-tool-usage-rules.md` 規則三 — 禁止串接 git 寫入操作（同源的共享 git 狀態問題，但聚焦 `index.lock` 競爭而非 staged 內容範圍）
+- `.claude/rules/core/bash-tool-usage-rules.md` 規則三 — 禁止串接 git 寫入操作（同源於 `index.lock` 競爭，但聚焦「單一 agent 一次 Bash 呼叫內串接多個寫入指令」；本模式的互斥面聚焦「兩個獨立 agent 各自正常執行、時間點恰好重疊」，觸發條件不同但復原原則一致：重試、不手動介入鎖）
 - `.claude/error-patterns/process-compliance/PC-SCLK-001-parallel-agent-amend-rewrites-foreign-commit.md` — 姊妹模式：共享 HEAD 心智模型在並行下失效的另一種表現（寫入面直接改寫 vs 本模式的暫存面夾帶）
 - `.claude/error-patterns/process-compliance/PC-019-worktree-merge-state-loss.md` — worktree 隔離的前置條件與本模式的互斥關係
 - `.claude/skills/worktree/hooks/worktree-commit-before-dispatch-hook.py` — PC-019 的 Hook 強制層，決定本模式的適用時間窗口
@@ -126,4 +164,5 @@ Worktree 隔離可從根本避免本模式——每個 agent 各自的 index 天
 
 ## 關聯 Ticket
 
-- `1.4.0-W2-016`（發現本模式並自行以 `git commit -- <path>` 攔截的 ticket）
+- `1.4.0-W2-016`（發現範圍面並自行以 `git commit -- <path>` 攔截的 ticket）
+- `1.4.0-W3-002`（PM 追蹤票 commit 時撞見互斥面 `index.lock` 衝突）
