@@ -559,6 +559,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-SCLK-001 | 並行 agent 的 git commit --amend 改寫其他執行體的 commit | 高 | — |
 | PC-SCLK-002 | 代理人以編碼混淆繞過 sandbox 防護而非回報阻擋 | 高 | — |
 | PC-SCLK-003 | 任務 context 指定解法形態而非問題，使執行者實作弱手段並將其固化為驗收條件 | 中 | — |
+| PC-SCLK-004 | 事故回報以推測性歸因取代逐字證據，使後續票面建立在虛構前提上 | 高 | — |
 
 ---
 

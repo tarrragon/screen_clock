@@ -1,0 +1,100 @@
+---
+id: PC-SCLK-004
+title: 事故回報以推測性歸因取代逐字證據，使後續票面建立在虛構前提上
+severity: high
+---
+
+# PC-SCLK-004: 事故回報以推測性歸因取代逐字證據，使後續票面建立在虛構前提上
+
+---
+
+## 基本資訊
+
+| 項目 | 值 |
+|------|------|
+| 編號 | PC-SCLK-004 |
+| 類別 | process-compliance |
+| 風險等級 | 高 |
+| 首發時間 | 2026-07-31（screen_clock 1.4.0-W1-023 調查發現三次歷史事故回報機制描述互斥，且皆無逐字證據） |
+| 姊妹模式 | PC-SCLK-002（本模式的具體案例來源，首次事故回報即含此缺陷）、PC-166（confabulation 觸發鏈與防護） |
+
+---
+
+## 症狀
+
+代理人執行某動作遇到阻擋、拒絕或非預期行為時，NeedsContext / Exit Status 中記錄的不是**逐字擷取的原始錯誤訊息**，而是**對成因的合理推測**（讀取相似情境的既有 error-pattern 後，用其標題或摘要語意生成一句聽起來合理的歸因）。此推測性歸因一旦寫入 ticket，會被後續代理人當作已驗證事實引用（如「已知誤報 PC-XXX」），該既有 error-pattern 本身也因此被誤當作「已多次證實」而權威性虛增。
+
+關鍵特徵：**每一次回報單獨看都合理**（阻擋確實發生、代理人確實遵循既有指引標記為已知問題、行為本身無害），但**跨次回報比對才會發現機制描述彼此矛盾**——因為每次都是各自的合理推測，不是共享的逐字觀測。
+
+---
+
+## 實例（2026-07-31，screen_clock）
+
+三個獨立 ticket 回報同一現象（isolation:worktree 派發的代理人無法自行執行 `ticket track complete <id> --as <agent>` 收尾，需 PM 代跑）：
+
+| Ticket | 診斷的具體機制 |
+|--------|---------------|
+| 1.4.0-W1-015（首發，PC-SCLK-002 來源） | 「字面引數 token `complete` 被判為不安全的 shell builtin 樣式」 |
+| 1.4.0-W1-001.4 | 沿用「shell builtin」措辭，未附新證據 |
+| 1.4.0-W1-001.5 | 「被 sandbox 誤判為**跨 worktree git 操作**而拒絕執行」——與前兩者機制不同 |
+
+三次回報皆無附上逐字擷取的原始 stderr / denial reason，僅以「PC-SCLK-002 已知誤報」帶過。
+
+1.4.0-W1-023 依票面前提（「repo 內修正 sandbox 樣式比對邏輯」）展開調查：全文檢索 `.claude/hooks/`、`.claude/skills/ticket/`、`.claude/settings.json`（本機+全域）找不到任何比對「shell builtin」樣式的邏輯；獨立建立 git worktree 並透過 Bash 工具直接執行同一命令，兩次嘗試（裸引數形式、子 shell 形式）均正常執行，無任何阻擋，僅收到 CLI 應用層本身的 identity-guard deny（預期行為，與本案無關）。至此才發現「shell builtin 樣式比對」這個具體機制描述本身缺乏逐字證據支撐，且與另一次回報的機制描述互斥——整張 IMP ticket 建立在一個未經驗證的推測之上，浪費一整輪調查成本（重現實驗、repo 全文檢索、跨檔案比對）才發現前提不成立。
+
+---
+
+## 根因
+
+| 層次 | 說明 |
+|------|------|
+| 直接原因 | 代理人被阻擋時，NeedsContext / Exit Status 記錄的是「對成因的推測」而非「逐字擷取的原始輸出」 |
+| 結構原因 | 阻擋當下任務優先級是「完成收尾」，逐字擷取錯誤訊息不在標準流程的強制步驟中，代理人傾向用最省力的方式（引用既有 error-pattern 標題）交差 |
+| 放大機制 | 推測性歸因一旦寫入 ticket 並標記「已知問題」，後續代理人會信任該標籤而不再重新驗證（`tool-output-trust-rules` 規則 5：記錄平面不是 ground truth，但推測寫入記錄平面後被當成 ground truth 讀取） |
+| 遮蔽機制 | 每次回報單獨看都語意通順、行為合規（沒有繞過防護、有回報阻擋），審查者若不逐次交叉比對機制描述，無法察覺矛盾 |
+
+---
+
+## 解決方案
+
+### 防護 A：阻擋類 NeedsContext 必須附逐字原始輸出
+
+代理人被工具、hook 或 runtime 阻擋時，NeedsContext / Exit Status 必須包含逐字擷取的原始錯誤訊息（stderr / stdout / denial reason 原文），不可僅寫「被 XXX 阻擋（已知問題 PC-XXX）」。若受限於環境無法擷取（如 headless 執行、訊息未落地為可讀輸出），須明確標註「無法擷取逐字原文，以下為觀察到的行為描述」，不可將行為描述包裝成確定性的機制歸因。
+
+| 反模式 | 正確寫法 |
+|--------|---------|
+| 「被 sandbox 誤判為 XXX 阻擋（已知問題 PC-XXX）」 | 「執行 `<逐字命令>` 後收到以下輸出：`<逐字 stderr/stdout>`。是否與 PC-XXX 同一成因未經驗證，僅行為現象相似（皆為 ticket track complete 在 worktree 隔離環境失敗）」 |
+| 「阻擋原因是 shell builtin 誤判」 | 「阻擋發生，具體機制未知；已附逐字輸出供後續診斷比對」 |
+
+### 防護 B：既有 error-pattern 被引用時視為假設而非結論
+
+後續代理人遇到「看起來像」既有 error-pattern 描述的現象時，可引用該 pattern 作為**優先排查方向**，但不可直接標記「已知問題，跳過診斷」。除非能提供與該 pattern 記錄的逐字證據相符的新逐字證據，否則應視為未驗證假設處理（於 NeedsContext 標註「疑似 PC-XXX，未附逐字證據確認同一成因」）。
+
+### 防護 C：同一現象多次回報時，PM 收斂前先比對機制描述一致性
+
+PM 或審查者處理多個回報同一現象的 ticket 時，若機制描述彼此不同（如本案「shell builtin」vs「跨 worktree git 操作」），須視為警訊，優先安排獨立重現驗證，而非合併視為同一已驗證問題的重複發生。
+
+---
+
+## 預防措施
+
+以下任一出現時，回頭檢查回報是否為推測性歸因：
+
+- NeedsContext / Exit Status 描述阻擋原因，但欄位中找不到逐字輸出（stderr/stdout 原文）
+- 多次回報同一現象，但機制描述用詞不完全一致（換句話說即互斥的徵兆）
+- 回報直接引用既有 error-pattern 編號作為「已知問題」，卻未附上本次的逐字比對依據
+- 後續調查票（如本案 1.4.0-W1-023）在 repo 內找不到回報描述的具體邏輯位置
+
+---
+
+## 相關規則與方法論
+
+- `.claude/rules/core/tool-output-trust-rules.md` 規則 5（記錄平面不是 ground truth，重大狀態以世界平面為準）——本模式是規則 5 的具體案例：推測性歸因寫入 ticket（記錄平面）後被當作已驗證事實（世界平面）引用
+- `.claude/error-patterns/process-compliance/PC-166-confabulation-trigger-chain-and-guards.md`（confabulation 觸發鏈，本模式是「阻擋後生成合理但無 grounding 的歸因」的變體）
+- `.claude/error-patterns/process-compliance/PC-SCLK-002-agent-obfuscation-bypass-of-sandbox-guard.md`（本模式的首次案例來源；PC-SCLK-002 記錄的「shell builtin」機制描述本身即為未經逐字驗證的推測，待後續探針取得逐字證據後修訂）
+
+---
+
+**相關 Ticket**：1.4.0-W1-015（首次回報來源）、1.4.0-W1-001.4、1.4.0-W1-001.5（三次回報機制描述互斥）、1.4.0-W1-023（本模式發現與記錄來源）
+
+**Last Updated**: 2026-07-31 | **Source**: screen_clock 1.4.0-W1-023 調查（thyme-python-developer 獨立重現失敗 + 跨 ticket 機制描述交叉比對）
