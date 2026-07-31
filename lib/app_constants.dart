@@ -326,18 +326,23 @@ class AppCursorLocator {
   /// FR-06 預設值：啟用開關預設為開啟。
   static const bool defaultEnabled = true;
 
-  /// FR-06 預設值：特效時長，單位毫秒（1.5 秒）。
-  static const int defaultDurationMs = 1500;
+  /// FR-06 預設值：特效時長，單位秒（SPEC-009 A.1 v4 權威定義）。
+  static const double defaultDurationSeconds = 1.5;
 
-  /// FR-06 預設值：特效時長下限，單位毫秒（0.5 秒）。
-  static const int minDurationMs = 500;
+  /// FR-06 預設值：特效時長下限，單位秒。
+  static const double minDurationSeconds = 0.5;
 
-  /// FR-06 預設值：特效時長上限，單位毫秒（3.0 秒）。
-  static const int maxDurationMs = 3000;
+  /// FR-06 預設值：特效時長上限，單位秒。
+  static const double maxDurationSeconds = 3.0;
 
   /// FR-06 預設值：主色調，系統藍。
+  ///
+  /// 使用普通 Color 而非框架色板的 MaterialColor 型別常數：後者的
+  /// runtimeType 與從 ARGB int 經 SettingsModel._asColor 重建的普通
+  /// Color 不符，會導致 round-trip 相等性測試失敗
+  /// （見 1.4.0-W1-001.2 Solution 實證）。
   // color-exempt: 本檔即常數集中定義處（AppColors 同類先例），非散落硬編碼
-  static const Color defaultTint = Colors.blue;
+  static const Color defaultTint = Color(0xFF2196F3);
 
   /// FR-03 聚光燈：壓暗透明度上限（55%）。
   static const double spotlightMaxDimOpacity = 0.55;
