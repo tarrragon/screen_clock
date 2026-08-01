@@ -4,8 +4,8 @@ title: "使用者設定持久化資料契約"
 status: draft
 source_proposal: null
 created: "2026-07-29"
-updated: "2026-07-31"
-version: "1.2"
+updated: "2026-08-01"
+version: "1.3"
 owner: sassafras-data-administrator
 
 # Domain 歸屬
@@ -90,7 +90,7 @@ A 區記錄換一種儲存後端（例如改用 SQLite 或應用支援目錄下�
 
 > **與 SPEC-004 分工**：SPEC-004 `## 資料模型` 與 FR-01 聚焦「設定面板功能需要哪些欄位」；本節聚焦欄位的格式、值域與版本邊界約束。
 >
-> **已知落差（僅記錄，不修改 SPEC-004）**：SPEC-004 FR-02 記載「`schemaVersion` 目前為 1」、NFR-02 記載「MVP 階段只實作 v1 schema」、FR-01 欄位表僅列 7 欄，均停留在 v1 時點，未涵蓋 v2/v3 新增的 `birthDate`、`lifeTimerMode`、`bindings`、`bindingsSeeded`。本契約以 code 為準。SPEC-004 是否回補由 PM 決定。
+> **與 SPEC-004 同步狀態**：SPEC-004 FR-01 欄位表（現補齊至 14 欄）、FR-02 `schemaVersion` 現況值、NFR-02 相容性策略描述已更新至與本節一致，過往「停留在 v1 時點」的落差已回補，不再重複記錄。
 
 ### A.2 狀態責任分層
 
@@ -247,7 +247,7 @@ G-04 的理由：每個旗標為資料形態引入一次二分，N 個旗標即 
 
 | 欄位/章節 | 承載狀態 | 既有載體 | 說明 |
 |----------|---------|---------|------|
-| 表/欄位語意（單位/值域/格式） | 部分承載，本文件補約束細節與 v2/v3 增補欄位 | SPEC-004 `## 資料模型` / FR-01 | SPEC-004 停留在 v1 欄位集，本文件補齊並標註落差 |
+| 表/欄位語意（單位/值域/格式） | 部分承載，本文件補約束細節 | SPEC-004 `## 資料模型` / FR-01 | SPEC-004 現已同步至 v4 欄位集，本文件補單位/值域/格式細節 |
 | 不變式陳述 | 本文件新建完整清單並附編號 | 無 domain-map | 本專案尚無 domain-map；INV-03/INV-04 呼應 SPEC-004 設計約束與 FR-02 |
 | 契約 ↔ 測試對應 | 未承載 | 無 `docs/traceability.yaml` | 本專案尚無 traceability 第三軸；INV 編號待後續建立對應測試索引 |
 | 可攜性分區（A/B 兩區結構） | 新建 | 無 | — |
@@ -256,7 +256,7 @@ G-04 的理由：每個旗標為資料形態引入一次二分，N 個旗標即 
 | 錯誤語意契約 | 部分承載 | SPEC-004 `## 錯誤處理`（E_PREFS_*） | 本文件補「不定義型別化例外」的契約後果 |
 | 恢復模型 | 新建 | 無 | 含「跨版本降級不保證」的顯式限制聲明 |
 | 保證層歸屬 | 新建 | 無 | — |
-| Schema 演進策略 | 部分承載 | SPEC-004 NFR-02 / 設計約束 | 本文件補現行 v1–v3 實況與唯一命令式 migration |
+| Schema 演進策略 | 部分承載 | SPEC-004 NFR-02 / 設計約束 | 本文件補現行 v1–v4 實況、治理規則（G-01–G-04 / T-01–T-04）與唯一命令式 migration |
 
 ---
 
@@ -275,3 +275,4 @@ G-04 的理由：每個旗標為資料形態引入一次二分，N 個旗標即 
 | 1.0 | 2026-07-29 | 初始版本：記錄 schema v1–v3 既成事實與 v4 規劃條目（1.4.0-W1-007） |
 | 1.1 | 2026-07-29 | 回填 1.4.0-W1-011 評估結論：A.1 `bindingsSeeded` 標註為欄位級 migration 旗標並補正交性說明；A.3 補 `schemaVersion` 單向稽核標記的實測佐證、migration 治理規則 G-01–G-04、版本分支解析升級觸發條件 T-01–T-04；A.5 記錄降級寫回截斷（direction B）為已接受風險（1.4.0-W1-016） |
 | 1.2 | 2026-07-31 | 回填 1.4.0-W1-001.2 落地結果：A.1 主表與版本演進表 v4 列由「規劃中」轉為實作事實，補上三個欄位的實際 Dart/JSON 鍵名（`cursorLocatorEnabled` / `cursorLocatorEffectDurationSeconds` / `cursorLocatorPrimaryColor`）與 `cursorLocatorPrimaryColor` 預設值改用 `Color(0xFF2196F3)`（非 `Colors.blue`）的理由；B.3 v4 演進列更新為已確認 |
+| 1.3 | 2026-08-01 | SPEC-004 已同步更新至 code 現況，A.1「已知落差」段落改為「與 SPEC-004 同步狀態」確認說明，移除已回補的落差記錄 |
