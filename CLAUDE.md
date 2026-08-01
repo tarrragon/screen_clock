@@ -155,6 +155,17 @@ windowManager.waitUntilReadyToShow().then((_) async {
 | `docs/usecases/UC-*.md` | 用例 |
 | `docs/proposals-tracking.yaml` | 提案追蹤索引 |
 
+### 測試執行
+
+**單一入口**：`scripts/run-tests.sh`（依序執行 `flutter test` 與 `xcodebuild test`，任一失敗即整體失敗，退出碼合併）。本機或未來 CI 皆應呼叫此腳本，不分別手動下兩條指令。
+
+| 底層指令 | 涵蓋範圍 | 說明 |
+|---------|---------|------|
+| `flutter test` | Dart 單元/widget/整合測試 | 不涵蓋 `macos/` 下的 Swift target |
+| `xcodebuild test -workspace macos/Runner.xcworkspace -scheme Runner -configuration Debug -destination 'platform=macOS'` | Swift XCTest（`macos/RunnerTests/`） | Runner scheme 的 TestAction 已固定綁定 RunnerTests target，不需 `-only-testing`；`@testable import` 僅 Debug configuration 可用；模組名以 `PRODUCT_NAME=screen_clock` 為準（非 target 名 `Runner`） |
+
+**已知風險（無人值守執行）**：`macos/RunnerTests/` 目前僅含純函式判定測試，不啟動宿主 app、不觸發輔助使用權限彈窗。若日後新增啟動 `MainFlutterWindow`（CGEventTap）的 app-hosted 測試群組，無人值守執行時可能彈出權限對話框而阻塞，屆時須在腳本內以 `-skip-testing` 排除或另立 test plan（詳見 `scripts/run-tests.sh` 檔頭註解，1.4.0-W2-033）。
+
 ---
 
 ## 8. 里程碑
