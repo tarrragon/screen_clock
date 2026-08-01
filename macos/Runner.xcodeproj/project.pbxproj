@@ -30,6 +30,8 @@
 		0511AA9F3D5B68270866DD58 /* CursorLocatorEffectWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157CB28A680ED059B00CDD71 /* CursorLocatorEffectWindow.swift */; };
 		D528B71EBF86977677905136 /* CursorScreenLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7192E3EC30A93360D5E538 /* CursorScreenLocatorTests.swift */; };
 		608ECDB9F62688C496DCE32E /* CursorLocatorTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6892860B0CF1660417A2B29B /* CursorLocatorTestDoubles.swift */; };
+		6E7C888125B8AD810323F0B7 /* CursorLocatorEffectControllerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1E6EC50F0676B37763F865 /* CursorLocatorEffectControllerLifecycleTests.swift */; };
+		BF07F081F29E3D61850E47F6 /* CursorLocatorEffectControllerScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */; };
 		7368D41F50FB232BAAB1C2B4 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C3DBBDAF90FF981DBEAFD7A /* Pods_Runner.framework */; };
 		ECF4000094CBFBC55E1EE396 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F244AB2C16E845EDDBFDFBF8 /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
@@ -79,6 +81,8 @@
 		157CB28A680ED059B00CDD71 /* CursorLocatorEffectWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectWindow.swift; sourceTree = "<group>"; };
 		4F7192E3EC30A93360D5E538 /* CursorScreenLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorScreenLocatorTests.swift; sourceTree = "<group>"; };
 		6892860B0CF1660417A2B29B /* CursorLocatorTestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/CursorLocatorTestDoubles.swift; sourceTree = "<group>"; };
+		FA1E6EC50F0676B37763F865 /* CursorLocatorEffectControllerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectControllerLifecycleTests.swift; sourceTree = "<group>"; };
+		B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectControllerScreenTests.swift; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
@@ -122,6 +126,8 @@
 				331C80D7294CF71000263BE5 /* RunnerTests.swift */,
 				4F7192E3EC30A93360D5E538 /* CursorScreenLocatorTests.swift */,
 				6892860B0CF1660417A2B29B /* CursorLocatorTestDoubles.swift */,
+				FA1E6EC50F0676B37763F865 /* CursorLocatorEffectControllerLifecycleTests.swift */,
+				B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -441,6 +447,8 @@
 				331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */,
 				D528B71EBF86977677905136 /* CursorScreenLocatorTests.swift in Sources */,
 				608ECDB9F62688C496DCE32E /* CursorLocatorTestDoubles.swift in Sources */,
+				6E7C888125B8AD810323F0B7 /* CursorLocatorEffectControllerLifecycleTests.swift in Sources */,
+				BF07F081F29E3D61850E47F6 /* CursorLocatorEffectControllerScreenTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
