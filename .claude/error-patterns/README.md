@@ -322,7 +322,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | IMP-V1-004 | Hook 內部工具名字面守衛因平台工具改名靜默早退（matcher 別名仍投遞） | 高 | — |
 | IMP-V1-005 | index.lock 競爭下 fast-forward 移動 HEAD 但 index 寫入失敗，後續 commit 靜默刪除剛合併的檔案 | 高 | — |
 | IMP-V1-006 | 大小寫不敏感檔案系統上 Edit 工具寫入成功，但 git pathspec 以不同大小寫尋址失敗 | 低 | — |
-| IMP-SCLK-001 | macOS bash 3.2 將裸 `$VAR` 後緊鄰的全形標點吃進變數名，`set -u` 下崩在只有錯誤路徑才走到的分支 | 中 | — |
+| IMP-SCLK-001 | macOS bash 3.2 將裸 `$VAR` 後緊鄰的全形標點併入變數名，`set -u` 下崩在只有錯誤路徑才走到的分支 | 中 | — |
 | IMP-049 (hook-error-display-is-cli-bug) | "hook error" 顯示是 Claude Code CLI 已知 Bug，非 Hook 程式碼問題 | 低 | v0.17.3 |
 | IMP-049 (undefined-constants-in-hook-source) | Hook 原始碼引用未定義常數 | — | — |
 | IMP-BAL-004 | 豁免清單以檔名比對而非路徑錨定，使樹中任意深度的同名檔全數豁免 | — | — |
