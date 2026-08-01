@@ -1,4 +1,5 @@
 import Cocoa
+import CoreVideo
 import QuartzCore
 
 /// 特效層目標螢幕判定與視窗生命週期。
@@ -417,5 +418,161 @@ final class CursorLocatorEffectController {
     currentDisplayID = nil
     state = .idle
     generation += 1
+  }
+}
+
+// MARK: - Production 接線（子票 1.4.0-W2-006.2.2）
+
+/// production 特效視窗：覆寫 `canBecomeKey` 回傳 `false`，使 §2.5 契約「不搶
+/// 焦點」在型別層級成立，不依賴呼叫端記得用 `orderFrontRegardless()`。
+private final class NonKeyEffectWindow: NSWindow {
+  override var canBecomeKey: Bool { false }
+}
+
+/// production 的 `CursorLocatorSurface` 實作：依 Phase 1 §2.5 十二項屬性契約
+/// 建立真實 `NSWindow`。
+final class WindowCursorLocatorSurface: CursorLocatorSurface {
+  /// 底層真實 `NSWindow`，供 app-hosted XCTest（群組 F）直接斷言 §2.5
+  /// 契約值；型別暴露為 `NSWindow`（非 `NonKeyEffectWindow`），呼叫端不需
+  /// 知道 canBecomeKey 覆寫實作在子類別。
+  let window: NSWindow
+  private let hostView: NSView
+
+  var contentLayer: CALayer {
+    hostView.layer ?? CALayer()
+  }
+
+  init(frame: NSRect) {
+    window = NonKeyEffectWindow(
+      contentRect: frame,
+      styleMask: .borderless,
+      backing: .buffered,
+      defer: false
+    )
+    hostView = NSView(frame: NSRect(origin: .zero, size: frame.size))
+    hostView.wantsLayer = true
+
+    window.contentView = hostView
+    window.level = .screenSaver
+    window.collectionBehavior = [
+      .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle,
+    ]
+    window.ignoresMouseEvents = true
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    window.hasShadow = false
+    window.alphaValue = 1.0
+    window.isReleasedWhenClosed = false
+    window.setFrame(frame, display: false)
+
+    // 依 §2.5「不得用 makeKeyAndOrderFront」：後者於全螢幕播放中觸發熱鍵會
+    // 導致退出全螢幕，違反 UC-06 成功保證與 06d。
+    window.orderFrontRegardless()
+  }
+
+  func move(toScreenFrame frame: NSRect) {
+    window.setFrame(frame, display: true)
+  }
+
+  func setAlpha(_ value: CGFloat) {
+    window.alphaValue = value
+  }
+
+  func close() {
+    window.close()
+  }
+}
+
+/// production 的 surface 工廠。NSWindow 建立本身在 AppKit 下無失敗路徑，但
+/// 簽章維持 `throws` 以符合 `CursorLocatorSurfaceMaking`——失敗時應攜帶原因
+/// 字串觸發 E_CL_WINDOW。
+func makeProductionCursorLocatorSurface(frame: NSRect) throws -> CursorLocatorSurface {
+  WindowCursorLocatorSurface(frame: frame)
+}
+
+/// production 的逐幀驅動：以 `CVDisplayLink` 實作，回呼一律派回 main thread
+/// （呼叫端不需知道底層是 CVDisplayLink，Phase 1 §2.7）。
+final class DisplayLinkCursorLocatorFrameDriving: CursorLocatorFrameDriving {
+  private var displayLink: CVDisplayLink?
+  private var onFrame: ((CFTimeInterval) -> Void)?
+
+  func start(displayID: CGDirectDisplayID, onFrame: @escaping (CFTimeInterval) -> Void) {
+    self.onFrame = onFrame
+
+    var link: CVDisplayLink?
+    let createStatus = CVDisplayLinkCreateWithCGDisplay(displayID, &link)
+    guard createStatus == kCVReturnSuccess, let link = link else {
+      NSLog("[cursor-locator] CVDisplayLink 建立失敗，displayID=\(displayID)，status=\(createStatus)")
+      return
+    }
+
+    CVDisplayLinkSetOutputHandler(link) { [weak self] _, _, _, _, _ in
+      let timestamp = CACurrentMediaTime()
+      DispatchQueue.main.async {
+        self?.onFrame?(timestamp)
+      }
+      return kCVReturnSuccess
+    }
+
+    displayLink = link
+    CVDisplayLinkStart(link)
+  }
+
+  func retarget(displayID: CGDirectDisplayID) {
+    guard let link = displayLink else { return }
+    CVDisplayLinkSetCurrentCGDisplay(link, displayID)
+  }
+
+  func stop() {
+    guard let link = displayLink else { return }
+    CVDisplayLinkStop(link)
+    displayLink = nil
+    onFrame = nil
+  }
+}
+
+/// production 的逾時排程：`DispatchQueue.main.asyncAfter`。
+func makeProductionCursorLocatorDeadlineScheduler() -> CursorLocatorDeadlineScheduling {
+  { delay, callback in
+    final class CancelFlag {
+      var isCancelled = false
+    }
+    let flag = CancelFlag()
+    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+      guard !flag.isCancelled else { return }
+      callback()
+    }
+    return { flag.isCancelled = true }
+  }
+}
+
+/// production 的螢幕幾何快照提供者：讀 `NSScreen.screens` / `NSScreen.main`。
+/// 每次呼叫重新讀取，播放期間逐幀重建即涵蓋顯示器熱插拔（Phase 1 §2.8）。
+func productionCursorScreenSnapshot() -> CursorScreenSnapshot {
+  let screens = NSScreen.screens
+  let entries = screens.map { screen -> CursorScreenSnapshot.Entry in
+    let displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+      .uint32Value ?? 0
+    return CursorScreenSnapshot.Entry(frame: screen.frame, displayID: displayID)
+  }
+  let mainIndex = NSScreen.main.flatMap { main in
+    screens.firstIndex { $0 === main }
+  }
+  return CursorScreenSnapshot(entries: entries, mainIndex: mainIndex)
+}
+
+/// production 的游標取樣：讀 `NSEvent.mouseLocation`（全域 AppKit 座標）。
+func productionCursorLocation() -> NSPoint {
+  NSEvent.mouseLocation
+}
+
+extension NSColor {
+  /// 由 Dart 端傳入的 ARGB 整數建構顏色（`tintArgb` 參數，SPEC-008 FR-06）。
+  convenience init(cursorLocatorArgb value: Int) {
+    let alpha = CGFloat((value >> 24) & 0xFF) / 255.0
+    let red = CGFloat((value >> 16) & 0xFF) / 255.0
+    let green = CGFloat((value >> 8) & 0xFF) / 255.0
+    let blue = CGFloat(value & 0xFF) / 255.0
+    self.init(red: red, green: green, blue: blue, alpha: alpha)
   }
 }
