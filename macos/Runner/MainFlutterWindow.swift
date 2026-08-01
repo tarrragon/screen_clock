@@ -750,10 +750,20 @@ private func extractCursorLocatorArgument<T>(
 final class CursorLocatorBridge {
   private let channel: FlutterMethodChannel
 
+  /// 特效視窗控制器（子票 1.4.0-W2-006.2.2）。四個依賴皆傳 production 實作。
+  private let controller: CursorLocatorEffectController
+
   init(messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(
       name: CursorLocatorChannel.name,
       binaryMessenger: messenger
+    )
+    self.controller = CursorLocatorEffectController(
+      snapshotProvider: productionCursorScreenSnapshot,
+      locationSampler: productionCursorLocation,
+      surfaceMaker: makeProductionCursorLocatorSurface,
+      frameDriver: DisplayLinkCursorLocatorFrameDriving(),
+      deadlineScheduler: makeProductionCursorLocatorDeadlineScheduler()
     )
     self.channel.setMethodCallHandler { [weak self] (call, result) in
       self?.handle(call: call, result: result)
@@ -810,7 +820,26 @@ final class CursorLocatorBridge {
     }
 
     NSLog("[cursor-locator] play 收到: durationMs=\(durationMs) tintArgb=\(tintArgb)")
-    result(nil)
+
+    let request = CursorLocatorPlayRequest(
+      duration: TimeInterval(durationMs) / 1000.0,
+      tint: NSColor(cursorLocatorArgb: tintArgb)
+    )
+    do {
+      try controller.play(request)
+      result(nil)
+    } catch let error as CursorLocatorError {
+      result(CursorLocatorErrorMapping.flutterError(for: error))
+    } catch {
+      NSLog("[cursor-locator] play 未預期錯誤: \(error)")
+      result(
+        FlutterError(
+          code: CursorLocatorErrorCode.windowCreationFailed,
+          message: "特效播放發生未預期錯誤",
+          details: String(describing: error)
+        )
+      )
+    }
   }
 
   /// 記錄單一參數鍵的提取失敗原因；成功結果不記（呼叫端已在成功路徑統一記錄）。
