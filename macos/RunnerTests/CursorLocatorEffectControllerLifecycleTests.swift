@@ -173,6 +173,52 @@ final class CursorLocatorEffectControllerLifecycleTests: XCTestCase {
     }
   }
 
+  /// 1.4.0-W2-041：守住母票 1.4.0-W2-006 Solution「Phase 3a 虛擬碼修正」——
+  /// 重置分支不得遞增世代序號。與 T2.C-05 不同，本案例不藉由「最終是否進入
+  /// `.idle`」間接判斷，而是逐幀直接斷言 elapsed 確實推進、淡出窗內 alpha
+  /// 確實被寫入，排除「因其他路徑巧合達成 idle」的混淆可能，並在意圖上明示
+  /// 這是「重置後 driver 是否持續供幀」的專屬回歸測試。
+  ///
+  /// 若重置分支遞增世代序號，driver 閉包（重置不重呼 `start`，故仍是舊閉包）
+  /// 捕捉的世代將永久落後，`handleFrame` 的世代 guard 自此永遠不成立——重置
+  /// 後所有幀被靜默丟棄，elapsed 凍結在重置當下的 0，alpha 亦不再更新。
+  func testPlay_framesAfterReset_areProcessedNotSilentlyDropped() throws {
+    try controller.play(CursorLocatorPlayRequest(duration: 1.5, tint: .white))
+    driver.emit(at: t0)
+    driver.emit(at: t0 + 0.6)
+
+    assertPlaying(controller.state, elapsed: 0.6, duration: 1.5, screenFrame: mainFrame)
+
+    // 重置：同一個 driver 閉包持續供幀，起點清為 nil，elapsed 重新從 0 起算。
+    try controller.play(CursorLocatorPlayRequest(duration: 1.0, tint: .black))
+
+    // 重置後推進若干幀，逐一斷言 elapsed 確實推進（非被世代 guard 丟棄凍結）。
+    driver.emit(at: t0 + 0.6)
+    assertPlaying(controller.state, elapsed: 0, duration: 1.0, screenFrame: mainFrame)
+
+    driver.emit(at: t0 + 0.7)
+    assertPlaying(controller.state, elapsed: 0.1, duration: 1.0, screenFrame: mainFrame)
+
+    driver.emit(at: t0 + 0.9)
+    assertPlaying(controller.state, elapsed: 0.3, duration: 1.0, screenFrame: mainFrame)
+
+    // fadeDuration = min(0.2, 1.0*0.4=0.4) = 0.2；窗起於 elapsed 0.8，
+    // 已進入淡出窗，alpha 必然被寫入——若幀被丟棄，alphaValues 仍會停留
+    // 在重置時 setAlpha(1.0) 那一筆，不會再有新值。
+    driver.emit(at: t0 + 1.5)
+    XCTAssertGreaterThan(
+      log.alphaValues.count, 1,
+      "重置後淡出窗內應有新的 alpha 寫入，若只剩重置當下的 setAlpha(1.0) 一筆，代表後續幀被靜默丟棄"
+    )
+    XCTAssertLessThan(log.alphaValues.last!, 1.0)
+
+    // 最終應能自然抵達 idle，證明結束子程序（依賴幀持續推進 elapsed）未被
+    // 世代 guard 攔死。
+    driver.emit(at: t0 + 1.6)
+    XCTAssertEqual(controller.state, .idle)
+    XCTAssertEqual(log.closeCount, 1)
+  }
+
   // MARK: - 場景 9：十次完整播放無洩漏
 
   /// T2.C-07：連續十次完整播放，S1（close 計數）+ S2（weak 全數為 nil）
