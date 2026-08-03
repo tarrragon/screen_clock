@@ -197,6 +197,24 @@ enum CursorLocatorEffectConstants {
 
   /// normalized progress 的上界。播放自然結束該幀的 progress 即為此值。
   static let progressUpperBound: Double = 1
+
+  /// 聚光燈壓暗層的不透明度（SPEC-008 FR-03 上限 55%，取用上限值以達成
+  /// 「目標螢幕明顯變暗」的驗收標準）。
+  static let spotlightDimOpacity: Double = 0.55
+
+  /// 聚光燈亮區半徑（點，SPEC-008 FR-03 指定 120 px）。此半徑內完全不壓暗。
+  static let spotlightBrightRadius: CGFloat = 120
+
+  /// 亮區邊緣的羽化帶寬度（點）。自 `spotlightBrightRadius` 起往外，壓暗度由
+  /// 0 漸增到滿值；沒有這段寬度時邊緣為鋸齒硬邊，違反 FR-03。
+  static let spotlightEdgeFeather: CGFloat = 40
+
+  /// 亮區加羽化帶的總半徑，即壓暗完全生效的距離。
+  static let spotlightOuterRadius: CGFloat = spotlightBrightRadius + spotlightEdgeFeather
+
+  /// 亮區邊界在漸層中的位置比例（0 為圓心、1 為 `spotlightOuterRadius`）。
+  static let spotlightBrightStopRatio: Double =
+    Double(spotlightBrightRadius / spotlightOuterRadius)
 }
 
 /// 單一幀交付給 renderer 的全部資訊。
