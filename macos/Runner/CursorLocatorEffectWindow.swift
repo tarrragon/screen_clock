@@ -197,6 +197,22 @@ enum CursorLocatorEffectConstants {
 
   /// normalized progress 的上界。播放自然結束該幀的 progress 即為此值。
   static let progressUpperBound: Double = 1
+
+  /// 螢幕邊框閃爍（FR-04）的邊框寬度，往螢幕 frame 內緣描繪。
+  static let borderWidth: CGFloat = 8
+
+  /// 螢幕邊框閃爍（FR-04）單次淡入淡出的週期秒數。
+  ///
+  /// 固定值，不隨使用者設定的總時長伸縮：SPEC-008 FR-04 以「每次淡入淡出
+  /// 週期 200 ms」界定閃爍節奏，隨總時長壓縮會使節奏可辨識度隨設定而變。
+  static let flashCycleDuration: TimeInterval = 0.2
+
+  /// 螢幕邊框閃爍（FR-04）的閃爍次數。
+  ///
+  /// 總時長短於 `flashCycleDuration * flashCycleCount` 時採截斷：邊框依固定
+  /// 週期閃到播放結束為止，不足三次。理由見
+  /// `CursorLocatorBorderFlashRenderer.flashAlpha(elapsed:)`。
+  static let flashCycleCount: Int = 3
 }
 
 /// 單一幀交付給 renderer 的全部資訊。
