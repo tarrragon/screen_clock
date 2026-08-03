@@ -38,9 +38,10 @@ enum CursorLocatorErrorMapping {
   }
 }
 
-/// SPEC-008 定義的錯誤碼字面。與 `lib/app_constants.dart` 的 `AppCursorLocator`
-/// 須逐項一致（Swift 無法 import Dart 常數，以下列舉承載相同字面；跨語言一致性
-/// 的機械檢查屬 `1.4.0-W2-035`）。
+/// SPEC-008 定義的錯誤碼字面。目前 Dart 側尚無對應常數——`AppCursorLocator`
+/// 不含任何錯誤碼，全 Dart 樹亦無 `E_CL` 字面；此處為單一來源。待
+/// `1.4.0-W2-026` 建立 Dart 側常數後，兩邊須逐項一致（Swift 無法 import Dart
+/// 常數，屆時由各自列舉承載相同字面），該一致性的機械檢查屬 `1.4.0-W2-035`。
 enum CursorLocatorErrorCode {
   /// 特效視窗建立失敗（EX-06-03）。
   static let windowCreationFailed = "E_CL_WINDOW"

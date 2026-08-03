@@ -96,6 +96,9 @@ enum CursorScreenLocator {
 /// 一次播放的請求參數。由 bridge 從 channel 參數轉換而來（子票 .2.2 職責）。
 struct CursorLocatorPlayRequest: Equatable {
   let duration: TimeInterval
+
+  /// 特效顏色。目前無消費者：控制器只管視窗生命週期與 alpha，不做繪製。
+  /// 由 `1.4.0-W3-001` 的特效繪製接手使用。
   let tint: NSColor
 }
 
@@ -246,9 +249,10 @@ final class CursorLocatorEffectController {
   /// 觸發或重置播放。
   ///
   /// - `.idle` 時建立 surface 並開始播放。
-  /// - `.playing` 時「重置」既有 surface：elapsed 起點清除、tint/duration
-  ///   換為新請求、alpha 復位為 1、必要時搬遷至新目標螢幕；不建立第二個
-  ///   surface（UC-06 替代場景 06b）。
+  /// - `.playing` 時「重置」既有 surface：elapsed 起點清除、duration 換為
+  ///   新請求、alpha 復位為 1、必要時搬遷至新目標螢幕；不建立第二個
+  ///   surface（UC-06 替代場景 06b）。`request.tint` 目前無消費者——本控制器
+  ///   不負責繪製，重置時不會換色；該欄位為 `1.4.0-W3-001` 特效繪製預留。
   /// - 無任何可用螢幕時拋出 `.noAvailableScreen`，不建立 surface、不啟動
   ///   驅動、不排程逾時。
   /// - surface 建立失敗時拋出 `.windowCreationFailed`；此路徑結束後狀態
@@ -479,9 +483,11 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
   let window: NSWindow
   private let hostView: NSView
 
-  var contentLayer: CALayer {
-    hostView.layer ?? CALayer()
-  }
+  /// 繪製目標圖層。由本型別自建並在 `init` 掛上 `hostView`，故必然位於視窗的
+  /// layer hierarchy 內；不採 `hostView.layer ?? CALayer()` 那種 fallback——
+  /// 後者在 layer 為 nil 時會交出一個未接在任何視窗上的孤兒圖層，繪製全部
+  /// 「成功」但畫面無輸出且無錯誤無日誌。
+  let contentLayer: CALayer
 
   init(frame: NSRect) {
     window = NonKeyEffectWindow(
@@ -491,6 +497,11 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
       defer: false
     )
     hostView = NSView(frame: NSRect(origin: .zero, size: frame.size))
+    // 先指派再開 wantsLayer，使 hostView 成為 layer-hosted view，其 `layer`
+    // 即為此處持有的實例（AppKit 不會另行替換），兩者恆為同一物件。
+    contentLayer = CALayer()
+    contentLayer.frame = hostView.bounds
+    hostView.layer = contentLayer
     hostView.wantsLayer = true
 
     window.contentView = hostView
