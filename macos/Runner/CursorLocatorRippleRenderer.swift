@@ -74,10 +74,6 @@ final class CursorLocatorRippleRenderer: CursorLocatorEffectRendering {
   /// 「播放期間移動游標，波紋圓心跟隨」指的是波紋整體跟隨，釘住舊位置會
   /// 拖出軌跡而非同心圓。
   func render(_ frame: CursorLocatorEffectFrame) {
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    defer { CATransaction.commit() }
-
     for (index, ringLayer) in ringLayers.enumerated() {
       guard
         let appearance = CursorLocatorRippleTimeline.appearance(

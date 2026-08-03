@@ -27,9 +27,7 @@ final class CursorLocatorSpotlightRenderer: CursorLocatorEffectRendering {
     let mask = makeHoleMask(bounds: layer.bounds)
     let dim = makeDimLayer(bounds: layer.bounds, mask: mask)
 
-    withoutImplicitAnimations {
-      layer.addSublayer(dim)
-    }
+    layer.addSublayer(dim)
 
     self.dimLayer = dim
     self.holeMask = mask
@@ -41,17 +39,13 @@ final class CursorLocatorSpotlightRenderer: CursorLocatorEffectRendering {
     // 依附的圖層可能因視窗搬到另一台螢幕而改變尺寸，故每幀重新對齊。
     let bounds = dim.superlayer?.bounds ?? dim.bounds
 
-    withoutImplicitAnimations {
-      dim.frame = bounds
-      mask.frame = CGRect(origin: .zero, size: bounds.size)
-      applyHoleCenter(frame.cursorPointInLayer, to: mask, in: bounds.size)
-    }
+    dim.frame = bounds
+    mask.frame = CGRect(origin: .zero, size: bounds.size)
+    applyHoleCenter(frame.cursorPointInLayer, to: mask, in: bounds.size)
   }
 
   func detach() {
-    withoutImplicitAnimations {
-      dimLayer?.removeFromSuperlayer()
-    }
+    dimLayer?.removeFromSuperlayer()
     dimLayer = nil
     holeMask = nil
   }
@@ -108,14 +102,5 @@ final class CursorLocatorSpotlightRenderer: CursorLocatorEffectRendering {
       x: center.x + outerRadius / size.width,
       y: center.y + outerRadius / size.height
     )
-  }
-
-  /// 圖層屬性的隱含動畫會讓亮區「滑」向新位置而非即時跟隨（FR-03 要求無可見
-  /// 延遲），且每幀都會新建動畫物件；故所有幾何寫入一律停用隱含動畫。
-  private func withoutImplicitAnimations(_ body: () -> Void) {
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    body()
-    CATransaction.commit()
   }
 }
