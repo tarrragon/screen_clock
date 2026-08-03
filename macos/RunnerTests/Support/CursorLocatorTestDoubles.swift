@@ -252,6 +252,36 @@ final class ManualFrameDriver: CursorLocatorFrameDriving {
   }
 }
 
+/// 實作 `CursorLocatorEffectRendering`（子票 1.4.0-W3-001.1）。
+///
+/// 記錄 attach / render / detach 的完整參數，使「progress 由 CVDisplayLink
+/// 時間戳推進」「每幀游標取樣只有一次且被繪製層共用」「tint 與 duration 有
+/// 實際消費者」三項可被直接斷言，不必透過畫面判讀。
+final class SpyCursorLocatorRenderer: CursorLocatorEffectRendering {
+  struct Attachment: Equatable {
+    let tint: NSColor
+    let duration: TimeInterval
+  }
+
+  private(set) var attachments: [Attachment] = []
+  private(set) var attachedLayers: [CALayer] = []
+  private(set) var frames: [CursorLocatorEffectFrame] = []
+  private(set) var detachCount = 0
+
+  func attach(to layer: CALayer, tint: NSColor, duration: TimeInterval) {
+    attachedLayers.append(layer)
+    attachments.append(Attachment(tint: tint, duration: duration))
+  }
+
+  func render(_ frame: CursorLocatorEffectFrame) {
+    frames.append(frame)
+  }
+
+  func detach() {
+    detachCount += 1
+  }
+}
+
 /// 實作 `CursorLocatorDeadlineScheduling`。以 `schedule(delay:callback:)`
 /// 綁定實例方法作為要注入的 closure，型別與 `CursorLocatorDeadlineScheduling`
 /// 完全相符。
