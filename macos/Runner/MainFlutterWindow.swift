@@ -763,7 +763,11 @@ final class CursorLocatorBridge {
       locationSampler: productionCursorLocation,
       surfaceMaker: makeProductionCursorLocatorSurface,
       frameDriver: DisplayLinkCursorLocatorFrameDriving(),
-      deadlineScheduler: makeProductionCursorLocatorDeadlineScheduler()
+      deadlineScheduler: makeProductionCursorLocatorDeadlineScheduler(),
+      // 特效 renderer 的接線點。子票 1.4.0-W3-001.1 只建時間軸與取樣基礎，
+      // 不繪製可見內容，故陣列為空；聚光燈（.2）／邊框閃爍（.3）／波紋（.4）
+      // 各自把 renderer 加入此處。
+      renderer: CursorLocatorCompositeRenderer(renderers: [])
     )
     self.channel.setMethodCallHandler { [weak self] (call, result) in
       self?.handle(call: call, result: result)
