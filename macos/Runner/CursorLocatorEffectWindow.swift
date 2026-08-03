@@ -254,9 +254,7 @@ final class CursorLocatorEffectController {
   /// - surface 建立失敗時拋出 `.windowCreationFailed`；此路徑結束後狀態
   ///   仍為 `.idle`，且無殘留的排程與驅動。
   func play(_ request: CursorLocatorPlayRequest) throws {
-    let snapshot = snapshotProvider()
-    let cursorLocation = locationSampler()
-    let resolution = CursorScreenLocator.resolve(cursorLocation: cursorLocation, in: snapshot)
+    let (snapshot, resolution) = resolveTarget()
 
     let targetIndex: Int
     switch resolution {
@@ -288,6 +286,16 @@ final class CursorLocatorEffectController {
     endPlayback()
   }
 
+  /// `play` 與 `handleFrame` 共用的前置三行：取快照、取游標、判定螢幕。
+  /// switch 與對應的 log 留在各自呼叫端，因為兩條路徑對同一判定結果的診斷
+  /// 措辭不同（`play` 語境「無法播放」、`handleFrame` 語境「續行播放」）。
+  private func resolveTarget() -> (CursorScreenSnapshot, CursorScreenResolution) {
+    let snapshot = snapshotProvider()
+    let cursorLocation = locationSampler()
+    let resolution = CursorScreenLocator.resolve(cursorLocation: cursorLocation, in: snapshot)
+    return (snapshot, resolution)
+  }
+
   private func startNewPlayback(
     request: CursorLocatorPlayRequest,
     targetEntry: CursorScreenSnapshot.Entry
@@ -303,11 +311,7 @@ final class CursorLocatorEffectController {
     generation += 1
     let capturedGeneration = generation
 
-    let cancelDeadline = deadlineScheduler(
-      request.duration + CursorLocatorTimingConstants.deadlineMargin
-    ) { [weak self] in
-      self?.handleDeadline(generation: capturedGeneration)
-    }
+    let cancelDeadline = scheduleDeadline(duration: request.duration, generation: capturedGeneration)
 
     let newSession = PlayingSession(
       surface: newSurface,
@@ -334,20 +338,22 @@ final class CursorLocatorEffectController {
     currentSession.elapsed = 0
     currentSession.startTimestamp = nil
 
-    if targetEntry.frame != currentSession.screenFrame {
-      currentSession.surface.move(toScreenFrame: targetEntry.frame)
-      frameDriver.retarget(displayID: targetEntry.displayID)
-      currentSession.screenFrame = targetEntry.frame
-    }
+    updateTargetScreenIfNeeded(targetEntry, session: &currentSession)
 
     currentSession.surface.setAlpha(1.0)
 
     currentSession.cancelDeadline()
-    let capturedGeneration = generation
-    currentSession.cancelDeadline = deadlineScheduler(
-      request.duration + CursorLocatorTimingConstants.deadlineMargin
+    currentSession.cancelDeadline = scheduleDeadline(duration: request.duration, generation: generation)
+  }
+
+  /// 逾時保險排程的共用尾段：`startNewPlayback` 遞增後傳入新世代、
+  /// `resetExistingPlayback` 傳入現有世代不遞增——差異由呼叫端決定，本函式
+  /// 只負責排程與取消 closure 的組裝。
+  private func scheduleDeadline(duration: TimeInterval, generation: UInt64) -> () -> Void {
+    deadlineScheduler(
+      duration + CursorLocatorTimingConstants.deadlineMargin
     ) { [weak self] in
-      self?.handleDeadline(generation: capturedGeneration)
+      self?.handleDeadline(generation: generation)
     }
   }
 
@@ -356,35 +362,13 @@ final class CursorLocatorEffectController {
   private func handleFrame(timestamp: CFTimeInterval, generation frameGeneration: UInt64) {
     guard frameGeneration == generation else { return }
     guard var currentSession = session else { return }
-
-    let snapshot = snapshotProvider()
-    let cursorLocation = locationSampler()
-    let resolution = CursorScreenLocator.resolve(cursorLocation: cursorLocation, in: snapshot)
-
-    switch resolution {
-    case .unavailable:
-      NSLog("[cursor-locator] E_CL_SCREEN: 播放中螢幕數歸零，結束播放")
-      endPlayback()
-      return
-    case .matched(let index):
-      updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
-    case .fellBackToMain(let index):
-      NSLog("[cursor-locator] E_CL_SCREEN: 播放中退回 main，續行播放")
-      updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
-    }
+    guard updateScreenOrEndPlayback(for: &currentSession) else { return }
 
     let start = currentSession.startTimestamp ?? timestamp
     currentSession.startTimestamp = start
     let elapsed = timestamp - start
 
-    let fadeDuration = min(
-      CursorLocatorTimingConstants.fadeDurationCap,
-      currentSession.duration * CursorLocatorTimingConstants.fadeDurationRatio
-    )
-    let fadeStart = currentSession.duration - fadeDuration
-    if fadeDuration > 0 && elapsed >= fadeStart {
-      let remaining = currentSession.duration - elapsed
-      let alpha = max(0, min(1, remaining / fadeDuration))
+    if let alpha = Self.fadeAlpha(elapsed: elapsed, duration: currentSession.duration) {
       currentSession.surface.setAlpha(alpha)
     }
 
@@ -396,6 +380,26 @@ final class CursorLocatorEffectController {
     }
   }
 
+  /// 每幀螢幕重判定：無可用螢幕時走結束子程序並回傳 `false`（呼叫端應停止
+  /// 該幀後續處理）；命中或退回 main 時視需要搬遷 surface 並回傳 `true`。
+  private func updateScreenOrEndPlayback(for currentSession: inout PlayingSession) -> Bool {
+    let (snapshot, resolution) = resolveTarget()
+
+    switch resolution {
+    case .unavailable:
+      NSLog("[cursor-locator] E_CL_SCREEN: 播放中螢幕數歸零，結束播放")
+      endPlayback()
+      return false
+    case .matched(let index):
+      updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
+      return true
+    case .fellBackToMain(let index):
+      NSLog("[cursor-locator] E_CL_SCREEN: 播放中退回 main，續行播放")
+      updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
+      return true
+    }
+  }
+
   private func updateTargetScreenIfNeeded(
     _ entry: CursorScreenSnapshot.Entry,
     session: inout PlayingSession
@@ -404,6 +408,23 @@ final class CursorLocatorEffectController {
     session.surface.move(toScreenFrame: entry.frame)
     frameDriver.retarget(displayID: entry.displayID)
     session.screenFrame = entry.frame
+  }
+
+  /// 淡出窗內的 alpha 值計算，純函式、無副作用（母票 Phase 1 §2.8 淡出步驟）。
+  ///
+  /// `duration <= 0` 或 `elapsed` 尚未進入淡出窗時回傳 `nil`，呼叫端不設定
+  /// alpha（維持既有值，通常為 1.0）。淡出窗定義：`min(fadeDurationCap,
+  /// duration * fadeDurationRatio)` 秒，於 `duration` 結束前展開。
+  static func fadeAlpha(elapsed: TimeInterval, duration: TimeInterval) -> CGFloat? {
+    let fadeDuration = min(
+      CursorLocatorTimingConstants.fadeDurationCap,
+      duration * CursorLocatorTimingConstants.fadeDurationRatio
+    )
+    let fadeStart = duration - fadeDuration
+    guard fadeDuration > 0 && elapsed >= fadeStart else { return nil }
+
+    let remaining = duration - elapsed
+    return max(0, min(1, remaining / fadeDuration))
   }
 
   private func handleDeadline(generation deadlineGeneration: UInt64) {
