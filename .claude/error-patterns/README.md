@@ -153,6 +153,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | TEST-BAL-002 | 測試替身走簡化建構路徑，繞過 production 裝配步驟使缺口對測試不可見 | 高 | — |
 | TEST-MON-001 | 硬編碼時間戳 fixture × 時間相對查詢窗 = clock 時間炸彈 | 高 | — |
 | TEST-MON-002 | TDD Phase 2 紅燈設計漏 handler/lifecycle 行為測試；GREEN agent confidence<1.0 是補洞訊號 | 中 | — |
+| TEST-SCLK-001 | 快取化建置使「零警告 / 無 X」類驗收成為空訊號 | — | — |
 
 ### 文件 (DOC)
 
@@ -565,6 +566,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-SCLK-005 | 共享 working tree 下無 pathspec 的 git commit 會夾帶他人已 staged 的檔案 | 中 | — |
 | PC-SCLK-006 | 規格內的自然語言結論與其自身形式定義相反，TDD 循環無法自曝 | 高 | — |
 | PC-SCLK-007 | Hook 讀取錯誤的 payload 欄位名，取得空值後走「無事可做」分支而靜默失效 | 高 | — |
+| PC-SCLK-008 | PM 前置分析的斷言措辭被執行者照抄進產出，成為錯誤的事實來源 | — | — |
 
 ---
 
