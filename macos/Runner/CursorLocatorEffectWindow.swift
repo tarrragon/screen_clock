@@ -101,6 +101,9 @@ struct CursorLocatorPlayRequest: Equatable {
 
 /// 控制器對外可觀測的播放狀態。surface 是否存活由本型別唯一表示：
 /// `.idle` 等價於「無 surface」，`.playing` 等價於「恰有一個 surface」。
+/// 此不變式由 `CursorLocatorEffectController.session`（optional
+/// `PlayingSession`，見該類別定義）的型別結構保證：`state` 由 `session`
+/// 是否為 nil 直接推導，不存在需要人工同步的第二份真相。
 enum CursorLocatorPlaybackState: Equatable {
   case idle
 
@@ -192,7 +195,28 @@ final class CursorLocatorEffectController {
   private let frameDriver: CursorLocatorFrameDriving
   private let deadlineScheduler: CursorLocatorDeadlineScheduling
 
-  private(set) var state: CursorLocatorPlaybackState = .idle
+  /// playing 期間持有的全部狀態，`surface` 為 non-optional。存在即等價於
+  /// 「恰有一個 surface」——不變式由型別本身保證，不再靠人工同步多個獨立
+  /// ivar 維持。`duration`／`elapsed`／`screenFrame` 供外部可觀測的 `state`
+  /// 計算而來，不另存一份。
+  private struct PlayingSession {
+    let surface: CursorLocatorSurface
+    var duration: TimeInterval
+    var elapsed: TimeInterval
+    var startTimestamp: CFTimeInterval?
+    var screenFrame: NSRect
+    var cancelDeadline: (() -> Void)?
+  }
+
+  private var session: PlayingSession?
+
+  /// 控制器對外可觀測的播放狀態。`.idle` 等價於 `session == nil`，`.playing`
+  /// 等價於 `session != nil`——由 `session` 的 optional 性質直接保證，不需
+  /// 額外的一致性檢查。
+  var state: CursorLocatorPlaybackState {
+    guard let session = session else { return .idle }
+    return .playing(elapsed: session.elapsed, duration: session.duration, screenFrame: session.screenFrame)
+  }
 
   /// 過期幀攔截用的世代序號。於「建立新 surface」與「結束子程序」時遞增，
   /// 使已停止／已結束的舊 driver 產生的在途幀在比對時被過濾。
@@ -201,14 +225,11 @@ final class CursorLocatorEffectController {
   /// （只 `retarget`，不重呼 `start`），`onFrame` 閉包仍是同一個、捕捉的仍是
   /// 同一世代值；若重置也遞增，會使該閉包捕捉的世代永久落後於
   /// `self.generation`，導致重置後所有後續幀被誤判為過期而永久停止推進。
+  ///
+  /// 獨立於 `session` 之外持有（不隨 playing/idle 收放）：`endPlayback` 在
+  /// `session = nil` 之後仍須遞增，供已捕捉舊世代值的在途幀比對用；若隨
+  /// `session` 一起消失，會失去攔截在途幀的能力。
   private var generation: UInt64 = 0
-
-  private var surface: CursorLocatorSurface?
-  private var duration: TimeInterval = 0
-  private var startTimestamp: CFTimeInterval?
-  private var currentScreenFrame: NSRect?
-  private var currentDisplayID: CGDirectDisplayID?
-  private var cancelDeadline: (() -> Void)?
 
   init(
     snapshotProvider: @escaping CursorScreenSnapshotProviding,
@@ -253,7 +274,7 @@ final class CursorLocatorEffectController {
 
     let targetEntry = snapshot.entries[targetIndex]
 
-    if case .playing = state {
+    if session != nil {
       resetExistingPlayback(request: request, targetEntry: targetEntry)
       return
     }
@@ -264,7 +285,7 @@ final class CursorLocatorEffectController {
   /// 立即結束播放並釋放 surface（app 結束或測試 teardown 用）。
   /// `.idle` 時為 no-op，不 throw。
   func stop() {
-    guard case .playing = state else { return }
+    guard session != nil else { return }
     endPlayback()
   }
 
@@ -280,59 +301,65 @@ final class CursorLocatorEffectController {
       throw CursorLocatorError.windowCreationFailed(underlying: String(describing: error))
     }
 
-    surface = newSurface
-    duration = request.duration
-    startTimestamp = nil
-    currentScreenFrame = targetEntry.frame
-    currentDisplayID = targetEntry.displayID
     generation += 1
     let capturedGeneration = generation
+
+    var newSession = PlayingSession(
+      surface: newSurface,
+      duration: request.duration,
+      elapsed: 0,
+      startTimestamp: nil,
+      screenFrame: targetEntry.frame,
+      cancelDeadline: nil
+    )
 
     frameDriver.start(displayID: targetEntry.displayID) { [weak self] timestamp in
       self?.handleFrame(timestamp: timestamp, generation: capturedGeneration)
     }
 
-    cancelDeadline = deadlineScheduler(
+    newSession.cancelDeadline = deadlineScheduler(
       request.duration + CursorLocatorTimingConstants.deadlineMargin
     ) { [weak self] in
       self?.handleDeadline(generation: capturedGeneration)
     }
 
-    state = .playing(elapsed: 0, duration: request.duration, screenFrame: targetEntry.frame)
+    session = newSession
   }
 
   private func resetExistingPlayback(
     request: CursorLocatorPlayRequest,
     targetEntry: CursorScreenSnapshot.Entry
   ) {
-    duration = request.duration
-    startTimestamp = nil
+    guard var currentSession = session else { return }
 
-    if targetEntry.frame != currentScreenFrame {
-      surface?.move(toScreenFrame: targetEntry.frame)
+    currentSession.duration = request.duration
+    currentSession.elapsed = 0
+    currentSession.startTimestamp = nil
+
+    if targetEntry.frame != currentSession.screenFrame {
+      currentSession.surface.move(toScreenFrame: targetEntry.frame)
       frameDriver.retarget(displayID: targetEntry.displayID)
-      currentScreenFrame = targetEntry.frame
-      currentDisplayID = targetEntry.displayID
+      currentSession.screenFrame = targetEntry.frame
     }
 
-    surface?.setAlpha(1.0)
+    currentSession.surface.setAlpha(1.0)
 
-    cancelDeadline?()
+    currentSession.cancelDeadline?()
     let capturedGeneration = generation
-    cancelDeadline = deadlineScheduler(
+    currentSession.cancelDeadline = deadlineScheduler(
       request.duration + CursorLocatorTimingConstants.deadlineMargin
     ) { [weak self] in
       self?.handleDeadline(generation: capturedGeneration)
     }
 
-    state = .playing(elapsed: 0, duration: request.duration, screenFrame: targetEntry.frame)
+    session = currentSession
   }
 
   /// 每幀行為（母票 Phase 1 §2.8 五步）：世代攔截 -> 重判定螢幕 -> 計算
   /// elapsed -> 淡出窗內設定 alpha -> elapsed 達 duration 即走結束子程序。
   private func handleFrame(timestamp: CFTimeInterval, generation frameGeneration: UInt64) {
     guard frameGeneration == generation else { return }
-    guard case .playing(_, let currentDuration, _) = state else { return }
+    guard var currentSession = session else { return }
 
     let snapshot = snapshotProvider()
     let cursorLocation = locationSampler()
@@ -344,79 +371,65 @@ final class CursorLocatorEffectController {
       endPlayback()
       return
     case .matched(let index):
-      updateTargetScreenIfNeeded(snapshot.entries[index])
+      updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
     case .fellBackToMain(let index):
       NSLog("[cursor-locator] E_CL_SCREEN: 播放中退回 main，續行播放")
-      updateTargetScreenIfNeeded(snapshot.entries[index])
+      updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
     }
 
-    if startTimestamp == nil {
-      startTimestamp = timestamp
-    }
-    guard let start = startTimestamp else { return }
+    let start = currentSession.startTimestamp ?? timestamp
+    currentSession.startTimestamp = start
     let elapsed = timestamp - start
 
     let fadeDuration = min(
       CursorLocatorTimingConstants.fadeDurationCap,
-      currentDuration * CursorLocatorTimingConstants.fadeDurationRatio
+      currentSession.duration * CursorLocatorTimingConstants.fadeDurationRatio
     )
-    let fadeStart = currentDuration - fadeDuration
+    let fadeStart = currentSession.duration - fadeDuration
     if fadeDuration > 0 && elapsed >= fadeStart {
-      let remaining = currentDuration - elapsed
+      let remaining = currentSession.duration - elapsed
       let alpha = max(0, min(1, remaining / fadeDuration))
-      surface?.setAlpha(alpha)
+      currentSession.surface.setAlpha(alpha)
     }
 
-    if elapsed >= currentDuration {
+    if elapsed >= currentSession.duration {
       endPlayback()
       return
     }
 
-    state = .playing(
-      elapsed: elapsed,
-      duration: currentDuration,
-      screenFrame: currentScreenFrame ?? targetFallbackFrame(from: snapshot)
-    )
+    currentSession.elapsed = elapsed
+    session = currentSession
   }
 
-  private func targetFallbackFrame(from snapshot: CursorScreenSnapshot) -> NSRect {
-    guard let mainIndex = snapshot.mainIndex, snapshot.entries.indices.contains(mainIndex) else {
-      return .zero
-    }
-    return snapshot.entries[mainIndex].frame
-  }
-
-  private func updateTargetScreenIfNeeded(_ entry: CursorScreenSnapshot.Entry) {
-    guard entry.frame != currentScreenFrame else { return }
-    surface?.move(toScreenFrame: entry.frame)
+  private func updateTargetScreenIfNeeded(
+    _ entry: CursorScreenSnapshot.Entry,
+    session: inout PlayingSession
+  ) {
+    guard entry.frame != session.screenFrame else { return }
+    session.surface.move(toScreenFrame: entry.frame)
     frameDriver.retarget(displayID: entry.displayID)
-    currentScreenFrame = entry.frame
-    currentDisplayID = entry.displayID
+    session.screenFrame = entry.frame
   }
 
   private func handleDeadline(generation deadlineGeneration: UInt64) {
     guard deadlineGeneration == generation else { return }
-    guard case .playing = state else { return }
+    guard session != nil else { return }
     NSLog("[cursor-locator] 逾時保險觸發，強制結束播放")
     endPlayback()
   }
 
   /// 結束子程序（單一出口，供自然結束 / 螢幕歸零 / 逾時 / 主動停止四條路徑
-  /// 共用）：停驅動 -> 取消逾時 -> 關閉 surface -> 釋放持有 -> 狀態設為
-  /// 閒置 -> 遞增世代序號。
+  /// 共用）：停驅動 -> 取消逾時 -> 關閉 surface -> 釋放持有 -> 遞增世代序號。
   ///
   /// 四條結束路徑共用同一子程序，是「十次觸發無洩漏」在所有路徑上一致成立
   /// 的結構前提；若各路徑各自收尾，必有某條路徑漏掉其中一步。
   private func endPlayback() {
     frameDriver.stop()
-    cancelDeadline?()
-    cancelDeadline = nil
-    surface?.close()
-    surface = nil
-    startTimestamp = nil
-    currentScreenFrame = nil
-    currentDisplayID = nil
-    state = .idle
+    if let currentSession = session {
+      currentSession.cancelDeadline?()
+      currentSession.surface.close()
+    }
+    session = nil
     generation += 1
   }
 }
