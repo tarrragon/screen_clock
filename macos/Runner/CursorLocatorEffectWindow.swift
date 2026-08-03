@@ -231,6 +231,26 @@ enum CursorLocatorEffectConstants {
   /// 週期閃到播放結束為止，不足三次。理由見
   /// `CursorLocatorBorderFlashRenderer.flashAlpha(elapsed:)`。
   static let flashCycleCount: Int = 3
+
+  // MARK: - FR-05 游標波紋擴散（子票 1.4.0-W3-001.4）
+
+  /// 一次播放連續發出的圈數。
+  static let rippleRingCount: Int = 3
+
+  /// 單圈起始半徑（px）。
+  static let rippleStartRadius: CGFloat = 20
+
+  /// 單圈終止半徑（px）。
+  static let rippleEndRadius: CGFloat = 180
+
+  /// 單圈自發出至完全淡出的歷時（秒）。
+  static let rippleRingLifetime: TimeInterval = 0.5
+
+  /// 相鄰兩圈的發出間隔（秒）。第 n 圈於 `n * 此值` 發出。
+  static let rippleEmissionInterval: TimeInterval = 0.15
+
+  /// 圓環線寬（px）。SPEC-008 未規定；取值使 20 px 起始圈仍為可辨識的環而非實心點。
+  static let rippleLineWidth: CGFloat = 4
 }
 
 /// 單一幀交付給 renderer 的全部資訊。

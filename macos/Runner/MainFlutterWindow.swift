@@ -764,11 +764,13 @@ final class CursorLocatorBridge {
       surfaceMaker: makeProductionCursorLocatorSurface,
       frameDriver: DisplayLinkCursorLocatorFrameDriving(),
       deadlineScheduler: makeProductionCursorLocatorDeadlineScheduler(),
-      // 特效 renderer 的接線點。陣列順序即 sublayer 疊加順序（先加者在下）：
-      // 聚光燈（子票 1.4.0-W3-001.2）是覆蓋全螢幕的壓暗遮罩，必須墊底，
-      // 否則會蓋住其餘兩者；邊框閃爍（.3）位於最外層不受壓暗影響。
+      // 特效 renderer 的接線點。陣列順序即 sublayer 疊加順序（先加者在下），
+      // 三者的相對關係無法由任一子票單獨決定，於整併票 1.4.0-W3-001 定案：
+      // 聚光燈（子票 .2）是覆蓋全螢幕的壓暗遮罩，必須墊底，否則會蓋住其餘兩者；
+      // 波紋（.4）在游標處疊於壓暗之上；邊框閃爍（.3）位於最外層不受壓暗影響。
       renderer: CursorLocatorCompositeRenderer(renderers: [
         CursorLocatorSpotlightRenderer(),
+        CursorLocatorRippleRenderer(),
         CursorLocatorBorderFlashRenderer()
       ])
     )
