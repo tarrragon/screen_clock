@@ -34,6 +34,7 @@
 		BF07F081F29E3D61850E47F6 /* CursorLocatorEffectControllerScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */; };
 		702648B48D23ABA750B55F1E /* CursorLocatorErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54532B7E9469B735F0F1E6A /* CursorLocatorErrorMapping.swift */; };
 		64B05F2E0AFEA2C497D6F3EB /* CursorLocatorErrorMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15E7AF7A3271455B04178FDF /* CursorLocatorErrorMappingTests.swift */; };
+		21DAD77DB313D73904DB5431 /* CursorLocatorFadeAlphaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC760A764B189F7CE6DB77B /* CursorLocatorFadeAlphaTests.swift */; };
 		D9149A1F0B05DEADF478E30E /* CursorLocatorSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */; };
 		7368D41F50FB232BAAB1C2B4 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C3DBBDAF90FF981DBEAFD7A /* Pods_Runner.framework */; };
 		ECF4000094CBFBC55E1EE396 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F244AB2C16E845EDDBFDFBF8 /* Pods_RunnerTests.framework */; };
@@ -88,6 +89,7 @@
 		B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectControllerScreenTests.swift; sourceTree = "<group>"; };
 		C54532B7E9469B735F0F1E6A /* CursorLocatorErrorMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorErrorMapping.swift; sourceTree = "<group>"; };
 		15E7AF7A3271455B04178FDF /* CursorLocatorErrorMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorErrorMappingTests.swift; sourceTree = "<group>"; };
+		7EC760A764B189F7CE6DB77B /* CursorLocatorFadeAlphaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorFadeAlphaTests.swift; sourceTree = "<group>"; };
 		8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorSurfaceContractTests.swift; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
@@ -135,6 +137,7 @@
 				FA1E6EC50F0676B37763F865 /* CursorLocatorEffectControllerLifecycleTests.swift */,
 				B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */,
 				15E7AF7A3271455B04178FDF /* CursorLocatorErrorMappingTests.swift */,
+				7EC760A764B189F7CE6DB77B /* CursorLocatorFadeAlphaTests.swift */,
 				8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */,
 			);
 			path = RunnerTests;
@@ -459,6 +462,7 @@
 				6E7C888125B8AD810323F0B7 /* CursorLocatorEffectControllerLifecycleTests.swift in Sources */,
 				BF07F081F29E3D61850E47F6 /* CursorLocatorEffectControllerScreenTests.swift in Sources */,
 				64B05F2E0AFEA2C497D6F3EB /* CursorLocatorErrorMappingTests.swift in Sources */,
+				21DAD77DB313D73904DB5431 /* CursorLocatorFadeAlphaTests.swift in Sources */,
 				D9149A1F0B05DEADF478E30E /* CursorLocatorSurfaceContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
