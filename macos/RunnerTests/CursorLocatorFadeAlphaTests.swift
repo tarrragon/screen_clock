@@ -4,10 +4,15 @@ import XCTest
 
 /// `CursorLocatorEffectController.fadeAlpha(elapsed:duration:)` 純函式覆蓋。
 ///
-/// 對應 1.4.0-W3-009：淡出計算自 `handleFrame` 外提為純函式，acceptance 第 2
-/// 條要求成為「可獨立測試的數學」。既有 `CursorLocatorEffectControllerLifecycleTests`
-/// 的 `testFadeWindow_*` 群組經控制器整體驅動覆蓋同一計算的行為面；本檔補上
-/// 純函式邊界值的直接覆蓋，兩者互補、不互相取代。
+/// 對應 SPEC-008 FR-02 播放結束前的淡出視覺效果。既有
+/// `CursorLocatorEffectControllerLifecycleTests` 的 `testFadeWindow_*` 群組經
+/// 控制器整體驅動覆蓋同一計算的行為面；本檔補上純函式邊界值的直接覆蓋，
+/// 兩者互補、不互相取代。
+///
+/// 本檔期望值（0.8 / 0.9 / 0.24 等）皆由 `CursorLocatorTimingConstants` 的
+/// `fadeDurationCap` 與 `fadeDurationRatio` 推導而來（推導過程見各案例註解）；
+/// 調整這兩個常數需同步檢視並更新本檔，否則測試會出現一串看不出所以然的
+/// 算術紅燈。
 final class CursorLocatorFadeAlphaTests: XCTestCase {
 
   private func assertAlpha(
@@ -60,9 +65,22 @@ final class CursorLocatorFadeAlphaTests: XCTestCase {
     assertAlpha(elapsed: 0.24, duration: 0.3, equals: 0.5)
   }
 
-  /// duration <= 0 時 fadeDuration <= 0，不進入淡出窗，回傳 nil（呼叫端維持
-  /// 既有 alpha，不設定為異常值）。此為 handleFrame 抽取前隱含於
-  /// `fadeDuration > 0` 守衛的邊界，抽取後獨立覆蓋。
+  /// 交叉點：`fadeDurationCap`（0.2）與 `duration * fadeDurationRatio`
+  /// （0.5 * 0.4 = 0.2）剛好相等，`min()` 兩臂打平。驗證此處未因 `min()`
+  /// 的兩種取值路徑產生不一致：fadeDuration 仍為 0.2，fadeStart = 0.3。
+  func testFadeAlpha_durationAtCapRatioCrossover_usesEitherArmConsistently() {
+    let beforeWindow = CursorLocatorEffectController.fadeAlpha(elapsed: 0.2, duration: 0.5)
+    XCTAssertNil(beforeWindow)
+
+    assertAlpha(elapsed: 0.3, duration: 0.5, equals: 1.0)
+
+    // remaining = 0.1；fadeDuration = 0.2；0.1/0.2 = 0.5
+    assertAlpha(elapsed: 0.4, duration: 0.5, equals: 0.5)
+  }
+
+  /// `duration <= 0` 時 fadeDuration <= 0，不進入淡出窗，回傳 nil——與
+  /// `fadeAlpha` doc 所述「呼叫端不設定 alpha，維持既有值」的契約一致，
+  /// 非邊界特例。
   func testFadeAlpha_zeroDuration_returnsNil() {
     let alpha = CursorLocatorEffectController.fadeAlpha(elapsed: 0.0, duration: 0.0)
     XCTAssertNil(alpha)

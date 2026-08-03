@@ -286,9 +286,12 @@ final class CursorLocatorEffectController {
     endPlayback()
   }
 
-  /// `play` 與 `handleFrame` 共用的前置三行：取快照、取游標、判定螢幕。
-  /// switch 與對應的 log 留在各自呼叫端，因為兩條路徑對同一判定結果的診斷
-  /// 措辭不同（`play` 語境「無法播放」、`handleFrame` 語境「續行播放」）。
+  /// 取當下螢幕快照與游標對應的判定結果。
+  ///
+  /// 由 `play` 與 `handleFrame` 共用；switch 分支與對應診斷 log 留在各自
+  /// 呼叫端組裝，因為不同呼叫情境（觸發播放 / 播放中每幀）對同一判定結果
+  /// 需要不同的處理與措辭，寫在此處會讓被呼叫者記住呼叫者的用詞，任一方
+  /// 改動都需回頭同步。
   private func resolveTarget() -> (CursorScreenSnapshot, CursorScreenResolution) {
     let snapshot = snapshotProvider()
     let cursorLocation = locationSampler()
@@ -346,9 +349,11 @@ final class CursorLocatorEffectController {
     currentSession.cancelDeadline = scheduleDeadline(duration: request.duration, generation: generation)
   }
 
-  /// 逾時保險排程的共用尾段：`startNewPlayback` 遞增後傳入新世代、
-  /// `resetExistingPlayback` 傳入現有世代不遞增——差異由呼叫端決定，本函式
-  /// 只負責排程與取消 closure 的組裝。
+  /// 排程一次逾時保險，回傳取消用的 closure。
+  ///
+  /// 世代由參數傳入而非讀取 `self.generation`：是否遞增、遞增後或現有值，
+  /// 完全由呼叫端決定，本函式只負責排程與取消 closure 的組裝，不涉入世代
+  /// 遞增的判斷。
   private func scheduleDeadline(duration: TimeInterval, generation: UInt64) -> () -> Void {
     deadlineScheduler(
       duration + CursorLocatorTimingConstants.deadlineMargin
@@ -362,7 +367,10 @@ final class CursorLocatorEffectController {
   private func handleFrame(timestamp: CFTimeInterval, generation frameGeneration: UInt64) {
     guard frameGeneration == generation else { return }
     guard var currentSession = session else { return }
-    guard updateScreenOrEndPlayback(for: &currentSession) else { return }
+    guard followCursorScreen(&currentSession) else {
+      endPlayback()
+      return
+    }
 
     let start = currentSession.startTimestamp ?? timestamp
     currentSession.startTimestamp = start
@@ -380,15 +388,15 @@ final class CursorLocatorEffectController {
     }
   }
 
-  /// 每幀螢幕重判定：無可用螢幕時走結束子程序並回傳 `false`（呼叫端應停止
-  /// 該幀後續處理）；命中或退回 main 時視需要搬遷 surface 並回傳 `true`。
-  private func updateScreenOrEndPlayback(for currentSession: inout PlayingSession) -> Bool {
+  /// 每幀螢幕重判定：回傳目前是否仍有可用螢幕可續行播放，不做任何終結性
+  /// 副作用（無可用螢幕時是否結束播放由呼叫端決定）。回傳 `true` 時已視
+  /// 需要將 surface 搬遷至判定結果對應的螢幕。
+  private func followCursorScreen(_ currentSession: inout PlayingSession) -> Bool {
     let (snapshot, resolution) = resolveTarget()
 
     switch resolution {
     case .unavailable:
       NSLog("[cursor-locator] E_CL_SCREEN: 播放中螢幕數歸零，結束播放")
-      endPlayback()
       return false
     case .matched(let index):
       updateTargetScreenIfNeeded(snapshot.entries[index], session: &currentSession)
@@ -410,11 +418,15 @@ final class CursorLocatorEffectController {
     session.screenFrame = entry.frame
   }
 
-  /// 淡出窗內的 alpha 值計算，純函式、無副作用（母票 Phase 1 §2.8 淡出步驟）。
+  /// 淡出窗內的 alpha 值計算，純函式、無副作用（SPEC-008 FR-02 播放結束前
+  /// 的淡出視覺效果）。
   ///
   /// `duration <= 0` 或 `elapsed` 尚未進入淡出窗時回傳 `nil`，呼叫端不設定
   /// alpha（維持既有值，通常為 1.0）。淡出窗定義：`min(fadeDurationCap,
   /// duration * fadeDurationRatio)` 秒，於 `duration` 結束前展開。
+  ///
+  /// 宣告為 `internal`（非 `private`）僅為讓 RunnerTests 透過 `@testable
+  /// import` 直接呼叫，不代表對外公開 API。
   static func fadeAlpha(elapsed: TimeInterval, duration: TimeInterval) -> CGFloat? {
     let fadeDuration = min(
       CursorLocatorTimingConstants.fadeDurationCap,
