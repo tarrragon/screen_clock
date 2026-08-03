@@ -33,6 +33,8 @@
 		6E7C888125B8AD810323F0B7 /* CursorLocatorEffectControllerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1E6EC50F0676B37763F865 /* CursorLocatorEffectControllerLifecycleTests.swift */; };
 		BF07F081F29E3D61850E47F6 /* CursorLocatorEffectControllerScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */; };
 		702648B48D23ABA750B55F1E /* CursorLocatorErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54532B7E9469B735F0F1E6A /* CursorLocatorErrorMapping.swift */; };
+		5C1A0B0012D34E5A9F0A0012 /* CursorLocatorSpotlightRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C1A0B0012D34E5A9F0A0011 /* CursorLocatorSpotlightRenderer.swift */; };
+		5C1A0B0012D34E5A9F0A0022 /* CursorLocatorSpotlightRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C1A0B0012D34E5A9F0A0021 /* CursorLocatorSpotlightRendererTests.swift */; };
 		64B05F2E0AFEA2C497D6F3EB /* CursorLocatorErrorMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15E7AF7A3271455B04178FDF /* CursorLocatorErrorMappingTests.swift */; };
 		21DAD77DB313D73904DB5431 /* CursorLocatorFadeAlphaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC760A764B189F7CE6DB77B /* CursorLocatorFadeAlphaTests.swift */; };
 		4A1C0E5D7B92F1440C3D8E11 /* CursorLocatorEffectFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1C0E5C7B92F1440C3D8E10 /* CursorLocatorEffectFrameTests.swift */; };
@@ -89,6 +91,8 @@
 		FA1E6EC50F0676B37763F865 /* CursorLocatorEffectControllerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectControllerLifecycleTests.swift; sourceTree = "<group>"; };
 		B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectControllerScreenTests.swift; sourceTree = "<group>"; };
 		C54532B7E9469B735F0F1E6A /* CursorLocatorErrorMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorErrorMapping.swift; sourceTree = "<group>"; };
+		5C1A0B0012D34E5A9F0A0011 /* CursorLocatorSpotlightRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorSpotlightRenderer.swift; sourceTree = "<group>"; };
+		5C1A0B0012D34E5A9F0A0021 /* CursorLocatorSpotlightRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorSpotlightRendererTests.swift; sourceTree = "<group>"; };
 		15E7AF7A3271455B04178FDF /* CursorLocatorErrorMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorErrorMappingTests.swift; sourceTree = "<group>"; };
 		7EC760A764B189F7CE6DB77B /* CursorLocatorFadeAlphaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorFadeAlphaTests.swift; sourceTree = "<group>"; };
 		4A1C0E5C7B92F1440C3D8E10 /* CursorLocatorEffectFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectFrameTests.swift; sourceTree = "<group>"; };
@@ -140,6 +144,7 @@
 				B602178AC87A84D29CC7F7D8 /* CursorLocatorEffectControllerScreenTests.swift */,
 				15E7AF7A3271455B04178FDF /* CursorLocatorErrorMappingTests.swift */,
 				7EC760A764B189F7CE6DB77B /* CursorLocatorFadeAlphaTests.swift */,
+				5C1A0B0012D34E5A9F0A0021 /* CursorLocatorSpotlightRendererTests.swift */,
 				4A1C0E5C7B92F1440C3D8E10 /* CursorLocatorEffectFrameTests.swift */,
 				8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */,
 			);
@@ -207,6 +212,7 @@
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				157CB28A680ED059B00CDD71 /* CursorLocatorEffectWindow.swift */,
 				C54532B7E9469B735F0F1E6A /* CursorLocatorErrorMapping.swift */,
+				5C1A0B0012D34E5A9F0A0011 /* CursorLocatorSpotlightRenderer.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -466,6 +472,7 @@
 				BF07F081F29E3D61850E47F6 /* CursorLocatorEffectControllerScreenTests.swift in Sources */,
 				64B05F2E0AFEA2C497D6F3EB /* CursorLocatorErrorMappingTests.swift in Sources */,
 				21DAD77DB313D73904DB5431 /* CursorLocatorFadeAlphaTests.swift in Sources */,
+				5C1A0B0012D34E5A9F0A0022 /* CursorLocatorSpotlightRendererTests.swift in Sources */,
 				4A1C0E5D7B92F1440C3D8E11 /* CursorLocatorEffectFrameTests.swift in Sources */,
 				D9149A1F0B05DEADF478E30E /* CursorLocatorSurfaceContractTests.swift in Sources */,
 			);
@@ -478,6 +485,7 @@
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				0511AA9F3D5B68270866DD58 /* CursorLocatorEffectWindow.swift in Sources */,
 				702648B48D23ABA750B55F1E /* CursorLocatorErrorMapping.swift in Sources */,
+				5C1A0B0012D34E5A9F0A0012 /* CursorLocatorSpotlightRenderer.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);
