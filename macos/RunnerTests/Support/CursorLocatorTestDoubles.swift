@@ -195,7 +195,6 @@ final class SpySurfaceFactory {
 
   private let log: SurfaceCallLog
   private let behavior: Behavior
-  private var callCount = 0
 
   private(set) var weakBoxes: [WeakBox] = []
   private(set) var requestedFrames: [NSRect] = []
@@ -206,10 +205,9 @@ final class SpySurfaceFactory {
   }
 
   func make(_ frame: NSRect) throws -> CursorLocatorSurface {
-    callCount += 1
     requestedFrames.append(frame)
 
-    if case .throwOnCall(let n) = behavior, callCount == n {
+    if case .throwOnCall(let n) = behavior, requestedFrames.count == n {
       throw FactoryError(reason: "spy factory 依設定於第 \(n) 次呼叫拋出")
     }
 
@@ -229,7 +227,6 @@ final class ManualFrameDriver: CursorLocatorFrameDriving {
   private(set) var onFrame: ((CFTimeInterval) -> Void)?
   private(set) var startCount = 0
   private(set) var stopCount = 0
-  private var lastEmittedTimestamp: CFTimeInterval?
 
   init(log: SurfaceCallLog) {
     self.log = log
@@ -251,17 +248,7 @@ final class ManualFrameDriver: CursorLocatorFrameDriving {
   /// 送一幀，`timestamp` 為單調遞增絕對時間戳（對應 production 的
   /// `CACurrentMediaTime()`），非幀間隔。
   func emit(at timestamp: CFTimeInterval) {
-    lastEmittedTimestamp = timestamp
     onFrame?(timestamp)
-  }
-
-  /// 以固定步長自上次送出的時間戳連續送幀至 `timestamp`（含）。
-  func advance(to timestamp: CFTimeInterval, step: CFTimeInterval) {
-    var t = (lastEmittedTimestamp ?? timestamp - step) + step
-    while t <= timestamp {
-      emit(at: t)
-      t += step
-    }
   }
 }
 
