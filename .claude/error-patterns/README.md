@@ -222,6 +222,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | CQ-004 | namedtuple 早退路徑返回裸型別 | 高 | v0.1.0 |
 | CQ-005 | Mock 路徑未隨函式遷移同步更新 | 中 | v0.1.0 |
 | CQ-006 | 純工具函式定義在 commands/ 層阻礙複用 | 中 | v0.1.0 |
+| CQ-SCLK-001 | 程式碼宣告了實際不存在的保證（註解描述未實作的行為、註解描述不存在的對應、fallback 交出孤兒物件），且該落差不產生任何測試訊號 | 中 | — |
 
 ### 實作 (IMP)
 
