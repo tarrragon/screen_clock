@@ -43,6 +43,7 @@
 		D9149A1F0B05DEADF478E30E /* CursorLocatorSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */; };
 		3C81B4A20D5E7F1160A29E31 /* CursorLocatorBorderFlashRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C81B4A10D5E7F1160A29E30 /* CursorLocatorBorderFlashRenderer.swift */; };
 		3C81B4A40D5E7F1160A29E33 /* CursorLocatorBorderFlashRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C81B4A30D5E7F1160A29E32 /* CursorLocatorBorderFlashRendererTests.swift */; };
+		CMP0A1B2C3D4E5F60718293A /* CursorLocatorEffectCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CMP0A1B2C3D4E5F60718293B /* CursorLocatorEffectCompositionTests.swift */; };
 		7368D41F50FB232BAAB1C2B4 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C3DBBDAF90FF981DBEAFD7A /* Pods_Runner.framework */; };
 		ECF4000094CBFBC55E1EE396 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F244AB2C16E845EDDBFDFBF8 /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
@@ -105,6 +106,7 @@
 		8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorSurfaceContractTests.swift; sourceTree = "<group>"; };
 		3C81B4A10D5E7F1160A29E30 /* CursorLocatorBorderFlashRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorBorderFlashRenderer.swift; sourceTree = "<group>"; };
 		3C81B4A30D5E7F1160A29E32 /* CursorLocatorBorderFlashRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorBorderFlashRendererTests.swift; sourceTree = "<group>"; };
+		CMP0A1B2C3D4E5F60718293B /* CursorLocatorEffectCompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectCompositionTests.swift; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
@@ -157,6 +159,7 @@
 				8ABE2BE16248C628AE2628A8 /* CursorLocatorSurfaceContractTests.swift */,
 				3C81B4A30D5E7F1160A29E32 /* CursorLocatorBorderFlashRendererTests.swift */,
 				RIP2E0000000000000000001 /* CursorLocatorRippleRendererTests.swift */,
+				CMP0A1B2C3D4E5F60718293B /* CursorLocatorEffectCompositionTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -489,6 +492,7 @@
 				RIP2E0000000000000000002 /* CursorLocatorRippleRendererTests.swift in Sources */,
 				D9149A1F0B05DEADF478E30E /* CursorLocatorSurfaceContractTests.swift in Sources */,
 				3C81B4A40D5E7F1160A29E33 /* CursorLocatorBorderFlashRendererTests.swift in Sources */,
+				CMP0A1B2C3D4E5F60718293A /* CursorLocatorEffectCompositionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
