@@ -311,15 +311,36 @@ final class CursorLocatorCompositeRenderer: CursorLocatorEffectRendering {
   }
 
   func attach(to layer: CALayer, tint: NSColor, duration: TimeInterval) {
-    renderers.forEach { $0.attach(to: layer, tint: tint, duration: duration) }
+    withoutImplicitAnimations {
+      renderers.forEach { $0.attach(to: layer, tint: tint, duration: duration) }
+    }
   }
 
   func render(_ frame: CursorLocatorEffectFrame) {
-    renderers.forEach { $0.render(frame) }
+    withoutImplicitAnimations {
+      renderers.forEach { $0.render(frame) }
+    }
   }
 
   func detach() {
-    renderers.forEach { $0.detach() }
+    withoutImplicitAnimations {
+      renderers.forEach { $0.detach() }
+    }
+  }
+
+  /// 停用隱含動畫是「繪製一幀」的環境屬性而非個別特效的職責，故收斂於此：
+  /// 宿主是 layer-hosted layer，其 sublayer 的 `delegate` 為 nil，AppKit 不會
+  /// 回傳停用 action，任何 animatable 屬性（`opacity`／`frame`／`path`）的每次
+  /// 寫入都會啟動預設 0.25 秒的隱含動畫；當特效週期短於該時長（FR-04 的
+  /// 200 ms 閃爍週期）時，後幀持續覆蓋前幀，實際輸出被低通濾波抹平。
+  ///
+  /// 由 composite 統一包裹亦使每幀只開一次 transaction，且新增第四個特效時
+  /// 不需再各自處理。
+  private func withoutImplicitAnimations(_ body: () -> Void) {
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    body()
+    CATransaction.commit()
   }
 }
 

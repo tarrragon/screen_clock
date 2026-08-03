@@ -120,6 +120,94 @@ final class CursorLocatorEffectCompositionTests: XCTestCase {
     )
   }
 
+  // MARK: - 隱含動畫停用（1.4.0-W3-021）
+
+  /// 建立與 production 同構的宿主：layer-hosted view 掛在視窗上。
+  ///
+  /// 隱含動畫只在圖層樹已被 commit 且連上實際 render context 時才會生成，
+  /// 脫離視窗的裸 `CALayer` 寫入 animatable 屬性不產生任何動畫（實測），
+  /// 用裸圖層斷言 `animationKeys` 為空會恆真而無法分辨受測行為。視窗不
+  /// `orderFront`（實測不需要），避免測試期間有畫面彈出。
+  ///
+  /// 回傳的視窗須由呼叫端持有到斷言結束：視窗釋放會連帶拆掉圖層樹。
+  private func makeHostedLayer() -> (window: NSWindow, layer: CALayer) {
+    let view = NSView(frame: hostBounds)
+    let layer = CALayer()
+    layer.frame = hostBounds
+    view.layer = layer
+    view.wantsLayer = true
+
+    let window = NSWindow(
+      contentRect: hostBounds,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.contentView = view
+    return (window, layer)
+  }
+
+  /// 收集宿主底下所有會被寫入 animatable 屬性的圖層：三個 renderer 的
+  /// sublayer 加上聚光燈壓暗層的遮罩（遮罩不在 `sublayers` 內但每幀被寫入
+  /// `frame` 與漸層座標）。
+  private func animatableLayers(under host: CALayer) -> [CALayer] {
+    let sublayers = host.sublayers ?? []
+    return sublayers + sublayers.compactMap { $0.mask }
+  }
+
+  private func assertNoImplicitAnimation(
+    _ layers: [CALayer], stage: String, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    for layer in layers {
+      XCTAssertEqual(
+        layer.animationKeys() ?? [], [],
+        "\(stage) 後 \(type(of: layer)) 啟動了隱含動畫：\(layer.animationKeys() ?? [])",
+        file: file, line: line
+      )
+    }
+  }
+
+  /// 每幀寫入 `opacity`／`frame`／`path` 都是 animatable 屬性；宿主為
+  /// layer-hosted layer，其 sublayer 的 `delegate` 為 nil，AppKit 不回傳停用
+  /// action，未包 `CATransaction` 時每次寫入都會啟動預設 0.25 秒的隱含動畫。
+  /// 該時長長於 FR-04 的 200 ms 閃爍週期，會使閃爍在實機上被抹平——本測試是
+  /// 唯一能分辨該情形的觀測面（純函式曲線測試看不到）。
+  func testRender_doesNotStartImplicitAnimationOnAnySublayer() {
+    let (window, layer) = makeHostedLayer()
+    let renderer = makeProductionRenderer()
+    renderer.attach(to: layer, tint: .systemBlue, duration: 1.5)
+    // commit 圖層樹：其後的屬性寫入才會進入隱含動畫的判定路徑。
+    CATransaction.flush()
+
+    // 覆蓋閃爍週期內外：週期內 opacity 逐幀變動，最能觸發隱含動畫。
+    for elapsed in stride(from: 0.0, through: 1.5, by: 0.05) {
+      renderer.render(makeFrame(elapsed: elapsed))
+      assertNoImplicitAnimation(
+        animatableLayers(under: layer), stage: "render(elapsed: \(elapsed))")
+      CATransaction.flush()
+    }
+
+    XCTAssertNotNil(window.contentView)
+  }
+
+  /// `detach` 的移除同樣須即時：三個 renderer 皆以「圖層移除」保證播放結束
+  /// 無殘留，移除若被隱含動畫延後，殘影會留到下一次播放。
+  func testDetach_doesNotStartImplicitAnimationOnRemovedLayers() {
+    let (window, layer) = makeHostedLayer()
+    let renderer = makeProductionRenderer()
+    renderer.attach(to: layer, tint: .systemBlue, duration: 1.5)
+    CATransaction.flush()
+    renderer.render(makeFrame(elapsed: 0.5))
+    CATransaction.flush()
+    let removedLayers = animatableLayers(under: layer)
+    XCTAssertFalse(removedLayers.isEmpty)
+
+    renderer.detach()
+
+    assertNoImplicitAnimation(removedLayers, stage: "detach")
+    XCTAssertNotNil(window.contentView)
+  }
+
   /// 重播（attach → detach → attach）不得疊加：圖層數與首次 attach 相同。
   func testReattach_afterDetachDoesNotAccumulateLayers() {
     let layer = makeHostLayer()
