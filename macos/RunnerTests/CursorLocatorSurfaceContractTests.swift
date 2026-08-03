@@ -85,4 +85,80 @@ final class CursorLocatorSurfaceContractTests: XCTestCase {
     surface.window.makeKey()
     XCTAssertFalse(surface.window.isKeyWindow)
   }
+
+  // MARK: - layer-hosted 幾何與 scale 同步（1.4.0-W3-018）
+
+  /// hostView 轉為 layer-hosted 後，AppKit 不再替 hosted layer 做 frame 與
+  /// contentsScale 同步，本組即針對那兩項換走的自動行為。斷言對象是真實
+  /// `NSWindow` 經 AppKit resize 後的 contentView，非 test double 的 CALayer。
+
+  /// 搬遷至不同尺寸的 frame 後，hosted layer 幾何跟上 hostView bounds。
+  /// 缺此同步時 contentLayer.frame 停在 init 尺寸，繪製區被裁切或偏移，
+  /// 且無錯誤無日誌。
+  func testContentLayerFrameFollowsResizeOnMove() {
+    let enlarged = NSRect(
+      x: testFrame.origin.x,
+      y: testFrame.origin.y,
+      width: testFrame.width + 320,
+      height: testFrame.height + 240
+    )
+    surface.move(toScreenFrame: enlarged)
+
+    let hostBounds = surface.window.contentView!.bounds
+    XCTAssertEqual(hostBounds.size, enlarged.size)
+    XCTAssertEqual(surface.contentLayer.frame, hostBounds)
+  }
+
+  /// 縮小方向亦須同步：只在放大方向驗證會讓「只設過一次較大值」的實作矇混通過。
+  func testContentLayerFrameFollowsShrinkOnMove() {
+    let shrunk = NSRect(
+      x: testFrame.origin.x,
+      y: testFrame.origin.y,
+      width: max(testFrame.width - 200, 100),
+      height: max(testFrame.height - 150, 100)
+    )
+    surface.move(toScreenFrame: shrunk)
+
+    XCTAssertEqual(surface.contentLayer.frame, surface.window.contentView!.bounds)
+  }
+
+  /// init 當下 contentsScale 即對齊視窗 backingScaleFactor；停在預設 1.0
+  /// 會使 Retina 上實際渲染解析度減半（畫面模糊，無錯誤無日誌）。
+  func testContentsScaleMatchesBackingScaleAtInit() {
+    XCTAssertEqual(surface.contentLayer.contentsScale, surface.window.backingScaleFactor)
+  }
+
+  /// 跨螢幕搬遷後 contentsScale 重新對齊該螢幕 backingScaleFactor。
+  /// 單機測試環境可能只有一個 scale，故斷言的是「搬遷後與當前視窗一致」
+  /// 這條恆成立的關係，而非硬編碼 2.0。
+  func testContentsScaleRealignsAfterMove() {
+    let moved = NSRect(
+      x: testFrame.origin.x,
+      y: testFrame.origin.y,
+      width: testFrame.width + 100,
+      height: testFrame.height + 100
+    )
+    surface.move(toScreenFrame: moved)
+
+    XCTAssertEqual(surface.contentLayer.contentsScale, surface.window.backingScaleFactor)
+  }
+
+  /// acceptance 第 4 條掃描的第三處：layer-backed 時 AppKit 會透過
+  /// `layer.delegate` 停用隱含動畫，hosted layer 的 delegate 為 nil，frame
+  /// 變更會啟動 0.25 秒隱含動畫，使搬遷期間 layer 落在舊位置。
+  func testGeometrySyncDoesNotStartImplicitAnimation() {
+    let moved = NSRect(
+      x: testFrame.origin.x,
+      y: testFrame.origin.y,
+      width: testFrame.width + 160,
+      height: testFrame.height + 120
+    )
+    surface.move(toScreenFrame: moved)
+
+    XCTAssertEqual(surface.contentLayer.animationKeys() ?? [], [])
+    XCTAssertEqual(
+      surface.contentLayer.presentation()?.frame ?? surface.contentLayer.frame,
+      surface.contentLayer.frame
+    )
+  }
 }

@@ -474,6 +474,51 @@ private final class NonKeyEffectWindow: NSWindow {
   override var canBecomeKey: Bool { false }
 }
 
+/// layer-hosted 承載視圖（子票 1.4.0-W3-018）。
+///
+/// `WindowCursorLocatorSurface` 自建 `contentLayer` 並指派給本視圖，使其成為
+/// layer-hosted view。該模式消除了孤兒圖層，代價是 AppKit 不再視此 layer 為
+/// 自己的產物，layer-backed 時代兩項自動行為隨之換走：
+///
+/// | 行為 | layer-backed | layer-hosted |
+/// |------|-------------|-------------|
+/// | resize 時 layer 幾何跟隨 view bounds | AppKit 自動 | 契約上由呼叫端負責 |
+/// | contentsScale 對齊 backingScaleFactor | AppKit 自動 | 不設定，預設 1.0 |
+///
+/// 第一項在現行 macOS 上實測仍會跟隨（AppKit 由 view 幾何推導 hosted layer 的
+/// bounds/position），但那是未見於文件的實作細節，不宜當契約倚賴；本視圖仍在
+/// `setFrameSize` 顯式同步，使幾何正確與 AppKit 版本無關。第二項則確實不再發生：
+/// 未同步時 Retina 上實際渲染解析度減半，畫面模糊而無錯誤無日誌。
+///
+/// 同步一律包在停用隱含動畫的 `CATransaction` 內：hosted layer 的 `delegate`
+/// 為 nil，不像 layer-backed 那樣由 AppKit 回傳 `NSNull` 停用 action，直接改
+/// frame 會啟動 0.25 秒隱含動畫，使搬遷期間圖層仍畫在舊位置。
+private final class LayerHostingView: NSView {
+  override func setFrameSize(_ newSize: NSSize) {
+    super.setFrameSize(newSize)
+    synchronizeHostedLayer()
+  }
+
+  /// 視窗搬到不同 `backingScaleFactor` 的螢幕時由 AppKit 呼叫。
+  override func viewDidChangeBackingProperties() {
+    super.viewDidChangeBackingProperties()
+    synchronizeHostedLayer()
+  }
+
+  /// 讓 hosted layer 的幾何與解析度重新對齊目前的視圖與視窗狀態。
+  func synchronizeHostedLayer() {
+    guard let hostedLayer = layer else { return }
+
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    hostedLayer.frame = bounds
+    if let backingScaleFactor = window?.backingScaleFactor {
+      hostedLayer.contentsScale = backingScaleFactor
+    }
+    CATransaction.commit()
+  }
+}
+
 /// production 的 `CursorLocatorSurface` 實作：依 Phase 1 §2.5 十二項屬性契約
 /// 建立真實 `NSWindow`。
 final class WindowCursorLocatorSurface: CursorLocatorSurface {
@@ -481,7 +526,7 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
   /// 契約值；型別暴露為 `NSWindow`（非 `NonKeyEffectWindow`），呼叫端不需
   /// 知道 canBecomeKey 覆寫實作在子類別。
   let window: NSWindow
-  private let hostView: NSView
+  private let hostView: LayerHostingView
 
   /// 繪製目標圖層。由本型別自建並在 `init` 掛上 `hostView`，故必然位於視窗的
   /// layer hierarchy 內；不採 `hostView.layer ?? CALayer()` 那種 fallback——
@@ -496,7 +541,7 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
       backing: .buffered,
       defer: false
     )
-    hostView = NSView(frame: NSRect(origin: .zero, size: frame.size))
+    hostView = LayerHostingView(frame: NSRect(origin: .zero, size: frame.size))
     // 先指派再開 wantsLayer，使 hostView 成為 layer-hosted view，其 `layer`
     // 即為此處持有的實例（AppKit 不會另行替換），兩者恆為同一物件。
     contentLayer = CALayer()
@@ -516,6 +561,9 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
     window.alphaValue = 1.0
     window.isReleasedWhenClosed = false
     window.setFrame(frame, display: false)
+    // 掛上視窗後才知道 backingScaleFactor，故 init 的對齊須留到此處；
+    // 只在 CALayer 建立時設 frame 不足以涵蓋 contentsScale。
+    hostView.synchronizeHostedLayer()
 
     // 依 §2.5「不得用 makeKeyAndOrderFront」：後者於全螢幕播放中觸發熱鍵會
     // 導致退出全螢幕，違反 UC-06 成功保證與 06d。
@@ -524,6 +572,9 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
 
   func move(toScreenFrame frame: NSRect) {
     window.setFrame(frame, display: true)
+    // 同尺寸跨螢幕搬遷不會觸發 setFrameSize，而 backingScaleFactor 變更通知的
+    // 送達時機由 AppKit 決定；此處顯式同步使搬遷回傳時幾何與 scale 皆已就位。
+    hostView.synchronizeHostedLayer()
   }
 
   func setAlpha(_ value: CGFloat) {
