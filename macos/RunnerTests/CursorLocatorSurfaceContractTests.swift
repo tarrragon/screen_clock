@@ -143,23 +143,83 @@ final class CursorLocatorSurfaceContractTests: XCTestCase {
     XCTAssertEqual(surface.contentLayer.contentsScale, surface.window.backingScaleFactor)
   }
 
+  // MARK: - 隱含動畫防護（1.4.0-W3-027 重寫）
+  //
+  // 原版以真實 `WindowCursorLocatorSurface`（`.screenSaver` 層級 + 特殊
+  // `collectionBehavior` + `orderFrontRegardless`）作宿主，經 1.4.0-W3-026
+  // RED 對照兩輪實測（無 flush / 有 flush）確認 animationKeys() 恆為空，
+  // 為空斷言、無回歸保護。W3-027 進一步以 XCTFail canary 確認該實測所用的
+  // 是重新編譯的二進位（非建置快取殘留），排除「移除防護未真正生效」的
+  // 替代解釋後，才動手重寫。
+  //
+  // 改比照 1.4.0-W3-021 `CursorLocatorEffectCompositionTests.makeHostedLayer`
+  // 已驗證有效的手法：獨立 `NSWindow` + layer-hosted `NSView`，不經過
+  // `WindowCursorLocatorSurface` 的完整 production 初始化（`.screenSaver`
+  // 層級、`collectionBehavior`、`orderFrontRegardless` 等均與隱含動畫防護
+  // 無關，但足以構成原測試無分辨力的環境差異之一）。直接建構
+  // production 的 `LayerHostingView`（已由本票放寬為 `internal`），驗證的
+  // 仍是同一份 `synchronizeHostedLayer()` 實作，不是另起爐灶的替代邏輯。
+
+  /// 獨立宿主：`LayerHostingView` 掛在最小 `NSWindow` 上，不透過
+  /// `WindowCursorLocatorSurface` 建構。回傳的視窗須由呼叫端持有到斷言
+  /// 結束——視窗釋放會連帶拆掉圖層樹。
+  private func makeIndependentHostedLayerView() -> (window: NSWindow, view: LayerHostingView) {
+    let bounds = NSRect(x: 0, y: 0, width: 800, height: 600)
+    let contentLayer = CALayer()
+    contentLayer.frame = bounds
+
+    let view = LayerHostingView(frame: bounds)
+    view.layer = contentLayer
+    view.wantsLayer = true
+
+    let window = NSWindow(
+      contentRect: bounds,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.contentView = view
+    return (window, view)
+  }
+
   /// acceptance 第 4 條掃描的第三處：layer-backed 時 AppKit 會透過
   /// `layer.delegate` 停用隱含動畫，hosted layer 的 delegate 為 nil，frame
   /// 變更會啟動 0.25 秒隱含動畫，使搬遷期間 layer 落在舊位置。
+  ///
+  /// 呼叫 `view.setFrameSize` 直接觸發 `LayerHostingView.setFrameSize` 覆寫
+  /// ->`synchronizeHostedLayer()`，與 production 的
+  /// `WindowCursorLocatorSurface.move()` 在不同尺寸時觸發的路徑相同
+  /// （見該類別 `setFrameSize` 覆寫）；`testContentLayerFrameFollowsResizeOnMove`
+  /// 等既有測試已覆蓋「move() 是否呼叫到這條路徑」，本測試不重複驗證。
+  /// 不透過 `setFrameSize`：實測發現 AppKit 對 layer-hosting view 的
+  /// `setFrameSize` 自身已會把 hosted layer 的幾何同步到與 `bounds` 一致
+  /// （production 註解「AppKit 由 view 幾何推導 hosted layer 的
+  /// bounds/position」），使 `synchronizeHostedLayer()` 內的 `frame =
+  /// bounds` 寫入值與現值相同、CALayer 不視為變更、不產生隱含動畫——
+  /// 無論是否停用 action 兩者結果一樣，此路徑對本測試無分辨力。
+  ///
+  /// 改為人工先把 hosted layer 的 frame 撥到與 `bounds`不同的值（本身用
+  /// 停用 action 的 transaction 寫入，避免這筆準備動作污染待測的
+  /// `animationKeys()`），再直接呼叫 `synchronizeHostedLayer()`（production
+  /// 受測方法本身，非替代邏輯），使其內部的 `frame = bounds` 是一次真正
+  /// 的幾何變更，animationKeys() 才有分辨力。
   func testGeometrySyncDoesNotStartImplicitAnimation() {
-    let moved = NSRect(
-      x: testFrame.origin.x,
-      y: testFrame.origin.y,
-      width: testFrame.width + 160,
-      height: testFrame.height + 120
-    )
-    surface.move(toScreenFrame: moved)
+    let (window, view) = makeIndependentHostedLayerView()
+    CATransaction.flush()
 
-    XCTAssertEqual(surface.contentLayer.animationKeys() ?? [], [])
-    XCTAssertEqual(
-      surface.contentLayer.presentation()?.frame ?? surface.contentLayer.frame,
-      surface.contentLayer.frame
-    )
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    view.layer?.frame = NSRect(x: 0, y: 0, width: 100, height: 100)
+    CATransaction.commit()
+    CATransaction.flush()
+    XCTAssertNotEqual(
+      view.layer?.frame, view.bounds, "前置條件失敗：hosted layer 未與 bounds 不同步")
+
+    view.synchronizeHostedLayer()
+
+    XCTAssertEqual(view.layer?.frame, view.bounds)
+    XCTAssertEqual(view.layer?.animationKeys() ?? [], [])
+    XCTAssertNotNil(window.contentView)
   }
 
   // MARK: - renderer sublayer contentsScale 搬遷後重發（1.4.0-W3-022）
