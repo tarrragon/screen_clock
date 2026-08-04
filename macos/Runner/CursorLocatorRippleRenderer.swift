@@ -69,6 +69,8 @@ final class CursorLocatorRippleRenderer: CursorLocatorEffectRendering {
       layer.addSublayer(ringLayer)
       return ringLayer
     }
+
+    NSLog("[cursor-locator] RippleRenderer attach: bounds=\(layer.bounds)")
   }
 
   /// 每幀重畫三圈。已發出的圈同樣以本幀游標位置為圓心（三圈永遠同心），
@@ -93,8 +95,11 @@ final class CursorLocatorRippleRenderer: CursorLocatorEffectRendering {
   /// 移除本 renderer 加到宿主圖層上的一切。播放的四條結束路徑共用此出口，
   /// 故「淡出完整、無殘留圖形」由圖層移除保證，不倚賴最後一幀的透明度。
   func detach() {
+    let bounds = ringLayers.first?.superlayer?.bounds ?? .zero
     ringLayers.forEach { $0.removeFromSuperlayer() }
     ringLayers = []
+
+    NSLog("[cursor-locator] RippleRenderer detach: bounds=\(bounds)")
   }
 
   private static func ringPath(center: CGPoint, radius: CGFloat) -> CGPath {
