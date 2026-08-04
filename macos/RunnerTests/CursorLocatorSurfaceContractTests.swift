@@ -161,4 +161,25 @@ final class CursorLocatorSurfaceContractTests: XCTestCase {
       surface.contentLayer.frame
     )
   }
+
+  // MARK: - renderer sublayer contentsScale 搬遷後重發（1.4.0-W3-022）
+
+  /// `move` 除了對齊 hosted layer 自身，還須重新下發至 renderer 掛在其上的
+  /// sublayer：以人工設一個偏離值的 sublayer 模擬「搬遷前殘留舊 scale」，
+  /// 斷言搬遷後被重新對齊，而非只有 contentLayer 自身對齊、sublayer 維持舊值。
+  func testSublayerContentsScaleRealignsAfterMove() {
+    let sublayer = CALayer()
+    sublayer.contentsScale = surface.contentLayer.contentsScale + 1.0
+    surface.contentLayer.addSublayer(sublayer)
+
+    let moved = NSRect(
+      x: testFrame.origin.x,
+      y: testFrame.origin.y,
+      width: testFrame.width + 100,
+      height: testFrame.height + 100
+    )
+    surface.move(toScreenFrame: moved)
+
+    XCTAssertEqual(sublayer.contentsScale, surface.contentLayer.contentsScale)
+  }
 }

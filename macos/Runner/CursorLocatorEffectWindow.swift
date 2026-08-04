@@ -313,6 +313,7 @@ final class CursorLocatorCompositeRenderer: CursorLocatorEffectRendering {
   func attach(to layer: CALayer, tint: NSColor, duration: TimeInterval) {
     withoutImplicitAnimations {
       renderers.forEach { $0.attach(to: layer, tint: tint, duration: duration) }
+      Self.synchronizeSublayerContentsScale(on: layer)
     }
   }
 
@@ -340,6 +341,27 @@ final class CursorLocatorCompositeRenderer: CursorLocatorEffectRendering {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     body()
+    CATransaction.commit()
+  }
+
+  /// 對齊 `layer` 全部 sublayer 的 `contentsScale` 至 `layer` 本身的值（1.4.0-W3-022）。
+  ///
+  /// CoreAnimation 不會把父層的 `contentsScale` 傳播給 sublayer，`LayerHostingView
+  /// .synchronizeHostedLayer` 只對齊 hosted layer 自身，三個 renderer 各自建立的
+  /// sublayer（Spotlight 的 dimLayer／holeMask、BorderFlash 的 borderLayer、Ripple
+  /// 的 ringLayer）因而全部沿用預設 1.0；CAGradientLayer 的羽化帶與 borderWidth
+  /// 描邊皆為光柵化輸出，Retina 上以 1.0 光柵化等於解析度減半。
+  ///
+  /// 宣告為 `static` 而非依賴 composite 實例，使 attach 流程（composite 自身
+  /// 呼叫）與螢幕搬遷流程（`WindowCursorLocatorSurface.move` 呼叫，該處不持有
+  /// composite 實例）共用同一份下發邏輯，任一 renderer 都不需要自行複製這行。
+  static func synchronizeSublayerContentsScale(on layer: CALayer) {
+    guard let sublayers = layer.sublayers else { return }
+    let scale = layer.contentsScale
+
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    sublayers.forEach { $0.contentsScale = scale }
     CATransaction.commit()
   }
 }
@@ -844,6 +866,9 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
     // 同尺寸跨螢幕搬遷不會觸發 setFrameSize，而 backingScaleFactor 變更通知的
     // 送達時機由 AppKit 決定；此處顯式同步使搬遷回傳時幾何與 scale 皆已就位。
     hostView.synchronizeHostedLayer()
+    // hostedLayer 自身的 contentsScale 已由上一行對齊，但 renderer 掛在其上的
+    // sublayer 不會隨之連動（1.4.0-W3-022），需在此重發同一份下發邏輯。
+    CursorLocatorCompositeRenderer.synchronizeSublayerContentsScale(on: contentLayer)
   }
 
   func setAlpha(_ value: CGFloat) {
