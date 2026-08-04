@@ -30,9 +30,6 @@ final class CursorLocatorBorderFlashRenderer: CursorLocatorEffectRendering {
 
     let border = CALayer()
     border.frame = layer.bounds
-    // 螢幕解析度變更或視窗跨螢幕搬遷時 bounds 會改變，邊框須隨之貼齊；
-    // autoresizing 使幾何跟隨父層，不需逐幀重算。
-    border.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
     border.borderWidth = CursorLocatorEffectConstants.borderWidth
     border.borderColor = tint.cgColor
     // 首幀 render 之前不應可見：attach 與首幀之間可能間隔一次螢幕更新，
@@ -44,6 +41,10 @@ final class CursorLocatorBorderFlashRenderer: CursorLocatorEffectRendering {
   }
 
   func render(_ frame: CursorLocatorEffectFrame) {
+    // 螢幕解析度變更或視窗跨螢幕搬遷時 bounds 會改變，逐幀依
+    // `frame.layerBounds`（控制器單一來源）對齊，不再倚賴
+    // `autoresizingMask` 隱式跟隨父層的觸發時機（1.4.0-W3-023）。
+    borderLayer?.frame = frame.layerBounds
     borderLayer?.opacity = Float(Self.flashAlpha(elapsed: frame.elapsed))
   }
 

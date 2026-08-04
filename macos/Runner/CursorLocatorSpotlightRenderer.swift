@@ -36,8 +36,10 @@ final class CursorLocatorSpotlightRenderer: CursorLocatorEffectRendering {
   func render(_ frame: CursorLocatorEffectFrame) {
     guard let dim = dimLayer, let mask = holeMask else { return }
 
-    // 依附的圖層可能因視窗搬到另一台螢幕而改變尺寸，故每幀重新對齊。
-    let bounds = dim.superlayer?.bounds ?? dim.bounds
+    // 依附的圖層可能因視窗搬到另一台螢幕而改變尺寸，故每幀重新對齊；
+    // bounds 取自 `frame.layerBounds`（控制器單一來源），不再反查
+    // `dim.superlayer?.bounds`（1.4.0-W3-023）。
+    let bounds = frame.layerBounds
 
     dim.frame = bounds
     mask.frame = CGRect(origin: .zero, size: bounds.size)
