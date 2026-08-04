@@ -124,6 +124,27 @@ final class CursorLocatorEffectFrameTests: XCTestCase {
     XCTAssertEqual(renderer.frames.map { $0.elapsed }, [0, 0.5, 1.0])
   }
 
+  // MARK: - layerBounds 單一來源（1.4.0-W3-023）
+
+  /// `layerBounds` 與 `cursorPointInLayer` 同一處（`deliverFrame`）填入，讀自
+  /// `session.surface.contentLayer.bounds`，不是渲染層各自取樣的結果。先讓
+  /// surface 的 `contentLayer` 落在一個刻意與 attach 時不同的尺寸，若
+  /// `deliverFrame` 沒有逐幀重讀而是快取初始值，斷言即會落空。
+  func testDeliverFrame_layerBoundsReflectsSurfaceContentLayerBounds() throws {
+    try controller.play(CursorLocatorPlayRequest(duration: 2.0, tint: .white))
+
+    guard let surface = factory.weakBoxes.last?.value as? SpyCursorLocatorSurface else {
+      return XCTFail("預期播放已建立 surface")
+    }
+    let resized = CGRect(x: 0, y: 0, width: 1280, height: 720)
+    surface.contentLayer.frame = resized
+
+    driver.emit(at: t0)
+
+    XCTAssertEqual(renderer.frames.last?.layerBounds, surface.contentLayer.bounds)
+    XCTAssertEqual(renderer.frames.last?.layerBounds.size, resized.size)
+  }
+
   // MARK: - FR-03 與 FR-05 共用同一組取樣
 
   /// 一幀內只呼叫 `locationSampler` 一次：螢幕判定與繪製層共用同一次取樣。
@@ -212,6 +233,7 @@ final class CursorLocatorEffectFrameTests: XCTestCase {
       elapsed: 0.75,
       duration: 1.5,
       cursorPointInLayer: CGPoint(x: 10, y: 20),
+      layerBounds: CGRect(x: 0, y: 0, width: 1920, height: 1080),
       tint: .blue
     )
 

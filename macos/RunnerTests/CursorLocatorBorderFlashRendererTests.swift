@@ -16,14 +16,19 @@ final class CursorLocatorBorderFlashRendererTests: XCTestCase {
     cycle * Double(CursorLocatorEffectConstants.flashCycleCount)
   }
 
-  private func makeFrame(elapsed: TimeInterval, duration: TimeInterval = 1.5)
-    -> CursorLocatorEffectFrame
-  {
+  private static let defaultLayerBounds = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+
+  private func makeFrame(
+    elapsed: TimeInterval,
+    duration: TimeInterval = 1.5,
+    layerBounds: CGRect = CursorLocatorBorderFlashRendererTests.defaultLayerBounds
+  ) -> CursorLocatorEffectFrame {
     CursorLocatorEffectFrame(
       progress: duration > 0 ? min(elapsed / duration, 1) : 1,
       elapsed: elapsed,
       duration: duration,
       cursorPointInLayer: .zero,
+      layerBounds: layerBounds,
       tint: .red
     )
   }
@@ -215,5 +220,22 @@ final class CursorLocatorBorderFlashRendererTests: XCTestCase {
 
     renderer.render(makeFrame(elapsed: totalFlashDuration + 0.5))
     XCTAssertEqual(renderer.borderLayer?.opacity, 0)
+  }
+
+  /// bounds 來源改為逐幀消費 `frame.layerBounds`（控制器單一來源），不再
+  /// 倚賴 `autoresizingMask` 隱式跟隨父層；本測試刻意不觸碰 `layer.bounds`，
+  /// 只靠 `layerBounds` 參數驅動搬遷後的尺寸對齊，先給錯誤尺寸的初始
+  /// attach 再以不同尺寸 render，若實作仍讀 `layer.bounds` 會維持初始值而
+  /// 斷言失敗（1.4.0-W3-023）。
+  func testRender_resizesBorderToLayerBoundsFromFrame() {
+    let renderer = CursorLocatorBorderFlashRenderer()
+    let layer = CALayer()
+    layer.bounds = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+    renderer.attach(to: layer, tint: .red, duration: 1.5)
+
+    let resized = CGRect(x: 0, y: 0, width: 1280, height: 720)
+    renderer.render(makeFrame(elapsed: cycle / 2, layerBounds: resized))
+
+    XCTAssertEqual(renderer.borderLayer?.frame, resized)
   }
 }

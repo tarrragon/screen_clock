@@ -30,12 +30,15 @@ final class CursorLocatorEffectCompositionTests: XCTestCase {
     return layer
   }
 
-  private func makeFrame(elapsed: TimeInterval) -> CursorLocatorEffectFrame {
+  private func makeFrame(
+    elapsed: TimeInterval, layerBounds: CGRect? = nil
+  ) -> CursorLocatorEffectFrame {
     CursorLocatorEffectFrame(
       progress: elapsed / 1.5,
       elapsed: elapsed,
       duration: 1.5,
       cursorPointInLayer: CGPoint(x: 500, y: 250),
+      layerBounds: layerBounds ?? hostBounds,
       tint: .systemBlue
     )
   }
@@ -273,5 +276,33 @@ final class CursorLocatorEffectCompositionTests: XCTestCase {
     }
     let holeMask = (layer.sublayers ?? []).first { $0.mask != nil }?.mask
     XCTAssertEqual(holeMask?.contentsScale, 3.0, "holeMask 未隨重發對齊新 scale")
+  }
+
+  // MARK: - bounds 下發（1.4.0-W3-023）
+
+  /// 搬遷改變視窗尺寸後，Spotlight 壓暗層與 BorderFlash 邊框層都須取得
+  /// 同一份新尺寸，且與 `CursorLocatorEffectFrame.layerBounds` 一致——
+  /// 兩者共用控制器單一來源，不再各自反查宿主圖層或倚賴
+  /// `autoresizingMask` 觸發時機（母票 1.4.0-W3-001 Phase 4 審查發現）。
+  ///
+  /// 先以較小尺寸 attach，刻意不去更動 `layer.bounds`，只靠 `layerBounds`
+  /// 參數驅動 render；若 Spotlight 仍讀 `superlayer?.bounds` 或 BorderFlash
+  /// 仍倚賴 `autoresizingMask`，兩者的 sublayer 會維持 attach 時的舊尺寸而
+  /// 非新尺寸，斷言隨即失敗。
+  func testRender_afterResize_spotlightAndBorderFlashAgreeOnLayerBounds() {
+    let layer = makeHostLayer()
+    let renderer = makeProductionRenderer()
+    renderer.attach(to: layer, tint: .systemBlue, duration: 1.5)
+
+    let resized = CGRect(x: 0, y: 0, width: 1600, height: 900)
+    renderer.render(makeFrame(elapsed: 0.5, layerBounds: resized))
+
+    let sublayers = layer.sublayers ?? []
+    let spotlightDim = try? XCTUnwrap(sublayers.first { $0.mask != nil })
+    let borderFlash = try? XCTUnwrap(sublayers.first { $0.borderWidth > 0 })
+
+    XCTAssertEqual(spotlightDim?.frame, resized, "Spotlight 未跟上搬遷後的新尺寸")
+    XCTAssertEqual(borderFlash?.frame, resized, "BorderFlash 未跟上搬遷後的新尺寸")
+    XCTAssertEqual(spotlightDim?.frame, borderFlash?.frame, "兩個 renderer 取得的 bounds 不一致")
   }
 }

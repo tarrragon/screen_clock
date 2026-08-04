@@ -164,6 +164,7 @@ final class CursorLocatorRippleRendererTests: XCTestCase {
       elapsed: elapsed,
       duration: 1.5,
       cursorPointInLayer: cursorPoint,
+      layerBounds: CGRect(x: 0, y: 0, width: 1920, height: 1080),
       tint: .red
     )
   }

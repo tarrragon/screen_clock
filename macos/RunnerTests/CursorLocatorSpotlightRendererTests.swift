@@ -10,7 +10,8 @@ import XCTest
 /// 反應。
 final class CursorLocatorSpotlightRendererTests: XCTestCase {
 
-  private let hostBounds = CGRect(x: 0, y: 0, width: 1000, height: 500)
+  private static let hostBounds = CGRect(x: 0, y: 0, width: 1000, height: 500)
+  private let hostBounds = CursorLocatorSpotlightRendererTests.hostBounds
 
   private func makeHostLayer() -> CALayer {
     let layer = CALayer()
@@ -18,12 +19,16 @@ final class CursorLocatorSpotlightRendererTests: XCTestCase {
     return layer
   }
 
-  private func makeFrame(cursor: CGPoint) -> CursorLocatorEffectFrame {
+  private func makeFrame(
+    cursor: CGPoint,
+    layerBounds: CGRect = CursorLocatorSpotlightRendererTests.hostBounds
+  ) -> CursorLocatorEffectFrame {
     CursorLocatorEffectFrame(
       progress: 0.5,
       elapsed: 0.75,
       duration: 1.5,
       cursorPointInLayer: cursor,
+      layerBounds: layerBounds,
       tint: .systemBlue
     )
   }
@@ -183,14 +188,16 @@ final class CursorLocatorSpotlightRendererTests: XCTestCase {
   }
 
   /// 視窗搬到不同尺寸的螢幕後，壓暗層須重新覆蓋整個圖層，否則邊緣露出未壓暗帶。
-  func testRender_resizesDimLayerToCurrentHostBounds() {
+  /// bounds 來源改為 `frame.layerBounds`（控制器單一來源），不再反查
+  /// 宿主圖層的 `superlayer?.bounds`；本測試刻意不觸碰 `host.frame`，
+  /// 只靠 `layerBounds` 參數驅動搬遷後的尺寸對齊（1.4.0-W3-023）。
+  func testRender_resizesDimLayerToLayerBoundsFromFrame() {
     let host = makeHostLayer()
     let renderer = CursorLocatorSpotlightRenderer()
     renderer.attach(to: host, tint: .systemBlue, duration: 1.5)
 
     let resized = CGRect(x: 0, y: 0, width: 1600, height: 900)
-    host.frame = resized
-    renderer.render(makeFrame(cursor: CGPoint(x: 800, y: 450)))
+    renderer.render(makeFrame(cursor: CGPoint(x: 800, y: 450), layerBounds: resized))
 
     XCTAssertEqual(host.sublayers?.first?.frame, CGRect(origin: .zero, size: resized.size))
   }

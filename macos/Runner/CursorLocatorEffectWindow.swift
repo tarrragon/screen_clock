@@ -274,6 +274,16 @@ struct CursorLocatorEffectFrame: Equatable {
   /// 游標於 `contentLayer` 座標系的位置（左下原點，y 軸向上為正）。
   let cursorPointInLayer: CGPoint
 
+  /// `contentLayer` 的目前 bounds（原點恆為零，size 隨搬遷/縮放而變）。
+  ///
+  /// 由 `deliverFrame` 與 `cursorPointInLayer` 同一處填入（1.4.0-W3-023）。
+  /// 三個 renderer 一律消費此值取得繪製範圍，不再各自反查宿主圖層
+  /// （Spotlight 舊有 `superlayer?.bounds` 分支）或倚賴 `autoresizingMask`
+  /// 的隱式觸發時機（BorderFlash 舊有作法）——`CursorLocatorEffectFrame` 的
+  /// 設立目的即避免各 renderer 自行取樣造成不同步，該論證同樣適用於
+  /// bounds，與 `cursorPointInLayer` 是同一個道理。
+  let layerBounds: CGRect
+
   /// 使用者設定的主色調（FR-06）。
   let tint: NSColor
 }
@@ -655,6 +665,7 @@ final class CursorLocatorEffectController {
         duration: session.duration,
         cursorPointInLayer: Self.layerPoint(
           forCursorLocation: cursorLocation, screenFrame: session.screenFrame),
+        layerBounds: session.surface.contentLayer.bounds,
         tint: session.tint
       )
     )
