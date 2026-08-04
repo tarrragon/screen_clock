@@ -182,4 +182,25 @@ final class CursorLocatorSurfaceContractTests: XCTestCase {
 
     XCTAssertEqual(sublayer.contentsScale, surface.contentLayer.contentsScale)
   }
+
+  /// `mask` 掛在 sublayer 底下（非 `sublayers` 陣列成員，Spotlight 的
+  /// `holeMask` 即此形態），搬遷後同樣須被重新對齊，不能只掃一層 sublayers
+  /// 就視為完成。
+  func testMaskedSublayerContentsScaleRealignsAfterMove() {
+    let sublayer = CALayer()
+    let mask = CALayer()
+    mask.contentsScale = surface.contentLayer.contentsScale + 1.0
+    sublayer.mask = mask
+    surface.contentLayer.addSublayer(sublayer)
+
+    let moved = NSRect(
+      x: testFrame.origin.x,
+      y: testFrame.origin.y,
+      width: testFrame.width + 50,
+      height: testFrame.height + 50
+    )
+    surface.move(toScreenFrame: moved)
+
+    XCTAssertEqual(mask.contentsScale, surface.contentLayer.contentsScale)
+  }
 }

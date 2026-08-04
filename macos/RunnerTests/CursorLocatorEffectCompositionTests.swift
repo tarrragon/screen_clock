@@ -242,6 +242,21 @@ final class CursorLocatorEffectCompositionTests: XCTestCase {
     }
   }
 
+  /// Spotlight 的 `holeMask`（`CAGradientLayer`）掛在 `dimLayer.mask`，不出現
+  /// 在 `layer.sublayers` 內；只掃一層 `sublayers` 拿不到它，仍會沿用預設
+  /// 1.0，使 FR-03 要求的「亮區邊緣為漸層、非鋸齒硬邊」在 Retina 上打折。
+  func testAttach_alignsSpotlightHoleMaskContentsScale() {
+    let layer = makeHostLayer()
+    layer.contentsScale = 2.0
+
+    makeProductionRenderer().attach(to: layer, tint: .systemBlue, duration: 1.5)
+
+    let dimLayer = (layer.sublayers ?? []).first { $0.mask != nil }
+    let holeMask = dimLayer?.mask
+    XCTAssertNotNil(holeMask, "找不到 Spotlight 壓暗層的 holeMask")
+    XCTAssertEqual(holeMask?.contentsScale, 2.0, "holeMask 的 contentsScale 未對齊宿主 layer")
+  }
+
   /// 下發由 composite 單一位置負責，不倚賴任何 renderer 各自處理：即使宿主
   /// layer 的 contentsScale 事後改變（模擬跨螢幕搬遷），重新呼叫下發函式仍
   /// 使全部 sublayer 對齊新值，證明對齊邏輯不散落在各 renderer 內。
@@ -256,5 +271,7 @@ final class CursorLocatorEffectCompositionTests: XCTestCase {
     for sublayer in layer.sublayers ?? [] {
       XCTAssertEqual(sublayer.contentsScale, 3.0)
     }
+    let holeMask = (layer.sublayers ?? []).first { $0.mask != nil }?.mask
+    XCTAssertEqual(holeMask?.contentsScale, 3.0, "holeMask 未隨重發對齊新 scale")
   }
 }

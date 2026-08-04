@@ -356,13 +356,28 @@ final class CursorLocatorCompositeRenderer: CursorLocatorEffectRendering {
   /// 呼叫）與螢幕搬遷流程（`WindowCursorLocatorSurface.move` 呼叫，該處不持有
   /// composite 實例）共用同一份下發邏輯，任一 renderer 都不需要自行複製這行。
   static func synchronizeSublayerContentsScale(on layer: CALayer) {
-    guard let sublayers = layer.sublayers else { return }
-    let scale = layer.contentsScale
-
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    sublayers.forEach { $0.contentsScale = scale }
+    applyContentsScaleRecursively(layer.contentsScale, to: layer)
     CATransaction.commit()
+  }
+
+  /// 遞迴對齊 `layer` 底下所有子層——`sublayers` 與 `mask` 兩條掛載路徑皆算：
+  /// Spotlight 的 `holeMask` 掛在 `dimLayer.mask`，不出現在任何人的
+  /// `sublayers` 陣列，只掃一層 `sublayers` 拿不到它，仍會沿用預設 1.0。
+  ///
+  /// `layer` 自身不設定（`scale` 即取自它），只處理其子層；子層若還有
+  /// 自己的 `sublayers`／`mask`（目前三個 renderer 皆無此巢狀情形），
+  /// 遞迴呼叫可一併涵蓋，不需假設子層的巢狀深度上限。
+  private static func applyContentsScaleRecursively(_ scale: CGFloat, to layer: CALayer) {
+    for sublayer in layer.sublayers ?? [] {
+      sublayer.contentsScale = scale
+      applyContentsScaleRecursively(scale, to: sublayer)
+    }
+    if let mask = layer.mask {
+      mask.contentsScale = scale
+      applyContentsScaleRecursively(scale, to: mask)
+    }
   }
 }
 
