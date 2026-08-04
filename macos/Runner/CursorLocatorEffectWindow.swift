@@ -536,7 +536,9 @@ final class CursorLocatorEffectController {
     currentSession.startTimestamp = nil
     currentSession.tint = request.tint
 
-    updateTargetScreenIfNeeded(targetEntry, session: &currentSession)
+    if let displayID = updateTargetScreenIfNeeded(targetEntry, session: &currentSession) {
+      frameDriver.retarget(displayID: displayID)
+    }
 
     currentSession.surface.setAlpha(1.0)
 
@@ -614,22 +616,28 @@ final class CursorLocatorEffectController {
 
   /// 每幀螢幕重判定：回傳該幀取樣到的游標位置，`nil` 表示已無可用螢幕。
   /// 不做任何終結性副作用（無可用螢幕時是否結束播放由呼叫端決定）。回傳
-  /// 非 `nil` 時已視需要將 surface 搬遷至判定結果對應的螢幕。
+  /// 非 `nil` 時已視需要將 surface 搬遷至判定結果對應的螢幕，並改綁
+  /// frame driver（此副作用由本函式負責，見 `updateTargetScreenIfNeeded`
+  /// 的回傳值設計）。
   private func followCursorScreen(_ currentSession: inout PlayingSession) -> NSPoint? {
     let target = resolveTarget()
 
+    let index: Int
     switch target.resolution {
     case .unavailable:
       NSLog("[cursor-locator] E_CL_SCREEN: 播放中螢幕數歸零，結束播放")
       return nil
-    case .matched(let index):
-      updateTargetScreenIfNeeded(target.snapshot.entries[index], session: &currentSession)
-      return target.cursorLocation
-    case .fellBackToMain(let index):
+    case .matched(let matchedIndex):
+      index = matchedIndex
+    case .fellBackToMain(let fallbackIndex):
       NSLog("[cursor-locator] E_CL_SCREEN: 播放中退回 main，續行播放")
-      updateTargetScreenIfNeeded(target.snapshot.entries[index], session: &currentSession)
-      return target.cursorLocation
+      index = fallbackIndex
     }
+
+    if let displayID = updateTargetScreenIfNeeded(target.snapshot.entries[index], session: &currentSession) {
+      frameDriver.retarget(displayID: displayID)
+    }
+    return target.cursorLocation
   }
 
   /// 0..1 的 normalized progress，純函式、無副作用。
@@ -663,14 +671,20 @@ final class CursorLocatorEffectController {
     CGPoint(x: location.x - screenFrame.minX, y: location.y - screenFrame.minY)
   }
 
+  /// 判定並視需要搬遷 surface。只做判定與 session 更新，不碰 `frameDriver`
+  /// ——後者的耦合對象非本函式參數列上的協作者，改綁責任交還呼叫端（見
+  /// `followCursorScreen`／`resetExistingPlayback`）。
+  ///
+  /// 回傳非 `nil` 表示已搬遷，值為該次搬遷目標的 `displayID`，呼叫端須據此
+  /// 呼叫 `frameDriver.retarget`；回傳 `nil` 表示未搬遷，呼叫端不需動作。
   private func updateTargetScreenIfNeeded(
     _ entry: CursorScreenSnapshot.Entry,
     session: inout PlayingSession
-  ) {
-    guard entry.frame != session.screenFrame else { return }
+  ) -> CGDirectDisplayID? {
+    guard entry.frame != session.screenFrame else { return nil }
     session.surface.move(toScreenFrame: entry.frame)
-    frameDriver.retarget(displayID: entry.displayID)
     session.screenFrame = entry.frame
+    return entry.displayID
   }
 
   /// 淡出窗內的 alpha 值計算，純函式、無副作用（SPEC-008 FR-02 播放結束前

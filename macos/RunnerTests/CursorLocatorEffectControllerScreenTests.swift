@@ -239,4 +239,29 @@ final class CursorLocatorEffectControllerScreenTests: XCTestCase {
 
     XCTAssertEqual(log.events.count, eventCountBefore)
   }
+
+  // MARK: - 重置路徑：換螢幕時亦須搬遷（1.4.0-W3-012 改動二防護）
+
+  /// 重置（播放中再次呼叫 `play`）若新請求對應的目標螢幕與當前不同，
+  /// surface 搬遷恰一次、driver 改綁恰一次。此路徑先前無任何測試覆蓋
+  /// （1.4.0-W3-012 Problem Analysis 主線程驗證：既有 8 個螢幕測試皆僅覆蓋
+  /// 每幀路徑）；若 `updateTargetScreenIfNeeded` 改為回傳值後，
+  /// `resetExistingPlayback` 端漏補 `frameDriver.retarget` 呼叫，本案例會
+  /// 直接抓到回歸——`resetExistingPlayback` 不呼叫 `frameDriver.start`，漏補
+  /// retarget 會使 driver 持續對舊螢幕出幀。
+  func testPlay_resetWithDifferentTargetScreen_movesAndRetargetsOnce() throws {
+    let snapshot = ScreenSnapshotFixtures.sideBySide
+    snapshotBox.value = snapshot
+    cursorBox.value = NSPoint(x: 500, y: 500)
+
+    try controller.play(CursorLocatorPlayRequest(duration: 5.0, tint: .white))
+    driver.emit(at: t0)
+
+    // 重置前先切換游標所在螢幕，reset 呼叫時應依新座標搬遷。
+    cursorBox.value = NSPoint(x: 2500, y: 500)
+    try controller.play(CursorLocatorPlayRequest(duration: 3.0, tint: .red))
+
+    XCTAssertEqual(log.moveCount, 1)
+    XCTAssertEqual(log.retargetedDisplayIDs, [snapshot.entries[1].displayID])
+  }
 }
