@@ -220,4 +220,58 @@ final class CursorLocatorEffectCompositionTests: XCTestCase {
 
     XCTAssertEqual(layer.sublayers?.count, firstCount)
   }
+
+  // MARK: - contentsScale 下發（1.4.0-W3-022）
+
+  /// attach 完成後，三個 renderer 的全部 sublayer 對齊宿主 layer 的
+  /// contentsScale：CoreAnimation 不會把父層的 contentsScale 傳播給
+  /// sublayer，未下發時 Spotlight／BorderFlash／Ripple 的 sublayer 全部沿用
+  /// 預設 1.0，Retina 上光柵化輸出等同解析度減半。
+  func testAttach_alignsSublayerContentsScaleToHostLayer() {
+    let layer = makeHostLayer()
+    layer.contentsScale = 2.0
+
+    makeProductionRenderer().attach(to: layer, tint: .systemBlue, duration: 1.5)
+
+    let sublayers = layer.sublayers ?? []
+    XCTAssertFalse(sublayers.isEmpty)
+    for sublayer in sublayers {
+      XCTAssertEqual(
+        sublayer.contentsScale, 2.0,
+        "\(type(of: sublayer)) 的 contentsScale 未對齊宿主 layer")
+    }
+  }
+
+  /// Spotlight 的 `holeMask`（`CAGradientLayer`）掛在 `dimLayer.mask`，不出現
+  /// 在 `layer.sublayers` 內；只掃一層 `sublayers` 拿不到它，仍會沿用預設
+  /// 1.0，使 FR-03 要求的「亮區邊緣為漸層、非鋸齒硬邊」在 Retina 上打折。
+  func testAttach_alignsSpotlightHoleMaskContentsScale() {
+    let layer = makeHostLayer()
+    layer.contentsScale = 2.0
+
+    makeProductionRenderer().attach(to: layer, tint: .systemBlue, duration: 1.5)
+
+    let dimLayer = (layer.sublayers ?? []).first { $0.mask != nil }
+    let holeMask = dimLayer?.mask
+    XCTAssertNotNil(holeMask, "找不到 Spotlight 壓暗層的 holeMask")
+    XCTAssertEqual(holeMask?.contentsScale, 2.0, "holeMask 的 contentsScale 未對齊宿主 layer")
+  }
+
+  /// 下發由 composite 單一位置負責，不倚賴任何 renderer 各自處理：即使宿主
+  /// layer 的 contentsScale 事後改變（模擬跨螢幕搬遷），重新呼叫下發函式仍
+  /// 使全部 sublayer 對齊新值，證明對齊邏輯不散落在各 renderer 內。
+  func testSynchronizeSublayerContentsScale_realignsAfterHostLayerScaleChanges() {
+    let layer = makeHostLayer()
+    layer.contentsScale = 1.0
+    makeProductionRenderer().attach(to: layer, tint: .systemBlue, duration: 1.5)
+
+    layer.contentsScale = 3.0
+    CursorLocatorCompositeRenderer.synchronizeSublayerContentsScale(on: layer)
+
+    for sublayer in layer.sublayers ?? [] {
+      XCTAssertEqual(sublayer.contentsScale, 3.0)
+    }
+    let holeMask = (layer.sublayers ?? []).first { $0.mask != nil }?.mask
+    XCTAssertEqual(holeMask?.contentsScale, 3.0, "holeMask 未隨重發對齊新 scale")
+  }
 }

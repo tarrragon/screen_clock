@@ -62,7 +62,9 @@ final class CursorLocatorRippleRenderer: CursorLocatorEffectRendering {
       ringLayer.fillColor = nil
       ringLayer.strokeColor = strokeColor
       ringLayer.lineWidth = CursorLocatorEffectConstants.rippleLineWidth
-      ringLayer.contentsScale = layer.contentsScale
+      // contentsScale 由 composite 於 attach 完成後統一下發
+      // （`CursorLocatorCompositeRenderer.synchronizeSublayerContentsScale`，
+      // 1.4.0-W3-022），本 renderer 不再自行複製一次性快照。
       ringLayer.opacity = 0
       layer.addSublayer(ringLayer)
       return ringLayer

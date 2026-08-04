@@ -313,6 +313,7 @@ final class CursorLocatorCompositeRenderer: CursorLocatorEffectRendering {
   func attach(to layer: CALayer, tint: NSColor, duration: TimeInterval) {
     withoutImplicitAnimations {
       renderers.forEach { $0.attach(to: layer, tint: tint, duration: duration) }
+      Self.synchronizeSublayerContentsScale(on: layer)
     }
   }
 
@@ -341,6 +342,42 @@ final class CursorLocatorCompositeRenderer: CursorLocatorEffectRendering {
     CATransaction.setDisableActions(true)
     body()
     CATransaction.commit()
+  }
+
+  /// 對齊 `layer` 全部 sublayer 的 `contentsScale` 至 `layer` 本身的值（1.4.0-W3-022）。
+  ///
+  /// CoreAnimation 不會把父層的 `contentsScale` 傳播給 sublayer，`LayerHostingView
+  /// .synchronizeHostedLayer` 只對齊 hosted layer 自身，三個 renderer 各自建立的
+  /// sublayer（Spotlight 的 dimLayer／holeMask、BorderFlash 的 borderLayer、Ripple
+  /// 的 ringLayer）因而全部沿用預設 1.0；CAGradientLayer 的羽化帶與 borderWidth
+  /// 描邊皆為光柵化輸出，Retina 上以 1.0 光柵化等於解析度減半。
+  ///
+  /// 宣告為 `static` 而非依賴 composite 實例，使 attach 流程（composite 自身
+  /// 呼叫）與螢幕搬遷流程（`WindowCursorLocatorSurface.move` 呼叫，該處不持有
+  /// composite 實例）共用同一份下發邏輯，任一 renderer 都不需要自行複製這行。
+  static func synchronizeSublayerContentsScale(on layer: CALayer) {
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    applyContentsScaleRecursively(layer.contentsScale, to: layer)
+    CATransaction.commit()
+  }
+
+  /// 遞迴對齊 `layer` 底下所有子層——`sublayers` 與 `mask` 兩條掛載路徑皆算：
+  /// Spotlight 的 `holeMask` 掛在 `dimLayer.mask`，不出現在任何人的
+  /// `sublayers` 陣列，只掃一層 `sublayers` 拿不到它，仍會沿用預設 1.0。
+  ///
+  /// `layer` 自身不設定（`scale` 即取自它），只處理其子層；子層若還有
+  /// 自己的 `sublayers`／`mask`（目前三個 renderer 皆無此巢狀情形），
+  /// 遞迴呼叫可一併涵蓋，不需假設子層的巢狀深度上限。
+  private static func applyContentsScaleRecursively(_ scale: CGFloat, to layer: CALayer) {
+    for sublayer in layer.sublayers ?? [] {
+      sublayer.contentsScale = scale
+      applyContentsScaleRecursively(scale, to: sublayer)
+    }
+    if let mask = layer.mask {
+      mask.contentsScale = scale
+      applyContentsScaleRecursively(scale, to: mask)
+    }
   }
 }
 
@@ -844,6 +881,9 @@ final class WindowCursorLocatorSurface: CursorLocatorSurface {
     // 同尺寸跨螢幕搬遷不會觸發 setFrameSize，而 backingScaleFactor 變更通知的
     // 送達時機由 AppKit 決定；此處顯式同步使搬遷回傳時幾何與 scale 皆已就位。
     hostView.synchronizeHostedLayer()
+    // hostedLayer 自身的 contentsScale 已由上一行對齊，但 renderer 掛在其上的
+    // sublayer 不會隨之連動（1.4.0-W3-022），需在此重發同一份下發邏輯。
+    CursorLocatorCompositeRenderer.synchronizeSublayerContentsScale(on: contentLayer)
   }
 
   func setAlpha(_ value: CGFloat) {
