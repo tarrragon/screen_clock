@@ -38,6 +38,8 @@ final class CursorLocatorBorderFlashRenderer: CursorLocatorEffectRendering {
 
     layer.addSublayer(border)
     borderLayer = border
+
+    NSLog("[cursor-locator] BorderFlashRenderer attach: bounds=\(layer.bounds)")
   }
 
   func render(_ frame: CursorLocatorEffectFrame) {
@@ -49,8 +51,11 @@ final class CursorLocatorBorderFlashRenderer: CursorLocatorEffectRendering {
   }
 
   func detach() {
+    let bounds = borderLayer?.bounds ?? .zero
     borderLayer?.removeFromSuperlayer()
     borderLayer = nil
+
+    NSLog("[cursor-locator] BorderFlashRenderer detach: bounds=\(bounds)")
   }
 
   /// 三次淡入淡出的不透明度曲線（純函式，供直接覆蓋邊界值）。

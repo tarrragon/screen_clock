@@ -31,6 +31,8 @@ final class CursorLocatorSpotlightRenderer: CursorLocatorEffectRendering {
 
     self.dimLayer = dim
     self.holeMask = mask
+
+    NSLog("[cursor-locator] SpotlightRenderer attach: bounds=\(layer.bounds)")
   }
 
   func render(_ frame: CursorLocatorEffectFrame) {
@@ -47,9 +49,12 @@ final class CursorLocatorSpotlightRenderer: CursorLocatorEffectRendering {
   }
 
   func detach() {
+    let bounds = dimLayer?.bounds ?? .zero
     dimLayer?.removeFromSuperlayer()
     dimLayer = nil
     holeMask = nil
+
+    NSLog("[cursor-locator] SpotlightRenderer detach: bounds=\(bounds)")
   }
 
   // MARK: - 建構
