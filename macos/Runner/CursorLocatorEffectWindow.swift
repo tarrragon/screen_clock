@@ -432,21 +432,15 @@ final class CursorLocatorEffectController {
   /// - surface 建立失敗時拋出 `.windowCreationFailed`；此路徑結束後狀態
   ///   仍為 `.idle`，且無殘留的排程與驅動。
   func play(_ request: CursorLocatorPlayRequest) throws {
-    let target = resolveTarget()
-
-    let targetIndex: Int
-    switch target.resolution {
-    case .matched(let index):
-      targetIndex = index
-    case .fellBackToMain(let index):
-      NSLog("[cursor-locator] E_CL_SCREEN: 螢幕解析退回 main，續行播放")
-      targetIndex = index
-    case .unavailable:
+    guard let target = resolveTarget() else {
       NSLog("[cursor-locator] E_CL_SCREEN: 無任何可用螢幕，無法播放")
       throw CursorLocatorError.noAvailableScreen
     }
+    if target.fellBackToMain {
+      NSLog("[cursor-locator] E_CL_SCREEN: 螢幕解析退回 main，續行播放")
+    }
 
-    let targetEntry = target.snapshot.entries[targetIndex]
+    let targetEntry = target.entry
 
     if var currentSession = session {
       resetExistingPlayback(&currentSession, request: request, targetEntry: targetEntry)
@@ -464,28 +458,43 @@ final class CursorLocatorEffectController {
     endPlayback()
   }
 
-  /// 一次判定所依據的三項值：快照、該次取樣到的游標位置、判定結果。
+  /// 一次判定已兌現的結果：索引已在此消化為 entry，呼叫端不再持有
+  /// `CursorScreenSnapshot`（`CursorScreenResolution` 的 `index` 脫離集合即
+  /// 無意義，故不讓 snapshot 跟著旅行到呼叫端）。
   ///
   /// 游標位置一併回傳而非只留在函式內，是為了讓每幀的螢幕判定與特效繪製
   /// 共用同一次 `NSEvent.mouseLocation` 取樣（FR-03／FR-05 共用取樣約束）。
   private struct TargetResolution {
-    let snapshot: CursorScreenSnapshot
+    let entry: CursorScreenSnapshot.Entry
     let cursorLocation: NSPoint
-    let resolution: CursorScreenResolution
+
+    /// `true` 表示本次判定退回 main（`CursorScreenResolution.fellBackToMain`）。
+    /// 診斷 log 的措辭留在各自呼叫端組裝，因為不同呼叫情境（觸發播放 /
+    /// 播放中每幀）對同一判定結果需要不同的處理與措辭，寫在此處會讓被呼叫者
+    /// 記住呼叫者的用詞，任一方改動都需回頭同步。
+    let fellBackToMain: Bool
   }
 
-  /// 取當下螢幕快照與游標對應的判定結果。
+  /// 取當下螢幕快照與游標對應的判定結果，並把索引兌現成 entry。
   ///
-  /// 由 `play` 與 `handleFrame` 共用；switch 分支與對應診斷 log 留在各自
-  /// 呼叫端組裝，因為不同呼叫情境（觸發播放 / 播放中每幀）對同一判定結果
-  /// 需要不同的處理與措辭，寫在此處會讓被呼叫者記住呼叫者的用詞，任一方
-  /// 改動都需回頭同步。
-  private func resolveTarget() -> TargetResolution {
+  /// `nil` 對應 `CursorScreenResolution.unavailable`（無任何可用螢幕）；
+  /// 呼叫端據此決定是否結束播放或拒絕開始播放，處理與診斷 log 措辭皆留在
+  /// 各自呼叫端。由 `play` 與 `followCursorScreen` 共用。
+  private func resolveTarget() -> TargetResolution? {
     let snapshot = snapshotProvider()
     let cursorLocation = locationSampler()
     let resolution = CursorScreenLocator.resolve(cursorLocation: cursorLocation, in: snapshot)
-    return TargetResolution(
-      snapshot: snapshot, cursorLocation: cursorLocation, resolution: resolution)
+
+    switch resolution {
+    case .matched(let index):
+      return TargetResolution(
+        entry: snapshot.entries[index], cursorLocation: cursorLocation, fellBackToMain: false)
+    case .fellBackToMain(let index):
+      return TargetResolution(
+        entry: snapshot.entries[index], cursorLocation: cursorLocation, fellBackToMain: true)
+    case .unavailable:
+      return nil
+    }
   }
 
   private func startNewPlayback(
@@ -620,21 +629,15 @@ final class CursorLocatorEffectController {
   /// frame driver（此副作用由本函式負責，見 `updateTargetScreenIfNeeded`
   /// 的回傳值設計）。
   private func followCursorScreen(_ currentSession: inout PlayingSession) -> NSPoint? {
-    let target = resolveTarget()
-
-    let index: Int
-    switch target.resolution {
-    case .unavailable:
+    guard let target = resolveTarget() else {
       NSLog("[cursor-locator] E_CL_SCREEN: 播放中螢幕數歸零，結束播放")
       return nil
-    case .matched(let matchedIndex):
-      index = matchedIndex
-    case .fellBackToMain(let fallbackIndex):
+    }
+    if target.fellBackToMain {
       NSLog("[cursor-locator] E_CL_SCREEN: 播放中退回 main，續行播放")
-      index = fallbackIndex
     }
 
-    if let displayID = updateTargetScreenIfNeeded(target.snapshot.entries[index], session: &currentSession) {
+    if let displayID = updateTargetScreenIfNeeded(target.entry, session: &currentSession) {
       frameDriver.retarget(displayID: displayID)
     }
     return target.cursorLocation
