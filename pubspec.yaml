@@ -59,6 +59,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # 測試用：DisplayDetector 單元測試以 ScreenRetrieverPlatform 假實作
+  # 取代真實 MethodChannel（1.4.0-W2-001），需直接依賴此 platform interface。
+  screen_retriever_platform_interface: ^0.2.0
+
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
