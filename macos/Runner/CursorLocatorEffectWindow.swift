@@ -362,12 +362,17 @@ final class CursorLocatorEffectController {
   /// 繪製層。`nil` 表示只跑生命週期不繪製（既有生命週期測試群組即為此形態）。
   private let renderer: CursorLocatorEffectRendering?
 
-  /// playing 期間持有的全部狀態（`generation` 除外，理由見其註解）。`surface`
-  /// 為 non-optional，故此結構存在即等價於「恰有一個 surface」，不存在需並行
-  /// 維護的第二份欄位。`duration`／`elapsed`／`screenFrame` 為 `state` 的計算
-  /// 來源，不另存一份。
+  /// playing 期間持有的全部狀態。`surface` 為 non-optional，故此結構存在即
+  /// 等價於「恰有一個 surface」，不存在需並行維護的第二份欄位。`duration`／
+  /// `elapsed`／`screenFrame` 為 `state` 的計算來源，不另存一份。
   private struct PlayingSession {
     let surface: CursorLocatorSurface
+
+    /// 本 session 的世代序號，建立時自控制器的 `nextGeneration` 配發，終身
+    /// 不變。過期幀攔截比對此值而非另一份控制器層級的可變狀態（見
+    /// `handleFrame`／`handleDeadline`）。
+    let generation: UInt64
+
     var duration: TimeInterval
     var elapsed: TimeInterval
     var startTimestamp: CFTimeInterval?
@@ -389,18 +394,15 @@ final class CursorLocatorEffectController {
     return .playing(elapsed: session.elapsed, duration: session.duration, screenFrame: session.screenFrame)
   }
 
-  /// 過期幀攔截用的世代序號。於「建立新 surface」與「結束子程序」時遞增，
-  /// 使已停止／已結束的舊 driver 產生的在途幀在比對時被過濾。
+  /// 世代序號配發器：僅 `startNewPlayback` 建立新 session 時遞增並配發給該
+  /// session（存入 `PlayingSession.generation`），本身不再獨立承載「這幀是否
+  /// 過期」的語意。
   ///
-  /// 重置（播放中再次 `play`）刻意**不**遞增此序號：driver 於重置時不重啟
-  /// （只 `retarget`，不重呼 `start`），`onFrame` 閉包仍是同一個、捕捉的仍是
-  /// 同一世代值；若重置也遞增，會使該閉包捕捉的世代永久落後於
-  /// `self.generation`，導致重置後所有後續幀被誤判為過期而永久停止推進。
-  ///
-  /// 獨立於 `session` 之外持有（不隨 playing/idle 收放）：世代比對在取出
-  /// `session` 之前執行，且 idle 期間仍須保有最後世代值供已捕捉舊世代值的
-  /// 在途幀比對，故不可隨 `session` 收放。
-  private var generation: UInt64 = 0
+  /// 過期幀攔截改為比對「這幀屬於當下存活的 session 嗎」（`handleFrame`／
+  /// `handleDeadline` 的單一 guard），即幀攜帶的世代是否等於 `session` 當下
+  /// 的世代。重置（播放中再次 `play`）不建立新 session，故 session 的世代
+  /// 不變，重置後的既有幀天然仍比對通過，不需額外的「刻意不遞增」處理。
+  private var nextGeneration: UInt64 = 0
 
   init(
     snapshotProvider: @escaping CursorScreenSnapshotProviding,
@@ -498,13 +500,14 @@ final class CursorLocatorEffectController {
       throw CursorLocatorError.windowCreationFailed(underlying: String(describing: error))
     }
 
-    generation += 1
-    let capturedGeneration = generation
+    nextGeneration += 1
+    let capturedGeneration = nextGeneration
 
     let cancelDeadline = scheduleDeadline(duration: request.duration, generation: capturedGeneration)
 
     let newSession = PlayingSession(
       surface: newSurface,
+      generation: capturedGeneration,
       duration: request.duration,
       elapsed: 0,
       startTimestamp: nil,
@@ -544,14 +547,15 @@ final class CursorLocatorEffectController {
     )
 
     currentSession.cancelDeadline()
-    currentSession.cancelDeadline = scheduleDeadline(duration: request.duration, generation: generation)
+    currentSession.cancelDeadline = scheduleDeadline(
+      duration: request.duration, generation: currentSession.generation)
   }
 
   /// 排程一次逾時保險，回傳取消用的 closure。
   ///
-  /// 世代由參數傳入而非讀取 `self.generation`：是否遞增、遞增後或現有值，
-  /// 完全由呼叫端決定，本函式只負責排程與取消 closure 的組裝，不涉入世代
-  /// 遞增的判斷。
+  /// 世代由參數傳入而非由本函式自行決定：新播放傳配發後的新世代、重置傳既有
+  /// session 的世代，本函式只負責排程與取消 closure 的組裝，不涉入世代本身
+  /// 的判斷。
   private func scheduleDeadline(duration: TimeInterval, generation: UInt64) -> () -> Void {
     deadlineScheduler(
       duration + CursorLocatorTimingConstants.deadlineMargin
@@ -564,8 +568,7 @@ final class CursorLocatorEffectController {
   /// 世代攔截 -> 重判定螢幕（同時取得該幀游標取樣）-> 計算 elapsed ->
   /// 淡出窗內設定 alpha -> 交付繪製層 -> elapsed 達 duration 即走結束子程序。
   private func handleFrame(timestamp: CFTimeInterval, generation frameGeneration: UInt64) {
-    guard frameGeneration == generation else { return }
-    guard var currentSession = session else { return }
+    guard var currentSession = session, frameGeneration == currentSession.generation else { return }
     guard let cursorLocation = followCursorScreen(&currentSession) else {
       endPlayback()
       return
@@ -692,15 +695,15 @@ final class CursorLocatorEffectController {
   }
 
   private func handleDeadline(generation deadlineGeneration: UInt64) {
-    guard deadlineGeneration == generation else { return }
-    guard session != nil else { return }
+    guard session?.generation == deadlineGeneration else { return }
     NSLog("[cursor-locator] 逾時保險觸發，強制結束播放")
     endPlayback()
   }
 
   /// 結束子程序（單一出口，供自然結束 / 螢幕歸零 / 逾時 / 主動停止四條路徑
-  /// 共用）：停驅動 -> 卸下繪製層 -> 取消逾時 -> 關閉 surface -> 釋放持有 ->
-  /// 遞增世代序號。
+  /// 共用）：停驅動 -> 卸下繪製層 -> 取消逾時 -> 關閉 surface -> 釋放持有。
+  /// `session = nil` 本身即使其世代連帶失效，不需額外遞增序號（世代隨
+  /// session 走，見 `PlayingSession.generation`）。
   ///
   /// 四條結束路徑共用同一子程序，是「十次觸發無洩漏」在所有路徑上一致成立
   /// 的結構前提；若各路徑各自收尾，必有某條路徑漏掉其中一步。
@@ -712,7 +715,6 @@ final class CursorLocatorEffectController {
       currentSession.surface.close()
     }
     session = nil
-    generation += 1
   }
 }
 
