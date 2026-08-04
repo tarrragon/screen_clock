@@ -810,7 +810,11 @@ private final class NonKeyEffectWindow: NSWindow {
 /// 同步一律包在停用隱含動畫的 `CATransaction` 內：hosted layer 的 `delegate`
 /// 為 nil，不像 layer-backed 那樣由 AppKit 回傳 `NSNull` 停用 action，直接改
 /// frame 會啟動 0.25 秒隱含動畫，使搬遷期間圖層仍畫在舊位置。
-private final class LayerHostingView: NSView {
+///
+/// 宣告為 `internal`（非 `private`）僅為讓 RunnerTests 透過 `@testable import`
+/// 直接建構獨立宿主測試隱含動畫防護（1.4.0-W3-027），不代表對外公開 API；
+/// `WindowCursorLocatorSurface` 仍是唯一的 production 建構點。
+final class LayerHostingView: NSView {
   override func setFrameSize(_ newSize: NSSize) {
     super.setFrameSize(newSize)
     synchronizeHostedLayer()
