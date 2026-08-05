@@ -61,6 +61,7 @@ htmlcov/
 .claude/dispatch-active
 .claude/dispatch-active.json
 .claude/dispatch-active.lock
+.claude/error-patterns/.allocator.lock
 .claude/hook-state/
 .claude/state/
 .claude/logs/
