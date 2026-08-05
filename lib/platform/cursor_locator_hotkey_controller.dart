@@ -62,11 +62,11 @@ class CursorLocatorHotkeyController {
 
   static const String _tag = 'cursor-locator-hotkey';
 
-  /// 熱鍵定義固定不變（引用 [AppCursorLocator] 常數，無硬編碼字面）；
+  /// 熱鍵定義固定不變（引用 [AppCursorLocatorHotkey] 常數，無硬編碼字面）；
   /// 建一次重用，避免每次註冊 / 解除都新建等價物件。
   static final HotKey _hotKey = HotKey(
-    key: AppCursorLocator.hotkeyPhysicalKey,
-    modifiers: AppCursorLocator.hotkeyModifiers,
+    key: AppCursorLocatorHotkey.physicalKey,
+    modifiers: AppCursorLocatorHotkey.modifiers,
     scope: HotKeyScope.system,
   );
 

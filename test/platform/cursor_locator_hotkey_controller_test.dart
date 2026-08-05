@@ -3,8 +3,8 @@
 //
 // 驗證熱鍵註冊 / 解除生命週期綁定 SettingsModel.cursorLocatorEnabled 的
 // 翻轉、觸發時讀取當下最新設定值換算播放參數、熱鍵定義引用
-// AppCursorLocator 常數無硬編碼、註冊 / 解除失敗皆不外洩例外且維持可重試
-// 的內部狀態。
+// AppCursorLocatorHotkey 常數無硬編碼、註冊 / 解除失敗皆不外洩例外且維持
+// 可重試的內部狀態。
 //
 // 依 test-assertion-design-rules D 規則：全程以 HotKeyRegistrar 替身記錄
 // 呼叫序列斷言，不使用 Stopwatch 計時門檻；`pumpEventQueue()` 排空整個
@@ -74,7 +74,7 @@ void main() {
   }
 
   setUp(() {
-    channel = const MethodChannel(AppCursorLocator.channelName);
+    channel = const MethodChannel(AppCursorLocatorChannel.channelName);
     locator = CursorLocator(channel: channel);
     playCalls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -91,7 +91,7 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('啟用狀態下 start() 註冊熱鍵，鍵值引用 AppCursorLocator 常數', () async {
+  test('啟用狀態下 start() 註冊熱鍵，鍵值引用 AppCursorLocatorHotkey 常數', () async {
     final CursorLocatorHotkeyController controller = buildController();
 
     await controller.start();
@@ -100,8 +100,8 @@ void main() {
     expect(controller.isRegistered, isTrue);
     final HotKey? registered = registrar.lastRegisteredHotKey;
     expect(registered, isNotNull);
-    expect(registered!.key, AppCursorLocator.hotkeyPhysicalKey);
-    expect(registered.modifiers, AppCursorLocator.hotkeyModifiers);
+    expect(registered!.key, AppCursorLocatorHotkey.physicalKey);
+    expect(registered.modifiers, AppCursorLocatorHotkey.modifiers);
     expect(registered.scope, HotKeyScope.system);
   });
 
@@ -125,10 +125,11 @@ void main() {
     await pumpEventQueue();
 
     expect(playCalls, hasLength(1));
-    expect(playCalls.single.method, AppCursorLocator.playMethod);
+    expect(playCalls.single.method, AppCursorLocatorChannel.playMethod);
     expect(playCalls.single.arguments, <String, Object?>{
-      AppCursorLocator.durationMsArgKey: 1500,
-      AppCursorLocator.tintArgbArgKey: AppCursorLocator.defaultTint.toARGB32(),
+      AppCursorLocatorChannel.durationMsArgKey: 1500,
+      AppCursorLocatorChannel.tintArgbArgKey:
+          AppCursorLocatorSettings.defaultTint.toARGB32(),
     });
   });
 
@@ -145,8 +146,8 @@ void main() {
 
     expect(playCalls, hasLength(1));
     expect(playCalls.single.arguments, <String, Object?>{
-      AppCursorLocator.durationMsArgKey: 2500,
-      AppCursorLocator.tintArgbArgKey: 0xFFFF0000,
+      AppCursorLocatorChannel.durationMsArgKey: 2500,
+      AppCursorLocatorChannel.tintArgbArgKey: 0xFFFF0000,
     });
   });
 

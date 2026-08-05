@@ -11,11 +11,13 @@ import 'method_channel_safety.dart';
 /// 骨架，原生端收到 play 僅以 NSLog 記錄；特效視窗管理留
 /// 1.4.0-W2-006、視覺特效繪製留 1.4.0-W3-001。
 ///
-/// channel 名 / 方法名 / 參數鍵一律引用 [AppCursorLocator] 常數，Swift 端
-/// 以對應的常數宣告承載相同字面（method channel 無法跨語言共用常數定義）。
+/// channel 名 / 方法名 / 參數鍵一律引用 [AppCursorLocatorChannel] 常數，
+/// Swift 端以對應的常數宣告承載相同字面（method channel 無法跨語言共用
+/// 常數定義）。
 class CursorLocator {
   CursorLocator({MethodChannel? channel})
-    : _channel = channel ?? const MethodChannel(AppCursorLocator.channelName);
+    : _channel =
+          channel ?? const MethodChannel(AppCursorLocatorChannel.channelName);
 
   static const String _tag = 'cursor-locator';
 
@@ -25,8 +27,8 @@ class CursorLocator {
   ///
   /// [duration] 與 [tint] 為 SPEC-008 介面規格節訂的簽章；本方法是設定層
   /// （[Duration] / [Color]）與傳輸層的換算點——傳輸層以整數毫秒
-  /// （[AppCursorLocator.durationMsArgKey]）與 ARGB 整數
-  /// （[AppCursorLocator.tintArgbArgKey]）傳遞。色彩換算集中於 [_tintToArgb]
+  /// （[AppCursorLocatorChannel.durationMsArgKey]）與 ARGB 整數
+  /// （[AppCursorLocatorChannel.tintArgbArgKey]）傳遞。色彩換算集中於 [_tintToArgb]
   /// 具名轉換點，與時長換算（`duration.inMilliseconds`）維持同一層級、
   /// 同一風格，皆不散落在呼叫式中。轉換與 channel 呼叫同在 try 區塊內，
   /// NaN / Infinite 等異常輸入與 [PlatformException] 共用同一 catch-log
@@ -45,11 +47,11 @@ class CursorLocator {
       );
       await invokeMethodSafely<void>(
         _channel,
-        AppCursorLocator.playMethod,
+        AppCursorLocatorChannel.playMethod,
         tag: _tag,
         arguments: <String, Object?>{
-          AppCursorLocator.durationMsArgKey: durationMs,
-          AppCursorLocator.tintArgbArgKey: tintArgb,
+          AppCursorLocatorChannel.durationMsArgKey: durationMs,
+          AppCursorLocatorChannel.tintArgbArgKey: tintArgb,
         },
       );
     } on UnsupportedError catch (e) {

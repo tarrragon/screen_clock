@@ -55,21 +55,21 @@ void main() {
     expect(swiftSource, contains('"$literal"'));
   }
 
-  group('AppCursorLocator 字面須存在於 Swift 端', () {
+  group('AppCursorLocatorChannel 字面須存在於 Swift 端', () {
     test('channelName', () {
-      expectExactLiteralInSwift(AppCursorLocator.channelName);
+      expectExactLiteralInSwift(AppCursorLocatorChannel.channelName);
     });
 
     test('playMethod', () {
-      expectExactLiteralInSwift(AppCursorLocator.playMethod);
+      expectExactLiteralInSwift(AppCursorLocatorChannel.playMethod);
     });
 
     test('durationMsArgKey', () {
-      expectExactLiteralInSwift(AppCursorLocator.durationMsArgKey);
+      expectExactLiteralInSwift(AppCursorLocatorChannel.durationMsArgKey);
     });
 
     test('tintArgbArgKey', () {
-      expectExactLiteralInSwift(AppCursorLocator.tintArgbArgKey);
+      expectExactLiteralInSwift(AppCursorLocatorChannel.tintArgbArgKey);
     });
   });
 
