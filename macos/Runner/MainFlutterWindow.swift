@@ -295,6 +295,10 @@ final class InputBindingBridge {
   private var draggingAction: [String: Any]?
   private var lastDragY: CGFloat = 0
 
+  /// Hotkey 綁定 down/up 消費配對狀態（SPEC-007 FR-03）。見
+  /// `ButtonEventConsumption` 型別註解。
+  private var hotkeyConsumption = ButtonEventConsumption()
+
   /// 偵測捕捉模式旗標（SPEC-007 FR-06）：為 true 時，下一個 otherMouseDown
   /// 經 onButtonCaptured 回報 buttonNumber 並消費該事件，不分派綁定動作。
   private var capturingButton = false
@@ -427,6 +431,7 @@ final class InputBindingBridge {
     runLoopSource = nil
     eventTap = nil
     draggingAction = nil
+    hotkeyConsumption = ButtonEventConsumption()
   }
 
   /// CGEventTap 回呼：依綁定分派側鍵事件（回呼維持輕量，NFR-01）。
@@ -451,7 +456,8 @@ final class InputBindingBridge {
       return handleButtonDown(button: button, event: event)
 
     case .otherMouseUp:
-      return handleButtonUp(event: event)
+      let button = event.getIntegerValueField(.mouseEventButtonNumber)
+      return handleButtonUp(button: button, event: event)
 
     case .mouseMoved, .otherMouseDragged, .leftMouseDragged, .rightMouseDragged:
       return handleDragMove(event: event)
@@ -478,6 +484,9 @@ final class InputBindingBridge {
     if type == "hotkey" {
       synthesizeHotkey(action: action)
       // 無論是否成功合成，皆消費原側鍵事件（FR-03），避免觸發瀏覽器上下頁。
+      // 記錄此 button 的 down 已消費，供 handleButtonUp 比對消費對應 up
+      // （1.4.0-W1-020 判定：orphan mouseUp 穿透為 SPEC-007 FR-03 缺口）。
+      hotkeyConsumption.recordHotkeyDownConsumed(button: button)
       return nil
     }
     return Unmanaged.passUnretained(event)
@@ -665,10 +674,15 @@ final class InputBindingBridge {
     return nil
   }
 
-  /// 側鍵放開：若正在拖曳則離開並消費，否則放行。
-  private func handleButtonUp(event: CGEvent) -> Unmanaged<CGEvent>? {
+  /// 側鍵放開：DragScroll 拖曳中優先離開並消費；否則若對應 Hotkey 綁定的
+  /// mouseDown 已消費，一併消費此 mouseUp（SPEC-007 FR-03，避免 orphan
+  /// mouseUp 穿透至底層應用）；否則放行。
+  private func handleButtonUp(button: Int64, event: CGEvent) -> Unmanaged<CGEvent>? {
     if draggingAction != nil {
       draggingAction = nil
+      return nil
+    }
+    if hotkeyConsumption.consumeHotkeyUpIfMatched(button: button) {
       return nil
     }
     return Unmanaged.passUnretained(event)
