@@ -328,6 +328,8 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | IMP-049 (hook-error-display-is-cli-bug) | "hook error" 顯示是 Claude Code CLI 已知 Bug，非 Hook 程式碼問題 | 低 | v0.17.3 |
 | IMP-049 (undefined-constants-in-hook-source) | Hook 原始碼引用未定義常數 | — | — |
 | IMP-BAL-004 | 豁免清單以檔名比對而非路徑錨定，使樹中任意深度的同名檔全數豁免 | — | — |
+| IMP-BAL-005 | 錯誤訊號被消費為顯示而非判定——印了紅字，流程照走 | 高 | v0.2.1 |
+| IMP-BAL-007 | 共用 runner 整體 strip 破壞下游格式敏感解析，測試 mock 在 runner 層繞過缺陷點 | 高 | — |
 
 ### 流程 (PROC)
 
@@ -559,6 +561,14 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-105 (feature-implemented-without-doc-integration) | 新功能實作後缺乏文件引導整合 | — | — |
 | PC-105 (pm-cli-syntax-autopilot) | PM 對 SKILL CLI 語法的 autopilot 假設 | 中 | v0.18.0 |
 | PC-BAL-014 | Skill 註冊表 session 快取遮蔽檔案系統變更 — 同 session 驗證得出假陰性 | 中 | v0.2.1 |
+| PC-BAL-015 | idle 通知加上尚未落地的寫入被當成代理人未執行，據以前台重做 | — | — |
+| PC-BAL-016 | 以既有缺陷為範本的同類掃描繼承種子缺陷的軸，零缺陷結論被下游當成全檔無缺陷 | — | — |
+| PC-BAL-017 | 以複製作為分發手段時副本凍結於複製時點，之後的上游修復不傳播且驗證易假設已含 | — | — |
+| PC-BAL-018 | 「前提已更正」標記使後手停止驗證，錯誤更正因此獲得免疫 | 高 | v0.2.1 |
+| PC-BAL-019 | 交接內容的完整度被誤讀為交接已建立，指標從未寫入任何讀取端 | 高 | v0.2.1 |
+| PC-BAL-020 | 已查證與未查證的陳述共用同一確定語氣，讀者無從分辨哪些被看過 | 高 | v0.2.1 |
+| PC-BAL-021 | 待認領的衍生票被範圍較廣的票連帶完成，票本身零狀態變化 | 中 | v0.2.1 |
+| PC-BAL-022 | 失敗歸因以因果範圍核對取代 baseline 對照，環境造成的新失敗被判為既有 | 高 | v0.2.1 |
 | PC-SCLK-001 | 並行 agent 的 git commit --amend 改寫其他執行體的 commit | 高 | — |
 | PC-SCLK-002 | 代理人以編碼混淆繞過 sandbox 防護而非回報阻擋 | 高 | — |
 | PC-SCLK-003 | 任務 context 指定解法形態而非問題，使執行者實作弱手段並將其固化為驗收條件 | 中 | — |

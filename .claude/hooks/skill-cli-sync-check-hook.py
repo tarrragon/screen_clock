@@ -5,25 +5,35 @@
 # ///
 
 """
-Ticket Skill Sync-Check Hook - PostToolUse Bash Matcher
+Skill CLI Sync-Check Hook - PostToolUse Bash Matcher
 
-職責: 偵測 git commit 成功後，當 commit 範圍含 ticket skill src 行為變更
-      （feat / refactor 性質）但未同步決策層文件時，輸出 INFO 級別提示。
+職責: 偵測 git commit 成功後，當 commit 範圍含任一具 CLI 入口點的 skill
+      src 行為變更（feat / refactor 性質）但未同步該 skill 的決策層文件時，
+      輸出 INFO 級別提示。
+
+背景（0.2.1-W3-136 ANA）: 舊版 ticket-skill-sync-check-hook.py 僅硬編碼
+      保護 ticket 一個 skill（TICKET_SKILL_SRC_PREFIX），但「CLI 行為變更
+      須同步 SKILL.md」語意對任何具 CLI 的 skill 皆成立。0.2.1-W3-131 修改
+      skill_sync/cli.py 行為後 SKILL.md 描述過期、全程無 hook 提示，缺口
+      已實證。本 hook 改採顯式 registry（SKILL_CLI_REGISTRY），泛化涵蓋
+      專案內全部 7 個 CLI skill（ticket / doc / skill-sync / worktree /
+      version-release / project-init / mermaid-ascii）。
 
 觸發時機: PostToolUse Bash matcher（git commit 成功後）
 
 偵測流程:
   1. 驗證 tool_name == "Bash" 且為 git commit 成功命令
   2. git show --name-only HEAD 取本次 commit 的 file list
-  3. 路徑過濾：含 .claude/skills/ticket/ticket_system/** 改動才繼續
+  3. 依 SKILL_CLI_REGISTRY 逐一比對 src_prefix，找出有變更的 skill
   4. commit msg 詞元過濾：feat / refactor 觸發；fix / test / docs / chore 跳過
   5. meta 防護：
      a. 路徑白名單豁免：本 hook 自身路徑改動不觸發（PC-099 教訓）
-     b. ticket 級豁免：同 commit 已含 .claude/pm-rules/ 或
-        .claude/skills/ticket/SKILL.md 改動 → 視為已同步，不提示
-  6. 滿足條件時輸出 INFO 提示（不阻擋 commit）
+     b. skill 級豁免：同 commit 已含該 skill 的 sync_targets 改動
+        → 視為已同步，該 skill 不提示
+  6. 對每個「有變更但未同步」的 skill 輸出 INFO 提示（不阻擋 commit）
 
-設計骨架參考: doc-sync-check-hook.py / commit-handoff-hook.py
+設計骨架參考: doc-sync-check-hook.py / commit-handoff-hook.py（前身：
+      舊版 ticket-skill-sync-check-hook.py，0.2.1-W3-239 泛化並搬遷）
 
 行為: 不阻擋（exit 0），僅在 additionalContext 輸出提醒訊息
 """
@@ -33,10 +43,10 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hooks"))
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib import (
     setup_hook_logging,
@@ -74,17 +84,49 @@ COMMIT_SUCCESS_MARKERS = [
 # 觸發提示的 commit type（行為變更性質）
 TRIGGER_COMMIT_TYPES = frozenset({"feat", "refactor"})
 
-# ticket skill src 路徑前綴（行為層）
-TICKET_SKILL_SRC_PREFIX = ".claude/skills/ticket/ticket_system/"
-
-# 同步豁免路徑前綴（決策層 / 對外契約）
-SYNC_EXEMPT_PREFIXES = (
-    ".claude/pm-rules/",
-    ".claude/skills/ticket/SKILL.md",
-)
+# 具 CLI 入口點的 skill registry（0.2.1-W3-136 ANA Option B，顯式定義）
+# 每條: name（skill 名稱）/ src_prefix（CLI 行為程式碼路徑前綴）/
+#       sync_targets（描述該行為的決策層文件，同 commit 含其中之一即視為已同步）
+SKILL_CLI_REGISTRY = [
+    {
+        "name": "ticket",
+        "src_prefix": ".claude/skills/ticket/ticket_system/",
+        "sync_targets": (".claude/pm-rules/", ".claude/skills/ticket/SKILL.md"),
+    },
+    {
+        "name": "doc",
+        "src_prefix": ".claude/skills/doc/doc_system/",
+        "sync_targets": (".claude/skills/doc/SKILL.md",),
+    },
+    {
+        "name": "skill-sync",
+        "src_prefix": ".claude/skills/skill-sync/skill_sync/",
+        "sync_targets": (".claude/skills/skill-sync/SKILL.md",),
+    },
+    {
+        "name": "worktree",
+        "src_prefix": ".claude/skills/worktree/scripts/",
+        "sync_targets": (".claude/skills/worktree/SKILL.md",),
+    },
+    {
+        "name": "version-release",
+        "src_prefix": ".claude/skills/version-release/scripts/",
+        "sync_targets": (".claude/skills/version-release/SKILL.md",),
+    },
+    {
+        "name": "project-init",
+        "src_prefix": ".claude/skills/project-init/project_init/",
+        "sync_targets": (".claude/skills/project-init/SKILL.md",),
+    },
+    {
+        "name": "mermaid-ascii",
+        "src_prefix": ".claude/skills/mermaid-ascii/mermaid_ascii/",
+        "sync_targets": (".claude/skills/mermaid-ascii/SKILL.md",),
+    },
+]
 
 # 本 hook 自身路徑（meta 自我引用豁免，PC-099 教訓）
-META_SELF_PATH = ".claude/skills/ticket/hooks/ticket-skill-sync-check-hook.py"  # W10-092: moved into skill
+META_SELF_PATH = ".claude/hooks/skill-cli-sync-check-hook.py"  # 0.2.1-W3-239: 由 skills/ticket/hooks/ 搬遷並泛化
 
 # PostToolUse 預設輸出
 DEFAULT_OUTPUT = {
@@ -160,55 +202,89 @@ def get_commit_files(project_root: Path, logger) -> List[str]:
         return []
 
 
-def has_ticket_skill_src_change(files: List[str]) -> List[str]:
-    """過濾出 ticket skill src 改動檔案"""
-    return [f for f in files if f.startswith(TICKET_SKILL_SRC_PREFIX)]
+def find_skill_src_changes(files: List[str]) -> Dict[str, List[str]]:
+    """
+    依 SKILL_CLI_REGISTRY 逐一比對 src_prefix，找出有變更的 skill。
+
+    Returns:
+        dict[str, list[str]] - {skill_name: [matched_files]}，僅含有變更的 skill
+    """
+    result: Dict[str, List[str]] = {}
+    for entry in SKILL_CLI_REGISTRY:
+        matched = [f for f in files if f.startswith(entry["src_prefix"])]
+        if matched:
+            result[entry["name"]] = matched
+    return result
 
 
-def has_sync_exempt_change(files: List[str]) -> bool:
-    """檢查是否同 commit 已含決策層 / 對外契約改動（同步豁免）"""
+def _get_registry_entry(skill_name: str) -> Optional[dict]:
+    for entry in SKILL_CLI_REGISTRY:
+        if entry["name"] == skill_name:
+            return entry
+    return None
+
+
+def is_sync_exempt_for_skill(files: List[str], skill_name: str) -> bool:
+    """檢查是否同 commit 已含該 skill 的 sync_targets 改動（同步豁免）"""
+    entry = _get_registry_entry(skill_name)
+    if entry is None:
+        return False
     for f in files:
-        for prefix in SYNC_EXEMPT_PREFIXES:
-            if f.startswith(prefix) or f == prefix:
+        for target in entry["sync_targets"]:
+            if f.startswith(target) or f == target:
                 return True
     return False
 
 
 def is_meta_self_only(files: List[str]) -> bool:
     """
-    檢查是否僅 hook 自身路徑改動（meta 自我引用豁免）。
+    檢查是否含 hook 自身路徑改動（meta 自我引用豁免）。
 
-    若 commit file list 含本 hook 自身路徑且不含其他 ticket skill src 改動，
-    視為自我引用（PC-099 教訓），不觸發提示。
+    若 commit file list 含本 hook 自身路徑，視為自我引用（PC-099 教訓），
+    不觸發提示。
     """
     return META_SELF_PATH in files
 
 
-def build_reminder(skill_files: List[str]) -> str:
-    """組裝 INFO 提示訊息"""
+def find_unsynced_skills(files: List[str]) -> Dict[str, List[str]]:
+    """
+    找出「有 CLI 行為變更但未同步決策層文件」的 skill 清單。
+
+    Returns:
+        dict[str, list[str]] - {skill_name: [matched_files]}，僅含未同步 skill
+    """
+    skill_changes = find_skill_src_changes(files)
+    return {
+        name: matched_files
+        for name, matched_files in skill_changes.items()
+        if not is_sync_exempt_for_skill(files, name)
+    }
+
+
+def build_reminder(unsynced: Dict[str, List[str]]) -> str:
+    """組裝 INFO 提示訊息（依觸發的 skill 動態生成）"""
     lines = [
         "=" * 60,
-        "[INFO] Ticket Skill 行為變更同步檢查提醒",
+        "[INFO] Skill CLI 行為變更同步檢查提醒",
         "=" * 60,
         "",
-        "本次 commit 含 ticket skill src 行為變更（feat / refactor），",
-        "但未在同 commit 同步決策層文件。",
+        "本次 commit 含以下 skill 的 CLI 行為變更（feat / refactor），",
+        "但未在同 commit 同步該 skill 的決策層文件。",
         "",
-        "改動檔案：",
     ]
-    for f in skill_files:
-        lines.append(f"  - {f}")
+    for skill_name in sorted(unsynced.keys()):
+        entry = _get_registry_entry(skill_name)
+        lines.append(f"[{skill_name}]")
+        lines.append("  改動檔案：")
+        for f in unsynced[skill_name]:
+            lines.append(f"    - {f}")
+        if entry is not None:
+            lines.append("  建議同步目標：")
+            for target in entry["sync_targets"]:
+                lines.append(f"    - {target}")
+        lines.append("")
     lines.extend([
-        "",
-        "建議掃描清單（確認無過時引用）：",
-        "  - .claude/skills/ticket/SKILL.md（對外契約）",
-        "  - .claude/pm-rules/decision-tree.md（決策路由）",
-        "  - .claude/pm-rules/*.md（情境 SOP）",
-        "",
-        "建議指令：",
-        "  grep -rln 'ticket track' .claude/pm-rules/",
-        "",
-        "若行為變更影響 PM 決策路徑或 SOP，請建立 follow-up ticket 同步更新。",
+        "若行為變更影響該 skill 的對外契約或 PM 決策路徑，請建立 follow-up ticket 同步更新。",
         "=" * 60,
     ])
     return "\n".join(lines)
@@ -220,7 +296,7 @@ def build_reminder(skill_files: List[str]) -> str:
 
 
 def main() -> int:
-    logger = setup_hook_logging("ticket-skill-sync-check-hook")
+    logger = setup_hook_logging("skill-cli-sync-check-hook")
 
     input_data = read_json_from_stdin(logger)
     if input_data is None:
@@ -273,20 +349,17 @@ def main() -> int:
         print(json.dumps(DEFAULT_OUTPUT, ensure_ascii=False))
         return EXIT_SUCCESS
 
-    skill_files = has_ticket_skill_src_change(files)
-    if not skill_files:
-        logger.debug("commit 不含 ticket skill src 改動，跳過")
+    unsynced = find_unsynced_skills(files)
+    if not unsynced:
+        logger.debug("commit 不含未同步的 skill CLI src 改動，跳過")
         print(json.dumps(DEFAULT_OUTPUT, ensure_ascii=False))
         return EXIT_SUCCESS
 
-    # ticket 級同步豁免
-    if has_sync_exempt_change(files):
-        logger.info("同步豁免：commit 已含 pm-rules/ 或 ticket SKILL.md 改動")
-        print(json.dumps(DEFAULT_OUTPUT, ensure_ascii=False))
-        return EXIT_SUCCESS
-
-    logger.info("觸發提醒：commit type=%s + ticket skill src 改動 %d 檔，無同步", commit_type, len(skill_files))
-    reminder = build_reminder(skill_files)
+    logger.info(
+        "觸發提醒：commit type=%s + %d 個 skill 未同步 (%s)",
+        commit_type, len(unsynced), ", ".join(sorted(unsynced.keys())),
+    )
+    reminder = build_reminder(unsynced)
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
@@ -298,4 +371,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(run_hook_safely(main, "ticket-skill-sync-check-hook"))
+    sys.exit(run_hook_safely(main, "skill-cli-sync-check-hook"))
