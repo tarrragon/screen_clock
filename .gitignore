@@ -75,3 +75,20 @@ htmlcov/
 
 # 測試副作用洩漏：mock 物件被當路徑使用時生成的字面目錄（純垃圾）
 **/MagicMock/
+
+# .claude runtime state 與 local-only 產物
+# 來源：sync_exclude_manifest.GITIGNORE_EXPECTED（push 端 clean-check 會把未列入者判為未追蹤而 abort）
+# 背景：PC-019 死循環——commit 後 AUQ 觸發 hook 寫入 runtime state，被 git tracked 即造成
+#      dirty tree，阻擋 worktree fork
+.claude/.pytest_cache
+.claude/.sync-conflicts
+.claude/.sync-state.json
+.claude/.venv
+.claude/.version-release.yaml
+.claude/.zhtw-mcp-skip
+.claude/analyses
+.claude/migration-backups
+.claude/plans
+.claude/settings.local.json
+.claude/sync-preserve.yaml
+.claude/sync-skills.yaml
