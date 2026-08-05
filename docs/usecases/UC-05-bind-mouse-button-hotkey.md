@@ -4,8 +4,8 @@ title: "綁定按鍵快捷鍵"
 status: draft
 source_proposal: PROP-002
 created: "2026-07-29"
-updated: "2026-07-29"
-version: "1.0"
+updated: "2026-08-05"
+version: "1.1"
 
 primary_actor: "screen_clock 使用者（已將某滑鼠側鍵綁定為快捷鍵動作）"
 secondary_actors: []
@@ -123,10 +123,11 @@ ticket_refs:
 | 限制 | 使用者可觀察到的現象 |
 |------|-------------------|
 | 對照表僅涵蓋標準鍵盤按鍵 | 綁定小鍵盤、多媒體鍵等非標準鍵時快捷鍵不會實際送出，僅側鍵按下的原生動作被消費 |
-| 放開事件不受本機制消費 | 若目標 app 對「側鍵放開」也有既定行為，該行為不受本功能保護 |
+| 放開事件（Hotkey 綁定）未被消費 | SPEC-007 FR-03 要求 otherMouseUp 消費，但 handleButtonUp 僅消費 DragScroll 的放開事件；Hotkey 綁定的 mouseUp 穿透至底層（當前主流 app 不因此誤觸發）。待修正：1.4.0-W1-028 |
 
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | 1.0 | 2026-07-29 | 初始版本（依 v1.3.0 `lib/input/` 與 `macos/Runner/MainFlutterWindow.swift` 實作反寫，1.4.0-W1-005） |
+| 1.1 | 2026-08-05 | 已知限制「放開事件」補充 SPEC-007 FR-03 落差判定結論與修正 ticket（1.4.0-W1-020） |
