@@ -39,10 +39,10 @@ class SettingsModel {
     this.lifeTimerMode = false,
     this.bindings = const <MouseBinding>[],
     this.bindingsSeeded = false,
-    this.cursorLocatorEnabled = AppCursorLocator.defaultEnabled,
+    this.cursorLocatorEnabled = AppCursorLocatorSettings.defaultEnabled,
     this.cursorLocatorEffectDurationSeconds =
-        AppCursorLocator.defaultDurationSeconds,
-    this.cursorLocatorPrimaryColor = AppCursorLocator.defaultTint,
+        AppCursorLocatorSettings.defaultDurationSeconds,
+    this.cursorLocatorPrimaryColor = AppCursorLocatorSettings.defaultTint,
   });
 
   /// 重現 v0.x 寫死預設值（SPEC-004 FR-01）。
@@ -67,10 +67,10 @@ class SettingsModel {
         ),
       ],
       bindingsSeeded: true,
-      cursorLocatorEnabled: AppCursorLocator.defaultEnabled,
+      cursorLocatorEnabled: AppCursorLocatorSettings.defaultEnabled,
       cursorLocatorEffectDurationSeconds:
-          AppCursorLocator.defaultDurationSeconds,
-      cursorLocatorPrimaryColor: AppCursorLocator.defaultTint,
+          AppCursorLocatorSettings.defaultDurationSeconds,
+      cursorLocatorPrimaryColor: AppCursorLocatorSettings.defaultTint,
     );
   }
 
@@ -368,8 +368,9 @@ double? _asDouble(Object? value) {
 ///
 /// 型別不符（欄位缺失除外，屬正常情境不記錄）或非有限值（NaN / Infinity）
 /// 落回 [fallback] 並記錄降級日誌；有限但越界的值夾制至
-/// [AppCursorLocator.minDurationSeconds] ～ [AppCursorLocator.maxDurationSeconds]
-/// （1.4.0-W2-010），此為正常夾制而非降級，不記錄日誌。
+/// [AppCursorLocatorSettings.minDurationSeconds] ～
+/// [AppCursorLocatorSettings.maxDurationSeconds]（1.4.0-W2-010），此為正常
+/// 夾制而非降級，不記錄日誌。
 double _asClampedDuration(Object? value, double fallback) {
   final double? parsed = _asDouble(value);
   if (parsed == null) {
@@ -387,8 +388,8 @@ double _asClampedDuration(Object? value, double fallback) {
   }
   return parsed
       .clamp(
-        AppCursorLocator.minDurationSeconds,
-        AppCursorLocator.maxDurationSeconds,
+        AppCursorLocatorSettings.minDurationSeconds,
+        AppCursorLocatorSettings.maxDurationSeconds,
       )
       .toDouble();
 }

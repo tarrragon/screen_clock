@@ -537,7 +537,7 @@ void main() {
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.minDurationSeconds,
+        AppCursorLocatorSettings.minDurationSeconds,
       );
     });
 
@@ -547,7 +547,7 @@ void main() {
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.maxDurationSeconds,
+        AppCursorLocatorSettings.maxDurationSeconds,
       );
     });
 
@@ -555,12 +555,12 @@ void main() {
       final SettingsModel decoded = SettingsModel.fromJson(
         <String, Object?>{
           'cursorLocatorEffectDurationSeconds':
-              AppCursorLocator.minDurationSeconds,
+              AppCursorLocatorSettings.minDurationSeconds,
         },
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.minDurationSeconds,
+        AppCursorLocatorSettings.minDurationSeconds,
       );
     });
 
@@ -568,12 +568,12 @@ void main() {
       final SettingsModel decoded = SettingsModel.fromJson(
         <String, Object?>{
           'cursorLocatorEffectDurationSeconds':
-              AppCursorLocator.maxDurationSeconds,
+              AppCursorLocatorSettings.maxDurationSeconds,
         },
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.maxDurationSeconds,
+        AppCursorLocatorSettings.maxDurationSeconds,
       );
     });
 
@@ -590,7 +590,7 @@ void main() {
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.defaultDurationSeconds,
+        AppCursorLocatorSettings.defaultDurationSeconds,
       );
     });
 
@@ -602,7 +602,7 @@ void main() {
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.defaultDurationSeconds,
+        AppCursorLocatorSettings.defaultDurationSeconds,
       );
     });
 
@@ -614,7 +614,7 @@ void main() {
       );
       expect(
         decoded.cursorLocatorEffectDurationSeconds,
-        AppCursorLocator.defaultDurationSeconds,
+        AppCursorLocatorSettings.defaultDurationSeconds,
       );
     });
   });

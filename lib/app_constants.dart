@@ -328,15 +328,17 @@ class AppInputBinding {
   static const String capturedButtonNumberArgKey = 'buttonNumber';
 }
 
-/// 滑鼠定位器 domain 常數（SPEC-008）。
+/// 滑鼠定位器 method channel 契約常數（SPEC-008 介面規格）。
 ///
-/// 集中 channel 契約（channel 名、方法名、參數鍵）與動畫預設值，
-/// 供 Dart 與 Swift 兩側共同引用；字面一旦被下游票（W1-001.3 channel
-/// 骨架、W3-001 視覺特效）引用即不可任意更動，故一次定案。
-class AppCursorLocator {
-  AppCursorLocator._();
+/// 對應 domain-map.md（user-experience）「CursorLocator」presentation
+/// bundle 的傳輸層。四個字面須與 macos/Runner/MainFlutterWindow.swift
+/// 逐字一致，由 test/platform/channel_contract_test.dart 守衛；獨立成
+/// 專屬類別（而非與其他滑鼠定位器常數合併），使這條「必須跨語言逐字相同」
+/// 的硬約束由類別邊界本身表達，不僅依賴註解提醒（1.4.0-W2-008）。
+class AppCursorLocatorChannel {
+  AppCursorLocatorChannel._();
 
-  /// 原生 ↔ Dart 滑鼠定位器 method channel 名稱（SPEC-008 介面規格）。
+  /// 原生 ↔ Dart 滑鼠定位器 method channel 名稱。
   /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
   static const String channelName = 'screen_clock/cursor_locator';
 
@@ -348,20 +350,62 @@ class AppCursorLocator {
 
   /// play 參數鍵：主色調，ARGB 整數值（SPEC-008 FR-06 主色調設定）。
   static const String tintArgbArgKey = 'tintArgb';
+}
 
-  /// FR-06 預設值：啟用開關預設為開啟。
+/// 滑鼠定位器全域熱鍵常數（SPEC-008 FR-01）。
+///
+/// 對應 domain-map.md（user-experience）「CursorLocator」presentation
+/// bundle 的觸發層；與 [AppCursorLocatorChannel] 同屬該 bundle 但關切不同
+/// 維度（如何觸發 vs 觸發後傳什麼），且消費者為獨立檔案
+/// `cursor_locator_hotkey_controller.dart`，故獨立成專屬類別
+/// （1.4.0-W2-008）。
+class AppCursorLocatorHotkey {
+  AppCursorLocatorHotkey._();
+
+  /// FR-01 全域熱鍵：觸發鍵（`Cmd + Option + L` 的字母鍵部分）。
+  /// 與 [modifiers] 共同組成 `HotKey`；`HotKey` 建構子非 const，
+  /// 無法在此直接組出常數物件，故拆為兩個原子常數供註冊處組裝。
+  static const PhysicalKeyboardKey physicalKey = PhysicalKeyboardKey.keyL;
+
+  /// FR-01 全域熱鍵：修飾鍵組合（`Cmd + Option`，與 SPEC-005 設定面板熱鍵
+  /// `Cmd + Option + ,` 同前綴）。
+  static const List<HotKeyModifier> modifiers = <HotKeyModifier>[
+    HotKeyModifier.meta,
+    HotKeyModifier.alt,
+  ];
+}
+
+/// 滑鼠定位器設定預設值與值域常數（SPEC-008 FR-06）。
+///
+/// 對應 domain-map.md（user-experience）「CursorLocatorSettings」
+/// cross-cutting bundle：定位器設定項目與持久化，供 [SettingsModel] 建構
+/// 預設值、fromJson 容錯回退與夾制、設定面板滑桿 min/max 共同引用
+/// （1.4.0-W2-008）。
+///
+/// 渲染參數（聚光燈 / 邊框閃爍 / 波紋擴散的半徑、寬度、週期等 10 項）不在
+/// 本類別：依 SPEC-008:245 決策 1，特效層走 Swift NSWindow + CALayer 不經
+/// Flutter engine，Dart 側原定義在 Dart 零引用；macOS 端
+/// `CursorLocatorEffectConstants`（CursorLocatorEffectWindow.swift）已
+/// 各自定義同義常數（如 spotlightDimOpacity=0.55 對應原
+/// spotlightMaxDimOpacity、flashCycleDuration=0.2s 對應原
+/// borderFlashCycleDurationMs 等，數值逐一核對一致），故本次拆分刪除
+/// Dart 側重複定義，不移植（1.4.0-W2-008 acceptance 條 2）。
+class AppCursorLocatorSettings {
+  AppCursorLocatorSettings._();
+
+  /// 預設值：啟用開關預設為開啟。
   static const bool defaultEnabled = true;
 
-  /// FR-06 預設值：特效時長，單位秒（SPEC-009 A.1 v4 權威定義）。
+  /// 預設值：特效時長，單位秒（SPEC-009 A.1 v4 權威定義）。
   static const double defaultDurationSeconds = 1.5;
 
-  /// FR-06 預設值：特效時長下限，單位秒。
+  /// 值域：特效時長下限，單位秒。
   static const double minDurationSeconds = 0.5;
 
-  /// FR-06 預設值：特效時長上限，單位秒。
+  /// 值域：特效時長上限，單位秒。
   static const double maxDurationSeconds = 3.0;
 
-  /// FR-06 預設值：主色調，系統藍。
+  /// 預設值：主色調，系統藍。
   ///
   /// 使用普通 Color 而非框架色板的 MaterialColor 型別常數：後者的
   /// runtimeType 與從 ARGB int 經 SettingsModel._asColor 重建的普通
@@ -369,48 +413,6 @@ class AppCursorLocator {
   /// （見 1.4.0-W1-001.2 Solution 實證）。
   // color-exempt: 本檔即常數集中定義處（AppColors 同類先例），非散落硬編碼
   static const Color defaultTint = Color(0xFF2196F3);
-
-  /// FR-03 聚光燈：壓暗透明度上限（55%）。
-  static const double spotlightMaxDimOpacity = 0.55;
-
-  /// FR-03 聚光燈：保留明亮圓形區域半徑，單位 px。
-  static const double spotlightRadiusPx = 120;
-
-  /// FR-04 邊框閃爍：邊框寬度，單位 px。
-  static const double borderWidthPx = 8;
-
-  /// FR-04 邊框閃爍：閃爍次數。
-  static const int borderFlashCount = 3;
-
-  /// FR-04 邊框閃爍：單次淡入淡出週期，單位毫秒。
-  static const int borderFlashCycleDurationMs = 200;
-
-  /// FR-05 波紋擴散：單圈起始半徑，單位 px。
-  static const double rippleStartRadiusPx = 20;
-
-  /// FR-05 波紋擴散：單圈結束半徑，單位 px。
-  static const double rippleEndRadiusPx = 180;
-
-  /// FR-05 波紋擴散：單圈歷時，單位毫秒。
-  static const int rippleDurationMs = 500;
-
-  /// FR-05 波紋擴散：圈數。
-  static const int rippleCount = 3;
-
-  /// FR-05 波紋擴散：每圈發出間隔，單位毫秒。
-  static const int rippleIntervalMs = 150;
-
-  /// FR-01 全域熱鍵：觸發鍵（`Cmd + Option + L` 的字母鍵部分）。
-  /// 與 [hotkeyModifiers] 共同組成 `HotKey`；`HotKey` 建構子非 const，
-  /// 無法在此直接組出常數物件，故拆為兩個原子常數供註冊處組裝。
-  static const PhysicalKeyboardKey hotkeyPhysicalKey = PhysicalKeyboardKey.keyL;
-
-  /// FR-01 全域熱鍵：修飾鍵組合（`Cmd + Option`，與 SPEC-005 設定面板熱鍵
-  /// `Cmd + Option + ,` 同前綴）。
-  static const List<HotKeyModifier> hotkeyModifiers = <HotKeyModifier>[
-    HotKeyModifier.meta,
-    HotKeyModifier.alt,
-  ];
 }
 
 /// SettingsModel 中 bindings 欄的 JSON 鍵（SPEC-007 FR-02）。

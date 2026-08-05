@@ -3,7 +3,7 @@
 // 涵蓋：
 // - 面板顯示啟用開關、特效時長滑桿、主色調選擇器三個控制項
 // - 三者變更後寫入 SettingsModel 對應欄位
-// - 特效時長滑桿 min/max 對應 AppCursorLocator 值域常數
+// - 特效時長滑桿 min/max 對應 AppCursorLocatorSettings 值域常數
 // - 「儲存」持久化整個模型（含三個新欄位）
 // - 既有設定面板區塊（滑鼠綁定）無回歸
 
@@ -111,7 +111,7 @@ void main() {
       expect(toggle.value, isFalse);
     });
 
-    testWidgets('特效時長滑桿 min/max 對應 AppCursorLocator 值域常數', (
+    testWidgets('特效時長滑桿 min/max 對應 AppCursorLocatorSettings 值域常數', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(panelUnder(SettingsModel.defaults()));
@@ -119,9 +119,9 @@ void main() {
       final Slider slider = tester.widget<Slider>(
         find.byKey(const ValueKey<String>('cursor-locator-duration-slider')),
       );
-      expect(slider.min, AppCursorLocator.minDurationSeconds);
-      expect(slider.max, AppCursorLocator.maxDurationSeconds);
-      expect(slider.value, AppCursorLocator.defaultDurationSeconds);
+      expect(slider.min, AppCursorLocatorSettings.minDurationSeconds);
+      expect(slider.max, AppCursorLocatorSettings.maxDurationSeconds);
+      expect(slider.value, AppCursorLocatorSettings.defaultDurationSeconds);
     });
   });
 
@@ -156,10 +156,13 @@ void main() {
           settingsController.value.cursorLocatorEffectDurationSeconds;
       expect(
         updated,
-        greaterThanOrEqualTo(AppCursorLocator.minDurationSeconds),
+        greaterThanOrEqualTo(AppCursorLocatorSettings.minDurationSeconds),
       );
-      expect(updated, lessThanOrEqualTo(AppCursorLocator.maxDurationSeconds));
-      expect(updated, isNot(AppCursorLocator.defaultDurationSeconds));
+      expect(
+        updated,
+        lessThanOrEqualTo(AppCursorLocatorSettings.maxDurationSeconds),
+      );
+      expect(updated, isNot(AppCursorLocatorSettings.defaultDurationSeconds));
     });
 
     testWidgets('選取色盤色票後 model.cursorLocatorPrimaryColor 更新', (

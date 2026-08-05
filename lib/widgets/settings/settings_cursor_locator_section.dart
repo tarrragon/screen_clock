@@ -9,8 +9,8 @@ import 'settings_color_picker.dart';
 /// 純結構搬移自 settings_panel.dart（1.4.0-W3-003），行為不變。
 ///
 /// 值域夾制屬 1.4.0-W2-010（model 層 fromJson）；本區塊 Slider min/max
-/// 僅引用 [AppCursorLocator] 常數，不重複實作夾制。啟用開關的熱鍵註冊/
-/// 解除屬 1.4.0-W2-005，本區塊只負責寫回 [SettingsController]。
+/// 僅引用 [AppCursorLocatorSettings] 常數，不重複實作夾制。啟用開關的熱鍵
+/// 註冊/解除屬 1.4.0-W2-005，本區塊只負責寫回 [SettingsController]。
 class SettingsCursorLocatorSection extends StatelessWidget {
   const SettingsCursorLocatorSection({
     super.key,
@@ -81,8 +81,8 @@ class SettingsCursorLocatorSection extends StatelessWidget {
         Expanded(
           child: Slider(
             key: const ValueKey<String>('cursor-locator-duration-slider'),
-            min: AppCursorLocator.minDurationSeconds,
-            max: AppCursorLocator.maxDurationSeconds,
+            min: AppCursorLocatorSettings.minDurationSeconds,
+            max: AppCursorLocatorSettings.maxDurationSeconds,
             value: seconds,
             label: seconds.toStringAsFixed(1),
             // (3.0 - 0.5) 秒值域 / 0.1 秒單格 = 25 格，對齊既有滑桿 0.1 精度慣例。

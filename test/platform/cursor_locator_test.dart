@@ -2,7 +2,7 @@
 // 1.4.0-W1-001.5 調整）。
 //
 // 驗證 Dart → 原生的 play 呼叫橋接：method channel 名 / 方法名 / 參數鍵
-// 引用 AppCursorLocator 常數、參數換算（Duration→毫秒、Color→ARGB）、
+// 引用 AppCursorLocatorChannel 常數、參數換算（Duration→毫秒、Color→ARGB）、
 // PlatformException / MissingPluginException / 轉換期例外不外洩。
 
 import 'package:flutter/services.dart';
@@ -19,7 +19,7 @@ void main() {
   late List<MethodCall> calls;
 
   setUp(() {
-    channel = const MethodChannel(AppCursorLocator.channelName);
+    channel = const MethodChannel(AppCursorLocatorChannel.channelName);
     locator = CursorLocator(channel: channel);
     calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -34,19 +34,19 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('play 呼叫使用 AppCursorLocator.playMethod 並帶入換算後參數', () async {
+  test('play 呼叫使用 AppCursorLocatorChannel.playMethod 並帶入換算後參數', () async {
     await locator.play(
       duration: const Duration(milliseconds: 1500),
       tint: const Color(0xFF2196F3),
     );
 
     expect(calls, hasLength(1));
-    expect(calls.single.method, AppCursorLocator.playMethod);
+    expect(calls.single.method, AppCursorLocatorChannel.playMethod);
     expect(
       calls.single.arguments,
       <String, Object?>{
-        AppCursorLocator.durationMsArgKey: 1500,
-        AppCursorLocator.tintArgbArgKey: 0xFF2196F3,
+        AppCursorLocatorChannel.durationMsArgKey: 1500,
+        AppCursorLocatorChannel.tintArgbArgKey: 0xFF2196F3,
       },
     );
   });
