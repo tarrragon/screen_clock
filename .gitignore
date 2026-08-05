@@ -49,6 +49,7 @@ app.*.map.json
 
 # Claude framework
 __pycache__/
+*.egg-info/
 coverage/
 htmlcov/
 .claude/hook-logs/
