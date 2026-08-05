@@ -618,4 +618,108 @@ void main() {
       );
     });
   });
+
+  group(
+      'SettingsModel fromJson 降級日誌 '
+      '(1.4.0-W1-017, observability-rules 規則 1)', () {
+    // 攔截 debugSettingsModelLogSink 以斷言降級日誌是否觸發；每筆測試結束
+    // 還原原值，避免污染其他測試（含平行執行的其他 group）。
+    late List<String> logMessages;
+    late void Function(String) originalSink;
+
+    setUp(() {
+      logMessages = <String>[];
+      originalSink = debugSettingsModelLogSink;
+      debugSettingsModelLogSink = logMessages.add;
+    });
+
+    tearDown(() {
+      debugSettingsModelLogSink = originalSink;
+    });
+
+    test('欄位型別錯誤時記錄含欄位名與實際型別的 warning 日誌', () {
+      SettingsModel.fromJson(
+        const <String, Object?>{'fontSize': 'not a number'},
+      );
+      expect(logMessages, hasLength(1));
+      expect(logMessages.single, contains('fontSize'));
+      expect(logMessages.single, contains('String'));
+    });
+
+    test('多個欄位各自型別錯誤時各記錄一則日誌', () {
+      SettingsModel.fromJson(const <String, Object?>{
+        'fontSize': 'not a number',
+        'autoLaunch': 'maybe',
+      });
+      expect(logMessages, hasLength(2));
+      expect(logMessages.any((String m) => m.contains('fontSize')), isTrue);
+      expect(logMessages.any((String m) => m.contains('autoLaunch')), isTrue);
+    });
+
+    test('cursorLocatorEffectDurationSeconds 型別錯誤時記錄日誌', () {
+      SettingsModel.fromJson(const <String, Object?>{
+        'cursorLocatorEffectDurationSeconds': 'not a number',
+      });
+      expect(logMessages, hasLength(1));
+      expect(
+        logMessages.single,
+        contains('cursorLocatorEffectDurationSeconds'),
+      );
+    });
+
+    test('bindings 內非 Map 元素被略過並記錄日誌', () {
+      SettingsModel.fromJson(<String, Object?>{
+        AppSettingsKeys.bindingsKey: <Object?>['not a map'],
+      });
+      expect(logMessages, hasLength(1));
+      expect(logMessages.single, contains('bindings'));
+    });
+
+    test('bindings 內單筆無法解析（未知 action type）被略過並記錄日誌', () {
+      SettingsModel.fromJson(<String, Object?>{
+        AppSettingsKeys.bindingsKey: <Object>[
+          <String, dynamic>{
+            AppInputBinding.buttonNumberKey: 4,
+            AppInputBinding.actionKey: <String, dynamic>{
+              AppInputBinding.actionTypeKey: 'corruptType',
+            },
+          },
+        ],
+      });
+      expect(logMessages, hasLength(1));
+      expect(logMessages.single, contains('bindings'));
+    });
+
+    test('正常解析路徑（所有欄位皆合法）不輸出任何日誌', () {
+      final SettingsModel original = SettingsModel.defaults().copyWith(
+        fontSize: 90,
+        cursorLocatorEffectDurationSeconds: 2.0,
+      );
+      SettingsModel.fromJson(original.toJson());
+      expect(logMessages, isEmpty);
+    });
+
+    test('欄位缺失（向後相容的正常情境）不輸出任何日誌', () {
+      SettingsModel.fromJson(const <String, Object?>{});
+      expect(logMessages, isEmpty);
+    });
+
+    test('值域夾制（合法型別但越界）不輸出任何日誌', () {
+      SettingsModel.fromJson(
+        const <String, Object?>{'cursorLocatorEffectDurationSeconds': 0.1},
+      );
+      expect(logMessages, isEmpty);
+    });
+
+    test('多重欄位型別錯誤仍不拋例外（INV-04 維持）', () {
+      expect(
+        () => SettingsModel.fromJson(const <String, Object?>{
+          'fontSize': <String, Object?>{'nested': 'garbage'},
+          'bindings': 'not a list even',
+          'cursorLocatorEffectDurationSeconds': <int>[1, 2, 3],
+        }),
+        returnsNormally,
+      );
+    });
+  });
 }
