@@ -170,6 +170,8 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | DOC-V1-001 | 位置編號引用隨目標文件演進靜默失效（misdirected 比 broken 難偵測） | 中 | v1.0.0 |
 | DOC-009 | 「靜默處理」用語誤用 — 混淆「不記錄」與「記錄但不顯示」 | 中 | — |
 | DOC-010 | 框架文件引用專案 ticket ID 造成跨專案 sync 誤導 | 中 | — |
+| DOC-BAL-001 | 規則只寫 Action 未寫 Consequence，讀者讀成偏好而非約束 | 高 | v0.2.1 |
+| DOC-BAL-002 | 同檔案內的行為契約隨程式碼變更漂移，因為只有程式碼有自動驗證而契約沒有 | 高 | v0.2.1 |
 
 ### 架構 (ARCH)
 
@@ -212,6 +214,11 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | ARCH-010 (module-assembly-omission) | 模組組裝遺漏導致功能鏈路靜默斷裂 | 高 | v0.15.4 |
 | ARCH-010 (overengineered-state-management) | 過度設計的狀態管理 — 框架機制已解決的問題不需要額外狀態層 | 中 | v0.1.0 |
 | ARCH-BAL-008 | 以單一消費者內容覆寫共用覆蓋層，靜默刪除其他消費者的獨有內容 | — | — |
+| ARCH-BAL-009 | 預覽路徑各自實作執行路徑的判定邏輯，兩者必然漂移使預覽閘門失效 | — | — |
+| ARCH-BAL-010 | 可選欄位的解析成敗決定記錄是否存在，解析失敗即整筆消失且無告警 | 高 | v0.2.1 |
+| ARCH-BAL-011 | 以主題命名的機制群造成該主題已被涵蓋的假象，查證止於名稱不及職責 | 高 | v0.2.1 |
+| ARCH-BAL-012 | 同一概念的第二份實作重新推導第一份刻意迴避的假設，且未繼承第一份的測試嚴謹度 | 高 | v0.2.1 |
+| ARCH-BAL-013 | 防護元件的處置建議未經其他防護檢驗，執行者照做即被另一道防護阻擋 | 中 | — |
 
 ### 程式碼品質 (CQ)
 
@@ -577,6 +584,7 @@ Claude Code 內建原生的 memory 系統（`~/.claude/projects/{project}/memory
 | PC-SCLK-006 | 規格內的自然語言結論與其自身形式定義相反，TDD 循環無法自曝 | 高 | — |
 | PC-SCLK-007 | Hook 讀取錯誤的 payload 欄位名，取得空值後走「無事可做」分支而靜默失效 | 高 | — |
 | PC-SCLK-008 | PM 前置分析的斷言措辭被執行者照抄進產出，成為錯誤的事實來源 | — | — |
+| PC-SCLK-009 | 上游 ticket 完成使下游 Context Bundle 失效，派發前未重新校準 | 中 | — |
 
 ---
 
