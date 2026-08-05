@@ -11,6 +11,16 @@ import '../input/mouse_binding.dart';
 /// .claude/rules/core/observability-rules.md）。
 const String _tag = 'settings-model';
 
+/// 降級日誌實際輸出點，預設呼叫 [developer.log]（warning 級，與專案既有
+/// `level: 900` 慣例一致，見 cursor_locator_hotkey_controller.dart）。
+///
+/// 測試可替換本變數以攔截降級日誌並斷言是否觸發（1.4.0-W1-017），正式執行
+/// 路徑維持預設值，不影響 runtime 行為；測試結束須還原原值避免污染其他測試。
+@visibleForTesting
+void Function(String message) debugSettingsModelLogSink = (String message) {
+  developer.log(message, name: _tag, level: 900);
+};
+
 /// 使用者設定資料模型（SPEC-004 FR-01）。
 ///
 /// schema v4（SPEC-009 A.1）；除 [birthDate] 外所有欄位 non-null、不可變；
@@ -66,32 +76,89 @@ class SettingsModel {
 
   /// 容錯解析（SPEC-004 FR-02）。
   ///
-  /// 缺欄位 / 型別錯誤 → 對應 default 該欄；整體解析永不拋例外。
+  /// 缺欄位 / 型別錯誤 → 對應 default 該欄；整體解析永不拋例外。欄位缺失
+  /// （向後相容的正常情境）不記錄日誌，僅型別錯誤導致的降級才記錄
+  /// （觀測性規則 1，見 [_resolveField]）。
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
     final SettingsModel d = SettingsModel.defaults();
     return SettingsModel(
-      fontSize: _asDouble(json['fontSize']) ?? d.fontSize,
-      fillColor: _asColor(json['fillColor']) ?? d.fillColor,
-      strokeColor: _asColor(json['strokeColor']) ?? d.strokeColor,
-      strokeWidth: _asDouble(json['strokeWidth']) ?? d.strokeWidth,
-      timeFormat: _asString(json['timeFormat']) ?? d.timeFormat,
-      targetScreenIndex:
-          _asInt(json['targetScreenIndex']) ?? d.targetScreenIndex,
-      autoLaunch: _asBool(json['autoLaunch']) ?? d.autoLaunch,
-      birthDate: _asDateTime(json['birthDate']) ?? d.birthDate,
-      lifeTimerMode: _asBool(json['lifeTimerMode']) ?? d.lifeTimerMode,
+      fontSize: _resolveField(
+        'fontSize',
+        json['fontSize'],
+        _asDouble(json['fontSize']),
+        d.fontSize,
+      ),
+      fillColor: _resolveField(
+        'fillColor',
+        json['fillColor'],
+        _asColor(json['fillColor']),
+        d.fillColor,
+      ),
+      strokeColor: _resolveField(
+        'strokeColor',
+        json['strokeColor'],
+        _asColor(json['strokeColor']),
+        d.strokeColor,
+      ),
+      strokeWidth: _resolveField(
+        'strokeWidth',
+        json['strokeWidth'],
+        _asDouble(json['strokeWidth']),
+        d.strokeWidth,
+      ),
+      timeFormat: _resolveField(
+        'timeFormat',
+        json['timeFormat'],
+        _asString(json['timeFormat']),
+        d.timeFormat,
+      ),
+      targetScreenIndex: _resolveField(
+        'targetScreenIndex',
+        json['targetScreenIndex'],
+        _asInt(json['targetScreenIndex']),
+        d.targetScreenIndex,
+      ),
+      autoLaunch: _resolveField(
+        'autoLaunch',
+        json['autoLaunch'],
+        _asBool(json['autoLaunch']),
+        d.autoLaunch,
+      ),
+      birthDate: _resolveField(
+        'birthDate',
+        json['birthDate'],
+        _asDateTime(json['birthDate']),
+        d.birthDate,
+      ),
+      lifeTimerMode: _resolveField(
+        'lifeTimerMode',
+        json['lifeTimerMode'],
+        _asBool(json['lifeTimerMode']),
+        d.lifeTimerMode,
+      ),
       bindings: _bindingsFromJson(json[AppSettingsKeys.bindingsKey]),
-      bindingsSeeded:
-          _asBool(json[AppSettingsKeys.bindingsSeededKey]) ?? false,
-      cursorLocatorEnabled:
-          _asBool(json['cursorLocatorEnabled']) ?? d.cursorLocatorEnabled,
+      bindingsSeeded: _resolveField(
+        'bindingsSeeded',
+        json[AppSettingsKeys.bindingsSeededKey],
+        _asBool(json[AppSettingsKeys.bindingsSeededKey]),
+        false,
+      ),
+      cursorLocatorEnabled: _resolveField(
+        'cursorLocatorEnabled',
+        json['cursorLocatorEnabled'],
+        _asBool(json['cursorLocatorEnabled']),
+        d.cursorLocatorEnabled,
+      ),
       cursorLocatorEffectDurationSeconds: _asClampedDuration(
         json['cursorLocatorEffectDurationSeconds'],
         d.cursorLocatorEffectDurationSeconds,
       ),
-      cursorLocatorPrimaryColor:
-          _asColor(json['cursorLocatorPrimaryColor']) ??
-              d.cursorLocatorPrimaryColor,
+      cursorLocatorPrimaryColor: _resolveField(
+        'cursorLocatorPrimaryColor',
+        json['cursorLocatorPrimaryColor'],
+        _asColor(json['cursorLocatorPrimaryColor']),
+        d.cursorLocatorPrimaryColor,
+      ),
     );
   }
 
@@ -239,17 +306,55 @@ class SettingsModel {
 
 /// 容錯解析 bindings 欄（SPEC-007 FR-02）。
 ///
-/// 非清單 → 空清單；單筆型別錯誤 / 未知 action type → 略過該筆，不拋例外；
-/// 同 buttonNumber 依 [dedupeBindingsByButton] 規則收斂。
+/// 非清單 → 空清單（欄位缺失屬正常情境，不記錄日誌）；單筆型別錯誤 / 未知
+/// action type → 略過該筆並記錄降級日誌，不拋例外；同 buttonNumber 依
+/// [dedupeBindingsByButton] 規則收斂。
 List<MouseBinding> _bindingsFromJson(Object? value) {
   if (value is! List) return const <MouseBinding>[];
   final List<MouseBinding> parsed = <MouseBinding>[];
   for (final Object? element in value) {
-    if (element is! Map<String, dynamic>) continue;
+    if (element is! Map<String, dynamic>) {
+      debugSettingsModelLogSink(
+        // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+        'bindings 略過非法條目（實際型別: ${element.runtimeType}）',
+      );
+      continue;
+    }
     final MouseBinding? binding = MouseBinding.fromJson(element);
-    if (binding != null) parsed.add(binding);
+    if (binding == null) {
+      debugSettingsModelLogSink(
+        // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+        'bindings 略過無法解析的條目',
+      );
+      continue;
+    }
+    parsed.add(binding);
   }
   return dedupeBindingsByButton(parsed);
+}
+
+/// 記錄欄位型別錯誤降級（觀測性規則 1）。
+///
+/// 僅在原始值存在但轉換失敗時呼叫；欄位缺失（[raw] 為 null）屬正常向後
+/// 相容情境，呼叫端不應為此呼叫本函式。
+void _logFieldTypeError(String field, Object? raw) {
+  debugSettingsModelLogSink(
+    // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
+    '$field 型別錯誤（實際型別: ${raw.runtimeType}），落回預設值',
+  );
+}
+
+/// 解析欄位並在型別錯誤時記錄降級日誌，統一 fromJson 各欄位的 fallback
+/// 邏輯（觀測性規則 1）。
+///
+/// [raw] 為原始 JSON 值，[parsed] 為對應 `_asXxx` 轉換器的結果。[parsed] 為
+/// null 且 [raw] 非 null 代表型別錯誤，記錄日誌後回退 [fallback]；[raw] 亦
+/// 為 null（欄位缺失）屬正常情境，不記錄日誌，直接回退 [fallback]。
+T _resolveField<T>(String field, Object? raw, T? parsed, T fallback) {
+  if (parsed == null && raw != null) {
+    _logFieldTypeError(field, raw);
+  }
+  return parsed ?? fallback;
 }
 
 double? _asDouble(Object? value) {
@@ -261,18 +366,22 @@ double? _asDouble(Object? value) {
 
 /// 解析並夾制游標定位器特效時長於值域內（SPEC-008 FR-06）。
 ///
-/// 型別不符或非有限值（NaN / Infinity）落回 [fallback] 並記錄日誌；
-/// 有限但越界的值夾制至 [AppCursorLocator.minDurationSeconds] ～
-/// [AppCursorLocator.maxDurationSeconds]（1.4.0-W2-010）。
+/// 型別不符（欄位缺失除外，屬正常情境不記錄）或非有限值（NaN / Infinity）
+/// 落回 [fallback] 並記錄降級日誌；有限但越界的值夾制至
+/// [AppCursorLocator.minDurationSeconds] ～ [AppCursorLocator.maxDurationSeconds]
+/// （1.4.0-W2-010），此為正常夾制而非降級，不記錄日誌。
 double _asClampedDuration(Object? value, double fallback) {
   final double? parsed = _asDouble(value);
-  if (parsed == null) return fallback;
+  if (parsed == null) {
+    if (value != null) {
+      _logFieldTypeError('cursorLocatorEffectDurationSeconds', value);
+    }
+    return fallback;
+  }
   if (!parsed.isFinite) {
-    developer.log(
+    debugSettingsModelLogSink(
       // i18n-exempt: 開發者除錯日誌，非 user-facing 文字。
       'cursorLocatorEffectDurationSeconds 非有限值，落回預設: $parsed',
-      name: _tag,
-      level: 900,
     );
     return fallback;
   }
