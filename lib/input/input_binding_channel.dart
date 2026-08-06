@@ -9,7 +9,7 @@ import 'mouse_binding.dart';
 /// 原生輸入綁定橋接（SPEC-007 FR-07，ticket 1.3.0-W2-001）。
 ///
 /// 將 Dart 端的輔助使用授權查詢 / 請求與綁定下傳，橋接到原生
-/// macos/Runner/MainFlutterWindow.swift 的 input_binding method channel。
+/// macos/Runner/InputBindingBridge.swift 的 input_binding method channel。
 ///
 /// 本階段為基礎骨架：原生端 updateBindings 僅儲存綁定、不建立 CGEventTap
 /// （event tap 整合留 W2-003）。授權狀態變化由原生經 [onPermissionChanged]

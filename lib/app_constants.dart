@@ -236,7 +236,7 @@ class AppFullscreenDetect {
   AppFullscreenDetect._();
 
   /// 原生端回報假全螢幕覆蓋狀態的 method channel 名稱。
-  /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
+  /// 須與 macos/Runner/FullscreenCoverageDetector.swift 內字面一致。
   static const String channelName = 'screen_clock/fullscreen_detect';
 
   /// 原生 → Dart：覆蓋狀態變化通知方法名。
@@ -290,7 +290,7 @@ class AppInputBinding {
   static const int defaultDragScrollButton = 4;
 
   /// 原生 ↔ Dart 滑鼠輸入綁定 method channel 名稱（SPEC-007 FR-07）。
-  /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
+  /// 須與 macos/Runner/InputBindingBridge.swift 內字面一致。
   static const String channelName = 'screen_clock/input_binding';
 
   /// Dart → 原生：查詢輔助使用授權狀態，回傳 bool（AXIsProcessTrusted）。
@@ -331,7 +331,7 @@ class AppInputBinding {
 /// 滑鼠定位器 method channel 契約常數（SPEC-008 介面規格）。
 ///
 /// 對應 domain-map.md（user-experience）「CursorLocator」presentation
-/// bundle 的傳輸層。四個字面須與 macos/Runner/MainFlutterWindow.swift
+/// bundle 的傳輸層。四個字面須與 macos/Runner/CursorLocatorBridge.swift
 /// 逐字一致，由 test/platform/channel_contract_test.dart 守衛；獨立成
 /// 專屬類別（而非與其他滑鼠定位器常數合併），使這條「必須跨語言逐字相同」
 /// 的硬約束由類別邊界本身表達，不僅依賴註解提醒（1.4.0-W2-008）。
@@ -339,7 +339,7 @@ class AppCursorLocatorChannel {
   AppCursorLocatorChannel._();
 
   /// 原生 ↔ Dart 滑鼠定位器 method channel 名稱。
-  /// 須與 macos/Runner/MainFlutterWindow.swift 內字面一致。
+  /// 須與 macos/Runner/CursorLocatorBridge.swift 內字面一致。
   static const String channelName = 'screen_clock/cursor_locator';
 
   /// Dart → 原生：於游標所在螢幕播放定位特效。

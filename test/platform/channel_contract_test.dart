@@ -1,7 +1,8 @@
 // Dart 與 Swift method channel 契約字面守衛（ticket 1.4.0-W2-009）。
 //
 // 問題：Dart 側常數（lib/app_constants.dart）與 Swift 側
-// macos/Runner/MainFlutterWindow.swift 各自宣告同一組 channel 名 /
+// macos/Runner/FullscreenCoverageDetector.swift、
+// macos/Runner/CursorLocatorBridge.swift 各自宣告同一組 channel 名 /
 // 方法名 / 參數鍵字面，兩者之間沒有任何自動化關聯。任一側字面被改動時
 // 編譯期全過、單元測試全綠（mock handler 不碰 Swift）、執行期才拋
 // MissingPluginException（且被 catch-log 吞掉）。三層都不會產生阻斷性
