@@ -41,12 +41,19 @@ void main() {
   // 工作目錄固定為專案根目錄，故用相對路徑組出絕對路徑，不依賴
   // Swift toolchain 或建置產物。不引入 package:path（非本專案既有
   // 直接依賴），改以 dart:io 內建 path 串接。
-  final String swiftFilePath =
-      '${Directory.current.path}/macos/Runner/MainFlutterWindow.swift';
+  //
+  // ticket 1.4.0-W2-015：MainFlutterWindow.swift 拆分為多檔後，
+  // cursor_locator 字面移至 CursorLocatorBridge.swift、
+  // fullscreen_detect 字面移至 FullscreenCoverageDetector.swift。
+  // 兩檔內容合併比對，維持本測試「跨越 channel 邊界必須守衛」的原意。
+  final String runnerDir = '${Directory.current.path}/macos/Runner';
   late String swiftSource;
 
   setUpAll(() {
-    swiftSource = File(swiftFilePath).readAsStringSync();
+    swiftSource = <String>[
+      File('$runnerDir/CursorLocatorBridge.swift').readAsStringSync(),
+      File('$runnerDir/FullscreenCoverageDetector.swift').readAsStringSync(),
+    ].join('\n');
   });
 
   // 斷言 [literal] 以完整雙引號字串字面（`"literal"`）出現在 Swift
