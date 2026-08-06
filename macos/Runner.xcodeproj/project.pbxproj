@@ -27,6 +27,9 @@
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
+		FSD1E0000000000000000002 /* FullscreenCoverageDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FSD1E0000000000000000001 /* FullscreenCoverageDetector.swift */; };
+		IBB1E0000000000000000002 /* InputBindingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = IBB1E0000000000000000001 /* InputBindingBridge.swift */; };
+		CLB1E0000000000000000002 /* CursorLocatorBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLB1E0000000000000000001 /* CursorLocatorBridge.swift */; };
 		0511AA9F3D5B68270866DD58 /* CursorLocatorEffectWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157CB28A680ED059B00CDD71 /* CursorLocatorEffectWindow.swift */; };
 		D528B71EBF86977677905136 /* CursorScreenLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7192E3EC30A93360D5E538 /* CursorScreenLocatorTests.swift */; };
 		608ECDB9F62688C496DCE32E /* CursorLocatorTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6892860B0CF1660417A2B29B /* CursorLocatorTestDoubles.swift */; };
@@ -92,6 +95,9 @@
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		33CC10F72044A3C60003C045 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Runner/Info.plist; sourceTree = "<group>"; };
 		33CC11122044BFA00003C045 /* MainFlutterWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFlutterWindow.swift; sourceTree = "<group>"; };
+		FSD1E0000000000000000001 /* FullscreenCoverageDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenCoverageDetector.swift; sourceTree = "<group>"; };
+		IBB1E0000000000000000001 /* InputBindingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputBindingBridge.swift; sourceTree = "<group>"; };
+		CLB1E0000000000000000001 /* CursorLocatorBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorBridge.swift; sourceTree = "<group>"; };
 		157CB28A680ED059B00CDD71 /* CursorLocatorEffectWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLocatorEffectWindow.swift; sourceTree = "<group>"; };
 		4F7192E3EC30A93360D5E538 /* CursorScreenLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorScreenLocatorTests.swift; sourceTree = "<group>"; };
 		6892860B0CF1660417A2B29B /* CursorLocatorTestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/CursorLocatorTestDoubles.swift; sourceTree = "<group>"; };
@@ -228,6 +234,9 @@
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
+				FSD1E0000000000000000001 /* FullscreenCoverageDetector.swift */,
+				IBB1E0000000000000000001 /* InputBindingBridge.swift */,
+				CLB1E0000000000000000001 /* CursorLocatorBridge.swift */,
 				157CB28A680ED059B00CDD71 /* CursorLocatorEffectWindow.swift */,
 				C54532B7E9469B735F0F1E6A /* CursorLocatorErrorMapping.swift */,
 				5C1A0B0012D34E5A9F0A0011 /* CursorLocatorSpotlightRenderer.swift */,
@@ -508,6 +517,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
+				FSD1E0000000000000000002 /* FullscreenCoverageDetector.swift in Sources */,
+				IBB1E0000000000000000002 /* InputBindingBridge.swift in Sources */,
+				CLB1E0000000000000000002 /* CursorLocatorBridge.swift in Sources */,
 				0511AA9F3D5B68270866DD58 /* CursorLocatorEffectWindow.swift in Sources */,
 				702648B48D23ABA750B55F1E /* CursorLocatorErrorMapping.swift in Sources */,
 				5C1A0B0012D34E5A9F0A0012 /* CursorLocatorSpotlightRenderer.swift in Sources */,
