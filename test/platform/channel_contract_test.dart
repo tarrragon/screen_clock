@@ -24,13 +24,19 @@
 // Swift 側三個字面（channelName / onCoverageChangedMethod /
 // coveredArgKey）雖未集中於單一宣告處，仍各自以獨立字串字面存在於呼叫
 // 點，斷言「檔案內容含此字面」的驗證方式不要求集中宣告，故納入不增加
-// 額外成本。input_binding 則不納入：其 Swift 側除 channelName 外，另有
-// 5 個方法字面（queryPermission / requestPermission / updateBindings /
-// beginCaptureButton / endCaptureButton）與多個資料模型 JSON 鍵
-// （buttonNumber / action / type 等）交錯在同一組字串常數命名空間，
-// 何者屬「跨越 channel 邊界必須守衛」、何者屬「純 Dart 內部序列化鍵」
-// 需先梳理才能精準斷言，屬既有技術債（見票 how 段與 Solution），不在
-// 本票必要範圍內硬做。
+// 額外成本。
+//
+// ticket 1.4.0-W2-047：補齊 input_binding 守衛。梳理後 AppInputBinding
+// 的字面分兩類——(a) method channel 名稱與方法名（跨語言呼叫點字面，
+// 明確跨邊界）；(b) updateBindings 下傳的 binding JSON map 鍵與
+// action type 字串（Dart 序列化、Swift 解析同一組鍵，同樣跨邊界，非
+// 純 Dart 內部序列化鍵，先前註解的推測不成立）。兩類共 18 個字面，皆已
+// 逐一確認以獨立字串字面存在於 InputBindingBridge.swift。
+// onPermissionChangedMethod（'onPermissionChanged'）與
+// grantedArgKey（'granted'）兩個常數為 Dart 側預先定義、Swift 端尚未
+// 實作 invokeMethod 呼叫的未來功能（授權狀態變化通知，見
+// lib/app_constants.dart 297-301 行註解），非既有不一致，故不列入本測試
+// 斷言範圍——待該功能於 Swift 端實作後另行補上對應斷言。
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -45,8 +51,9 @@ void main() {
   //
   // ticket 1.4.0-W2-015：MainFlutterWindow.swift 拆分為多檔後，
   // cursor_locator 字面移至 CursorLocatorBridge.swift、
-  // fullscreen_detect 字面移至 FullscreenCoverageDetector.swift。
-  // 兩檔內容合併比對，維持本測試「跨越 channel 邊界必須守衛」的原意。
+  // fullscreen_detect 字面移至 FullscreenCoverageDetector.swift、
+  // input_binding 字面移至 InputBindingBridge.swift。三檔內容合併比對，
+  // 維持本測試「跨越 channel 邊界必須守衛」的原意。
   final String runnerDir = '${Directory.current.path}/macos/Runner';
   late String swiftSource;
 
@@ -54,6 +61,7 @@ void main() {
     swiftSource = <String>[
       File('$runnerDir/CursorLocatorBridge.swift').readAsStringSync(),
       File('$runnerDir/FullscreenCoverageDetector.swift').readAsStringSync(),
+      File('$runnerDir/InputBindingBridge.swift').readAsStringSync(),
     ].join('\n');
   });
 
@@ -92,6 +100,80 @@ void main() {
 
     test('coveredArgKey', () {
       expectExactLiteralInSwift(AppFullscreenDetect.coveredArgKey);
+    });
+  });
+
+  group('AppInputBinding 字面須存在於 Swift 端', () {
+    test('channelName', () {
+      expectExactLiteralInSwift(AppInputBinding.channelName);
+    });
+
+    test('queryPermissionMethod', () {
+      expectExactLiteralInSwift(AppInputBinding.queryPermissionMethod);
+    });
+
+    test('requestPermissionMethod', () {
+      expectExactLiteralInSwift(AppInputBinding.requestPermissionMethod);
+    });
+
+    test('updateBindingsMethod', () {
+      expectExactLiteralInSwift(AppInputBinding.updateBindingsMethod);
+    });
+
+    test('beginCaptureButtonMethod', () {
+      expectExactLiteralInSwift(AppInputBinding.beginCaptureButtonMethod);
+    });
+
+    test('endCaptureButtonMethod', () {
+      expectExactLiteralInSwift(AppInputBinding.endCaptureButtonMethod);
+    });
+
+    test('onButtonCapturedMethod', () {
+      expectExactLiteralInSwift(AppInputBinding.onButtonCapturedMethod);
+    });
+
+    test('bindingsArgKey', () {
+      expectExactLiteralInSwift(AppInputBinding.bindingsArgKey);
+    });
+
+    test('capturedButtonNumberArgKey', () {
+      expectExactLiteralInSwift(AppInputBinding.capturedButtonNumberArgKey);
+    });
+
+    test('buttonNumberKey', () {
+      expectExactLiteralInSwift(AppInputBinding.buttonNumberKey);
+    });
+
+    test('actionKey', () {
+      expectExactLiteralInSwift(AppInputBinding.actionKey);
+    });
+
+    test('actionTypeKey', () {
+      expectExactLiteralInSwift(AppInputBinding.actionTypeKey);
+    });
+
+    test('dragScrollType', () {
+      expectExactLiteralInSwift(AppInputBinding.dragScrollType);
+    });
+
+    test('hotkeyType', () {
+      expectExactLiteralInSwift(AppInputBinding.hotkeyType);
+    });
+
+    test('directionKey', () {
+      expectExactLiteralInSwift(AppInputBinding.directionKey);
+    });
+
+    test('sensitivityKey', () {
+      expectExactLiteralInSwift(AppInputBinding.sensitivityKey);
+    });
+
+    test('keyCodeKey', () {
+      expectExactLiteralInSwift(AppInputBinding.keyCodeKey);
+    });
+
+    test('modifiersKey', () {
+      expectExactLiteralInSwift(AppInputBinding.modifiersKey);
     });
   });
 }
