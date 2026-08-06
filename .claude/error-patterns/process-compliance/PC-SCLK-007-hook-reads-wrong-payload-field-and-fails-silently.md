@@ -38,11 +38,37 @@ Claude Code 的 PostToolUse 事件 payload 中，工具執行結果位於 `tool_
 | `changelog-update-hook.py:126` | `input_data.get("tool_result", {})` | 欄位名錯誤，恆為空 dict |
 | `post-commit-fetch-hook.py:37` | `data.get("stdout", "")`（頂層而非巢狀） | 欄位層級錯誤，恆為空字串 |
 
-後兩者取得空值後，其 `is_commit_successful()` 類判斷因 stdout 不含 commit 成功特徵而回傳 False，隨即 return。CHANGELOG 更新檢查與 commit 後背景 fetch 兩項功能，自註冊起未曾實際執行。
+後兩者皆讀錯欄位而取得空值，但**取值後的後果相反**（2026-08-06 由 `1.4.0-W2-048` 全量日誌統計更正，本段初版誤判兩者皆未執行）：
+
+| Hook | 判定函式形態 | 空值輸入的結果 | 實際後果 |
+|------|------------|--------------|---------|
+| `post-commit-fetch-hook.py` | fail-closed（需 stdout 含 commit 成功特徵才繼續） | False → return | 靜默失效，0 個日誌檔，確為自註冊起未曾執行 |
+| `changelog-update-hook.py` | **fail-open**（`is_commit_successful()` 問「有無失敗特徵」而非「有無成功特徵」） | **True → 繼續執行** | 1542 個日誌檔中 18 行實際輸出，橫跨 2026-07-31 至 2026-08-06 |
+
+`changelog-update-hook.py:64-74` 的判定：
+
+```python
+def is_commit_successful(tool_result: dict) -> bool:
+    stdout = tool_result.get("stdout", "")   # tool_result 恆為 {} → ""
+    stderr = tool_result.get("stderr", "")
+    if "nothing to commit" in stdout or "Aborting" in stdout:
+        return False
+    if "nothing to commit" in stderr or "Aborting" in stderr:
+        return False
+    return True                               # 空字串無失敗特徵，恆走此路
+```
+
+**因此本模式有兩種後果形態，嚴重度不同**：fail-closed 者功能缺席（少做事）；fail-open 者功能誤動作（做錯事）——`changelog-update-hook` 對每一次 `git commit` 命令都當成功處理，包括失敗的、被 hook 擋下的、`nothing to commit` 的。後者更值得優先修，但外觀上更不像壞掉，因為它一直在產出看起來正常的輸出。
 
 **發現路徑具偶然性**：本缺陷並非被任何檢查機制捕獲，而是在處理另一個問題（四個 hook 重複註冊造成 git index.lock 競爭）時，因為必須逐項比對「合併版是否涵蓋被合併版的全部行為」，才在閱讀原始碼時撞見。若當時未設下「比對先於移除」的前置條件、逕行移除註冊，這兩個 hook 會被當作「功能已被合併版接手」而移除，缺陷連同其存在一起消失，永遠不會被記錄。
 
-**外顯訊號的不對稱**：同批重複註冊的第三個 hook（`commit-handoff-hook.py`）讀取欄位正確，因此每次 commit 產生兩份一字不差的提醒——這個雙份輸出被觀察到並觸發了調查。讀錯欄位的兩個反而完全沒有外顯訊號。**能被看見的是重複，不是缺席**。
+**外顯訊號的不對稱**：同批重複註冊的第三個 hook（`commit-handoff-hook.py`）讀取欄位正確，因此每次 commit 產生兩份一字不差的提醒——這個雙份輸出被觀察到並觸發了調查。讀錯欄位的兩個沒有「重複」這個外顯訊號。**能被看見的是重複，不是缺席**。
+
+**初版誤判的教訓（2026-08-06 補記）**：本 pattern 初版把兩個讀錯欄位的 hook 都寫成「未曾實際執行」。該判定源自對「讀錯欄位 → 空值 → 條件不滿足 → return」這條推論鏈的信任，未實際統計日誌。推論本身在 fail-closed 判定下成立，但它隱含假設了判定形態，而該假設未被檢查。
+
+此誤判隨後被複製到上游 canonical issue（`tarrragon/claude#35`）與下游 ticket，三份記錄同時失準。更正之所以發生，是因為後續 ticket 的派發 prompt 明確要求「以日誌獨立複驗，不要僅憑既有 error-pattern 敘述轉抄」（PC-SCLK-008 的防護）。
+
+**一份被廣泛引用的 error-pattern，其未經量測的推論會隨引用擴散並取得虛假的可信度。** 記錄「讀錯欄位」這個觀測事實是正確的；記錄「因此未曾執行」這個推論後果，應該先量測。
 
 ---
 
