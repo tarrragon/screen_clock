@@ -6,7 +6,7 @@ import '../app_constants.dart';
 
 /// 假全螢幕覆蓋偵測橋接（ticket 1.2.1-W2-001）。
 ///
-/// 監聽原生端（macos/Runner/MainFlutterWindow.swift 的
+/// 監聽原生端（macos/Runner/FullscreenCoverageDetector.swift 的
 /// [FullscreenCoverageDetector]）經 method channel 回報的覆蓋狀態變化，
 /// 將「目標螢幕是否被假全螢幕視窗鋪滿」轉成 Dart 端 callback。
 ///
